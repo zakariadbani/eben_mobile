@@ -1,50 +1,83 @@
-# Welcome to your Expo app 👋
+# EBEN Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+EBEN Mobile is a bilingual B2B2C auto-parts marketplace for Morocco. It connects clients looking for vehicle parts with prestataires (service providers and ferrailleurs).
 
-## Get started
+## Features
 
-1. Install dependencies
+- Separate Client and Prestataire experiences with role-based route access
+- Product discovery, categories, search, wishlist, cart, and checkout
+- Part requests, provider offers, orders, and shipment workflows
+- Vehicle, address, profile, notification, and wallet management
+- French and Arabic localization with LTR and RTL support
+- Typed API resources backed by local mock data during development
 
-   ```bash
-   npm install
-   ```
+## Tech stack
 
-2. Start the app
+- Expo SDK 51 and Expo Router 3
+- React Native 0.74 and React 18
+- TypeScript in strict mode
+- React i18next
+- AsyncStorage and Expo SecureStore
+- Jest with `jest-expo`
 
-   ```bash
-    npx expo start
-   ```
+## Getting started
 
-In the output, you'll find options to open the app in a
+### Prerequisites
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- Node.js and npm
+- Expo Go, an Android emulator, or an iOS simulator
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+### Installation
 
 ```bash
-npm run reset-project
+npm install
+npm run start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Follow the Expo prompt to open the app on a device or simulator.
 
-## Learn more
+## Commands
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+npm run start    # Start the Expo development server
+npm run android  # Build and run the Android app
+npm run ios      # Build and run the iOS app
+npm run web      # Start the web version
+npm run lint     # Run Expo ESLint
+npm test         # Run Jest in watch mode
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Project structure
 
-## Join the community
+```text
+src/
+├── api/           # API client, typed resources, and mock registry
+├── app/           # Expo Router routes grouped by role
+│   ├── (auth)/
+│   ├── (client)/
+│   └── (prestataire)/
+├── components/    # Shared UI components
+├── constants/     # App constants and route permissions
+├── context/       # Authentication and application providers
+├── interfaces/    # Shared domain types
+└── localization/  # French and Arabic translations
+```
 
-Join our community of developers creating universal apps.
+## API configuration
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+The app currently serves data through the mock registry in `src/api/mock/`. API calls are centralized in `src/api/client.ts`, and the backend base URL can be configured with:
+
+```bash
+EXPO_PUBLIC_API_BASE_URL=https://example.com/api/v1
+```
+
+Setting the variable alone does not enable live requests; the mock request block in `src/api/client.ts` must be replaced with the prepared `fetch` implementation when the backend integration is ready.
+
+## Localization
+
+User-facing copy lives in:
+
+- `src/localization/fr.json`
+- `src/localization/ar.json`
+
+Keep translation keys synchronized and verify visual changes in both French/LTR and Arabic/RTL.
