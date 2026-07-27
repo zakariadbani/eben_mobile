@@ -1,0 +1,142 @@
+import {
+  acceptOffer,
+  createRequest,
+  getOffers,
+  getRequest,
+  sendRequest,
+} from '@/api/resources/requests';
+import {
+  addToBasket,
+  getBasket,
+  removeBasketItem,
+  updateBasketItem,
+} from '@/api/resources/basket';
+import { getOrder, placeOrder } from '@/api/resources/orders';
+import {
+  getOfferShipment,
+  getPrestataireIncomingRequests,
+  getPrestataireOffer,
+  getPrestataireOffers,
+  shipOffer,
+  submitOffer,
+} from '@/api/resources/prestataire';
+import { resetMockStore } from '../goldenStore';
+
+describe('mock golden path', () => {
+  beforeEach(resetMockStore);
+
+  it('carries a multi-item request through exact basket, VAT order, and aggregate shipment', async () => {
+    const created = await createRequest({
+      vehicleId: 1,
+      items: [
+        { categoryId: 100, categoryTitle: 'Freins', quantity: 2, condition: 'occasion' },
+        { categoryId: 101, categoryTitle: 'Flexible', quantity: 1, condition: 'occasion' },
+      ],
+    });
+    await sendRequest(created.data.id);
+    expect((await getPrestataireIncomingRequests()).data.some(({ id }) => id === created.data.id)).toBe(true);
+
+    const request = await getRequest(created.data.id);
+    const [firstItem, secondItem] = request.data.items!;
+    await submitOffer(created.data.id, {
+      lines: [
+        { requestItemId: firstItem!.id, priceFerrailleur: 101.25, condition: 'occasion', description: 'Freins', images: [] },
+        { requestItemId: secondItem!.id, priceFerrailleur: 50.55, condition: 'occasion', description: 'Flexible', images: [] },
+      ],
+    });
+
+    const clientOffers = await getOffers(created.data.id);
+    expect(clientOffers.data).toHaveLength(2);
+    expect(clientOffers.data[0]).not.toHaveProperty('priceFerrailleur');
+    expect(clientOffers.data[0]).not.toHaveProperty('priceBc');
+    const partnerOffers = (await getPrestataireOffers('active')).data
+      .filter(({ requestId }) => requestId === created.data.id);
+    expect(await getPrestataireOffer(partnerOffers[0]!.id)).toEqual(expect.objectContaining({
+      data: expect.objectContaining({ priceFerrailleur: 50.55, priceClient: 53.58, priceBc: 47.52 }),
+    }));
+
+    for (const offer of partnerOffers) await acceptOffer(offer.id);
+    const selectedIds = partnerOffers.map(({ id }) => id).sort((a, b) => a - b);
+    const basket = await getBasket();
+    expect(basket.data.items?.map(({ offerId }) => offerId).sort((a, b) => a - b)).toEqual(selectedIds);
+    await expect(shipOffer(selectedIds[0]!, { trackingNumber: 'TOO-EARLY' }))
+      .rejects.toThrow('Confirmed order item not found');
+
+    const placed = await placeOrder({ addressId: 1, paymentMethod: 'cod' });
+    expect(placed.data).toMatchObject({ subtotal: 268.24, total: 321.89, status: 'confirmed' });
+    expect((await getRequest(created.data.id)).data.status).toBe('ordered');
+    expect((await getBasket()).data.items).toEqual([]);
+
+    await shipOffer(selectedIds[0]!, { trackingNumber: 'TRACK-1' });
+    let order = await getOrder(placed.data.id);
+    expect(order.data.status).toBe('confirmed');
+    expect(order.data.items?.map(({ status }) => status).sort()).toEqual(['confirmed', 'shipped']);
+
+    await shipOffer(selectedIds[1]!, { trackingNumber: 'TRACK-2' });
+    order = await getOrder(placed.data.id);
+    expect(order.data.status).toBe('shipped');
+    expect(order.data.items?.every(({ status }) => status === 'shipped')).toBe(true);
+    expect((await getOfferShipment(selectedIds[1]!)).data?.trackingNumber).toBe('TRACK-2');
+  });
+
+  it('validates request identifiers and quantities at the store boundary', async () => {
+    const validItem = { categoryId: 100, quantity: 1, condition: 'occasion' as const };
+    await expect(createRequest({ vehicleId: 0, items: [validItem] })).rejects.toThrow('Invalid request payload');
+    await expect(createRequest({ vehicleId: 1.5, items: [validItem] })).rejects.toThrow('Invalid request payload');
+    await expect(createRequest({ vehicleId: 1, items: [{ ...validItem, categoryId: -1 }] })).rejects.toThrow('Invalid request payload');
+    await expect(createRequest({ vehicleId: 1, items: [{ ...validItem, categoryId: 1.5 }] })).rejects.toThrow('Invalid request payload');
+    await expect(createRequest({ vehicleId: 1, items: [{ ...validItem, quantity: 0 }] })).rejects.toThrow('Invalid request payload');
+    await expect(createRequest({ vehicleId: 1, items: [{ ...validItem, quantity: 1.5 }] })).rejects.toThrow('Invalid request payload');
+  });
+
+  it('rejects duplicate, foreign, and invalid offer lines', async () => {
+    const created = await createRequest({
+      vehicleId: 1,
+      items: [{ categoryId: 100, quantity: 1, condition: 'occasion' }],
+    });
+    await sendRequest(created.data.id);
+    const itemId = (await getRequest(created.data.id)).data.items![0]!.id;
+    const line = { requestItemId: itemId, priceFerrailleur: 10, condition: 'occasion' as const, description: null, images: [] };
+
+    await expect(submitOffer(created.data.id, { lines: [line, line] })).rejects.toThrow('Invalid offer lines');
+    await expect(submitOffer(created.data.id, { lines: [{ ...line, requestItemId: 999999 }] })).rejects.toThrow('Invalid offer lines');
+    await expect(submitOffer(created.data.id, { lines: [{ ...line, priceFerrailleur: Number.NaN }] })).rejects.toThrow('Invalid offer lines');
+    await expect(submitOffer(created.data.id, { lines: [{ ...line, priceFerrailleur: 0 }] })).rejects.toThrow('Invalid offer lines');
+    await expect(submitOffer(created.data.id, { lines: [{ ...line, priceFerrailleur: 0.001 }] })).rejects.toThrow('Invalid offer lines');
+    await expect(submitOffer(created.data.id, { lines: [{ ...line, priceFerrailleur: Number.MAX_VALUE }] })).rejects.toThrow('Invalid offer lines');
+  });
+
+  it('replaces a selected competing offer for the same request item', async () => {
+    const created = await createRequest({
+      vehicleId: 1,
+      items: [{ categoryId: 100, quantity: 1, condition: 'occasion' }],
+    });
+    await sendRequest(created.data.id);
+    const requestItemId = (await getRequest(created.data.id)).data.items![0]!.id;
+    const first = await submitOffer(created.data.id, {
+      lines: [{ requestItemId, priceFerrailleur: 100, condition: 'occasion', description: null, images: [] }],
+    });
+    const second = await submitOffer(created.data.id, {
+      lines: [{ requestItemId, priceFerrailleur: 120, condition: 'occasion', description: null, images: [] }],
+    });
+
+    await acceptOffer(first.data.offerId);
+    await acceptOffer(second.data.offerId);
+
+    expect((await getBasket()).data.items).toEqual([
+      expect.objectContaining({ offerId: second.data.offerId, unitPrice: 127.2 }),
+    ]);
+    expect((await getPrestataireOffer(first.data.offerId)).data.status).toBe('validated');
+    expect((await getPrestataireOffer(second.data.offerId)).data.status).toBe('selected');
+  });
+
+  it('mutates direct-product basket items and rejects unknown ids', async () => {
+    const added = await addToBasket(1002, 1);
+    const item = added.data.items!.find(({ offerId }) => offerId === 1002)!;
+    expect((await updateBasketItem(item.id, 3)).data.items)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ id: item.id, quantity: 3 })]));
+    expect((await removeBasketItem(item.id)).data.items?.some(({ id }) => id === item.id)).toBe(false);
+    await expect(addToBasket(999999, 1)).rejects.toThrow('not found');
+    await expect(getRequest(999999)).rejects.toThrow('not found');
+  });
+});

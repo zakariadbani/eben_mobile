@@ -1,0 +1,622 @@
+/**
+ * My Orders List — "(client)/settings/orders"
+ * Figma: "Profile-My-orders"
+ *
+ * Shows paginated list of the user's orders with:
+ *   - Toolbar: month picker (left) + sort asc/desc + filter funnel (right)
+ *   - Month filter: shows only orders from the selected month
+ *   - Sort: by createdAt asc/desc
+ *   - Status filter: checkbox per status present in data (ConfirmModal slide-up)
+ *   - OrderCard: Details→ link top-right, green date, yellow CTA bottom-right
+ */
+
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import Screen from '@/components/common/Screen';
+import View from '@/components/common/View';
+import { Text } from '@/components/common/Text';
+import Colors from '@/constants/Colors';
+import EmptyListComponent from '@/components/screens/shared/app/EmptyListComponent';
+import Icon from '@/components/common/Icon';
+import ConfirmModal from '@/components/common/ConfirmModal';
+import { getOrders } from '@/api/resources/orders';
+import type { Order, OrderStatus } from '@/interfaces/Order';
+
+// ── Status display config ────────────────────────────────────────────────────
+
+const ORDER_STATUS_CONFIG: Record<
+  OrderStatus,
+  {
+    labelFr: string;
+    labelAr: string;
+    color: string;
+    background: string;
+    icon: string;
+    descFr: string;
+    descAr: string;
+    ctaLabelFr: string;
+    ctaLabelAr: string;
+  }
+> = {
+  pending: {
+    labelFr: 'En attente',
+    labelAr: 'قيد الانتظار',
+    color: Colors.orange,
+    background: '#FEF3C7',
+    icon: 'credit-card',
+    descFr: 'Nous attendons le paiement',
+    descAr: 'نحن بانتظار الدفع',
+    ctaLabelFr: 'Payez',
+    ctaLabelAr: 'ادفع',
+  },
+  confirmed: {
+    labelFr: 'Confirmée',
+    labelAr: 'مؤكدة',
+    color: Colors.blue,
+    background: '#DBEAFE',
+    icon: 'check-circle',
+    descFr: 'Votre commande est en cours de traitement',
+    descAr: 'طلبك قيد المعالجة',
+    ctaLabelFr: "Suivi de l'ordre",
+    ctaLabelAr: 'تتبع الطلب',
+  },
+  processing: {
+    labelFr: 'En traitement',
+    labelAr: 'قيد المعالجة',
+    color: Colors.processMedium,
+    background: '#EEF2FF',
+    icon: 'package',
+    descFr: 'Votre commande est en cours de traitement',
+    descAr: 'طلبك قيد المعالجة',
+    ctaLabelFr: "Suivi de l'ordre",
+    ctaLabelAr: 'تتبع الطلب',
+  },
+  shipped: {
+    labelFr: 'En route',
+    labelAr: 'في الطريق',
+    color: Colors.greenDark,
+    background: Colors.green + '33',
+    icon: 'truck',
+    descFr: 'Votre commande est en route',
+    descAr: 'طلبك في الطريق',
+    ctaLabelFr: "Suivi de l'ordre",
+    ctaLabelAr: 'تتبع الطلب',
+  },
+  delivered: {
+    labelFr: 'Livré',
+    labelAr: 'تم التسليم',
+    color: Colors.greenDark,
+    background: Colors.green + '33',
+    icon: 'check-square',
+    descFr: 'Votre commande a été livrée',
+    descAr: 'تم تسليم طلبك',
+    ctaLabelFr: "Suivi de l'ordre",
+    ctaLabelAr: 'تتبع الطلب',
+  },
+  cancelled: {
+    labelFr: 'Annulée',
+    labelAr: 'ملغاة',
+    color: Colors.red,
+    background: '#FEE2E2',
+    icon: 'x-circle',
+    descFr: 'Votre commande a été annulée',
+    descAr: 'تم إلغاء طلبك',
+    ctaLabelFr: 'Détails',
+    ctaLabelAr: 'التفاصيل',
+  },
+  refunded: {
+    labelFr: 'Remboursée',
+    labelAr: 'مُستردة',
+    color: Colors.grayMidDark,
+    background: Colors.backgroundGray,
+    icon: 'rotate-ccw',
+    descFr: 'Votre commande a été remboursée',
+    descAr: 'تم استرداد مبلغ طلبك',
+    ctaLabelFr: 'Détails',
+    ctaLabelAr: 'التفاصيل',
+  },
+};
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Returns "YYYY-MM" key for a createdAt ISO string — used as month bucket key. */
+function monthKey(createdAt: string): string {
+  return createdAt.slice(0, 7); // "2022-12"
+}
+
+/** Formats "YYYY-MM" key as localized month label, e.g. "December 2022". */
+function formatMonthLabel(key: string, locale: string): string {
+  const [year, month] = key.split('-');
+  const date = new Date(Number(year), Number(month) - 1, 1);
+  return date.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+}
+
+// ── Order card ───────────────────────────────────────────────────────────────
+
+interface OrderCardProps {
+  order: Order;
+  onPress: () => void;
+}
+
+const OrderCard: React.FC<OrderCardProps> = ({ order, onPress }) => {
+  const { i18n } = useTranslation();
+  const isAr = i18n.language === 'ar';
+  const cfg = ORDER_STATUS_CONFIG[order.status] ?? ORDER_STATUS_CONFIG.pending;
+
+  const dateStr = new Date(order.createdAt).toLocaleDateString(
+    isAr ? 'ar-MA' : 'fr-MA',
+    { day: '2-digit', month: 'long', year: 'numeric' },
+  );
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.75} style={styles.card}>
+      {/* Details link — top-right of card */}
+      <View flexDirection="row" alignItems="flex-start" gap={12}>
+        {/* Status-specific icon */}
+        <View style={styles.iconWrapper}>
+          <Icon name={cfg.icon} size={32} iconColor={cfg.color} type="Feather" />
+        </View>
+
+        {/* Info column */}
+        <View flex gap={4}>
+          {/* Ref row + Details link */}
+          <View flexDirection="row" alignItems="center" justifyContent="space-between">
+            <View flexDirection="row" alignItems="center" gap={6}>
+              <Text type="small" color={Colors.gray} translate={false}>
+                {isAr ? 'المرجع:' : 'Ref:'}
+              </Text>
+              <Text type="small" semiBold color={Colors.brand} translate={false}>
+                {order.reference}
+              </Text>
+            </View>
+            {/* Details → link */}
+            <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.detailsLink}>
+              <Text type="small" semiBold color={Colors.brand} translate={false}>
+                {isAr ? 'التفاصيل' : 'Details'}
+              </Text>
+              <Icon name="arrow-right" size={14} iconColor={Colors.brand} type="Feather" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Status description */}
+          <Text type="small" color={Colors.grayMidDark} translate={false}>
+            {isAr ? cfg.descAr : cfg.descFr}
+          </Text>
+
+          {/* Date — green per Figma */}
+          <Text type="small" color={Colors.greenDark} translate={false}>
+            {dateStr}
+          </Text>
+
+          {/* Status badge + CTA row */}
+          <View flexDirection="row" alignItems="center" justifyContent="space-between">
+            <View style={[styles.statusBadge, { backgroundColor: cfg.background }]}>
+              <Text type="small" color={cfg.color} translate={false}>
+                {isAr ? cfg.labelAr : cfg.labelFr}
+              </Text>
+            </View>
+            {/* Yellow CTA button bottom-right */}
+            <TouchableOpacity onPress={onPress} style={styles.ctaBtn} activeOpacity={0.8}>
+              <Text type="small" semiBold color={Colors.brand} translate={false}>
+                {isAr ? cfg.ctaLabelAr : cfg.ctaLabelFr}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+// ── Toolbar ──────────────────────────────────────────────────────────────────
+
+interface ToolbarProps {
+  monthLabel: string;
+  sortDir: 'asc' | 'desc';
+  onMonthPress: () => void;
+  onSortAsc: () => void;
+  onSortDesc: () => void;
+  onFilter: () => void;
+}
+
+const Toolbar: React.FC<ToolbarProps> = ({
+  monthLabel,
+  sortDir,
+  onMonthPress,
+  onSortAsc,
+  onSortDesc,
+  onFilter,
+}) => (
+  <View
+    flexDirection="row"
+    alignItems="center"
+    justifyContent="space-between"
+    style={styles.toolbar}
+  >
+    {/* Month + chevron */}
+    <TouchableOpacity onPress={onMonthPress} activeOpacity={0.75} style={styles.monthBtn}>
+      <Text type="label" semiBold color={Colors.brand} translate={false}>
+        {monthLabel}
+      </Text>
+      <Icon name="chevron-down" size={18} iconColor={Colors.brand} type="Feather" />
+    </TouchableOpacity>
+
+    {/* Sort + filter icons */}
+    <View flexDirection="row" alignItems="center" gap={16}>
+      <TouchableOpacity onPress={onSortAsc} activeOpacity={0.7}>
+        <Icon
+          name="arrow-up"
+          size={20}
+          iconColor={sortDir === 'asc' ? Colors.primary : Colors.gray}
+          type="Feather"
+        />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onSortDesc} activeOpacity={0.7}>
+        <Icon
+          name="arrow-down"
+          size={20}
+          iconColor={sortDir === 'desc' ? Colors.primary : Colors.gray}
+          type="Feather"
+        />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onFilter} activeOpacity={0.7}>
+        <Icon name="filter" size={20} iconColor={Colors.gray} type="Feather" />
+      </TouchableOpacity>
+    </View>
+  </View>
+);
+
+// ── Screen ───────────────────────────────────────────────────────────────────
+
+const OrdersListScreen: React.FC = () => {
+  const router = useRouter();
+  const { state } = useLocalSearchParams<{ state?: string }>();
+  const { i18n } = useTranslation();
+  const isAr = i18n.language === 'ar';
+  const locale = isAr ? 'ar-MA' : 'fr-MA';
+
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Toolbar state
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [selectedMonth, setSelectedMonth] = useState<string>(''); // "YYYY-MM"
+
+  // Filter modal state
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [pendingStatuses, setPendingStatuses] = useState<Set<OrderStatus>>(new Set());
+  const [activeStatuses, setActiveStatuses] = useState<Set<OrderStatus>>(new Set());
+
+  // Month picker modal state
+  const [monthPickerVisible, setMonthPickerVisible] = useState(false);
+
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await getOrders();
+      const data: Order[] = res.data;
+      setOrders(data);
+
+      // Default to most recent month
+      if (data.length > 0) {
+        const keys = data.map((o) => monthKey(o.createdAt)).sort().reverse();
+        setSelectedMonth(keys[0]);
+      }
+    } catch {
+      setError('Impossible de charger les commandes');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /** Distinct month keys sorted newest-first. */
+  const availableMonths = useMemo(() => {
+    const keys = Array.from(new Set(orders.map((o) => monthKey(o.createdAt))));
+    return keys.sort().reverse();
+  }, [orders]);
+
+  /** Statuses present in the full dataset (not filtered by month). */
+  const availableStatuses = useMemo((): OrderStatus[] => {
+    return Array.from(new Set(orders.map((o) => o.status))) as OrderStatus[];
+  }, [orders]);
+
+  /** Visible orders after month + status filters + sort. */
+  const visibleOrders = useMemo(() => {
+    if (state === 'empty') return [];
+    let filtered = orders.filter((o) => monthKey(o.createdAt) === selectedMonth);
+    if (activeStatuses.size > 0) {
+      filtered = filtered.filter((o) => activeStatuses.has(o.status));
+    }
+    return [...filtered].sort((a, b) => {
+      const diff =
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      return sortDir === 'asc' ? diff : -diff;
+    });
+  }, [orders, selectedMonth, activeStatuses, sortDir, state]);
+
+  const monthLabel = selectedMonth
+    ? formatMonthLabel(selectedMonth, locale)
+    : '';
+
+  // ── Filter modal handlers ─────────────────────────────────────────────────
+
+  const openFilter = () => {
+    setPendingStatuses(new Set(activeStatuses));
+    setFilterVisible(true);
+  };
+
+  const togglePending = (status: OrderStatus) => {
+    setPendingStatuses((prev) => {
+      const next = new Set(prev);
+      if (next.has(status)) next.delete(status);
+      else next.add(status);
+      return next;
+    });
+  };
+
+  const applyFilter = () => {
+    setActiveStatuses(new Set(pendingStatuses));
+    setFilterVisible(false);
+  };
+
+  const resetFilter = () => {
+    setPendingStatuses(new Set());
+    setActiveStatuses(new Set());
+    setFilterVisible(false);
+  };
+
+  // ── Loading / error guards ────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <Screen>
+        <View flex alignItems="center" style={{ justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (error) {
+    return (
+      <Screen>
+        <View flex alignItems="center" style={{ justifyContent: 'center', padding: 24 }}>
+          <Text type="label" color={Colors.error} center>
+            {error}
+          </Text>
+        </View>
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen>
+      {/* Toolbar */}
+      <Toolbar
+        monthLabel={monthLabel}
+        sortDir={sortDir}
+        onMonthPress={() => setMonthPickerVisible(true)}
+        onSortAsc={() => setSortDir('asc')}
+        onSortDesc={() => setSortDir('desc')}
+        onFilter={openFilter}
+      />
+
+      {/* Orders list */}
+      <FlatList
+        data={visibleOrders}
+        keyExtractor={(item) => String(item.id)}
+        contentContainerStyle={styles.listContent}
+        renderItem={({ item }) => (
+          <OrderCard
+            order={item}
+            onPress={() =>
+              router.push(
+                `/(client)/settings/orders/${item.id}` as never,
+              )
+            }
+          />
+        )}
+        ListEmptyComponent={
+          <EmptyListComponent
+            title={
+              orders.length === 0
+                ? (isAr ? 'لا توجد طلبات' : 'Vous n\'avez pas de commandes')
+                : (isAr ? 'لا توجد نتائج لهذا الفلتر' : 'Aucun résultat pour ce filtre')
+            }
+            styleContainer={{ marginTop: 60 }}
+          />
+        }
+      />
+
+      {/* Filter bottom-sheet (reuses existing ConfirmModal) */}
+      <ConfirmModal
+        visible={filterVisible}
+        onClose={() => setFilterVisible(false)}
+        primaryButton={{
+          title: isAr ? 'تطبيق' : 'Appliquer',
+          onPress: applyFilter,
+          variant: 'primary',
+        }}
+        secondaryButton={{
+          title: isAr ? 'إعادة تعيين' : 'Réinitialiser',
+          onPress: resetFilter,
+          bordless: true,
+        }}
+      >
+        <Text type="headerTitle" semiBold color={Colors.brand} translate={false}>
+          {isAr ? 'الفلاتر' : 'Filters'}
+        </Text>
+        {availableStatuses.map((status) => {
+          const cfg = ORDER_STATUS_CONFIG[status];
+          const label = isAr ? cfg.labelAr : cfg.labelFr;
+          const checked = pendingStatuses.has(status);
+          return (
+            <TouchableOpacity
+              key={status}
+              onPress={() => togglePending(status)}
+              activeOpacity={0.75}
+              style={styles.filterRow}
+            >
+              <Text type="label" color={Colors.brand} translate={false}>
+                {label}
+              </Text>
+              {/* Checkbox — right side (mirrors Figma; RTL flex handles direction) */}
+              <View
+                style={[
+                  styles.checkbox,
+                  checked && styles.checkboxChecked,
+                ]}
+              >
+                {checked && (
+                  <Icon name="check" size={14} iconColor={Colors.white} type="Feather" />
+                )}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </ConfirmModal>
+
+      {/* Month picker bottom-sheet */}
+      <ConfirmModal
+        visible={monthPickerVisible}
+        onClose={() => setMonthPickerVisible(false)}
+        primaryButton={{
+          title: isAr ? 'إغلاق' : 'Fermer',
+          onPress: () => setMonthPickerVisible(false),
+          bordless: true,
+        }}
+      >
+        <Text type="headerTitle" semiBold color={Colors.brand} translate={false}>
+          {isAr ? 'اختر الشهر' : 'Choisir le mois'}
+        </Text>
+        {availableMonths.map((key) => {
+          const label = formatMonthLabel(key, locale);
+          const active = key === selectedMonth;
+          return (
+            <TouchableOpacity
+              key={key}
+              onPress={() => {
+                setSelectedMonth(key);
+                setMonthPickerVisible(false);
+              }}
+              activeOpacity={0.75}
+              style={styles.monthPickerRow}
+            >
+              <Text
+                type="label"
+                semiBold={active}
+                color={active ? Colors.primary : Colors.brand}
+                translate={false}
+              >
+                {label}
+              </Text>
+              {active && (
+                <Icon name="check" size={16} iconColor={Colors.primary} type="Feather" />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </ConfirmModal>
+    </Screen>
+  );
+};
+
+const styles = StyleSheet.create({
+  toolbar: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+    backgroundColor: Colors.white,
+  },
+  monthBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  listContent: {
+    flexGrow: 1,
+    padding: 16,
+    gap: 10,
+  },
+  card: {
+    backgroundColor: Colors.white,
+    borderRadius: 10,
+    padding: 14,
+    shadowColor: Colors.borderLight,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  iconWrapper: {
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  statusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  ctaBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 80,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: Colors.gray,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  monthPickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+});
+
+export default OrdersListScreen;
