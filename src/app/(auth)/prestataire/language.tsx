@@ -43,14 +43,20 @@ const styles = StyleSheet.create({
   background: {
     flex: 1,
     justifyContent: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 40,
+    paddingHorizontal: 16,
   },
   title: {
-    marginBottom: 24,
+    fontSize: 28,
+    marginBottom: 12,
   },
   button: {
-    marginTop: 32,
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 176,
+    borderRadius: 4,
+    minHeight: 44,
+    width: "auto",
   },
 });
 

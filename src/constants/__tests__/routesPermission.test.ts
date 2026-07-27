@@ -1,8 +1,13 @@
-import { canAccessRoute } from "../routesPermission";
+import {
+  canAccessRoute,
+  getUnauthenticatedRedirect,
+} from "../routesPermission";
 
 describe("route permissions", () => {
   it.each([
     ["guest", undefined, "(prestataire)/dashboard"],
+    ["guest profile", undefined, "(client)/settings/index"],
+    ["guest profile edit", undefined, "(client)/settings/profile/index"],
     ["client", "client" as const, "(prestataire)/dashboard"],
     ["prestataire", "prestataire" as const, "(client)/settings/index"],
     ["prestataire preview", "prestataire" as const, "(client)/index"],
@@ -36,6 +41,15 @@ describe("route permissions", () => {
     expect(
       canAccessRoute("(prestataire)/dashboard", "prestataire"),
     ).toBe(true);
+  });
+
+  it("uses the correct unauthenticated fallback for each app area", () => {
+    expect(getUnauthenticatedRedirect("(client)/settings/profile/index")).toBe(
+      "/(auth)/ClientAuthenticationOptionsScreen",
+    );
+    expect(getUnauthenticatedRedirect("(prestataire)/profile")).toBe(
+      "/(auth)",
+    );
   });
 
   it("denies malformed persisted roles without crashing", () => {

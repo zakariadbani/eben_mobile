@@ -933,5 +933,9 @@
   "partner.search.loadError": "تعذر تحميل الطلبات",
   "requestList.reference": "القائمة رقم {{reference}}",
   "requestList.condition": "الحالة: {{condition}}",
-  "requestList.quantity": "الكمية: {{count}}"
+  "requestList.quantity": "الكمية: {{count}}",
+  "guestAuth.title": "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644",
+  "guestAuth.body": "\u064a\u062c\u0628 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0623\u0648 \u0625\u0646\u0634\u0627\u0621 \u062d\u0633\u0627\u0628 \u0644\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0645\u0644\u0641\u0643 \u0627\u0644\u0634\u062e\u0635\u064a.",
+  "guestAuth.createAccount": "\u0625\u0646\u0634\u0627\u0621 \u062d\u0633\u0627\u0628",
+  "guestAuth.signIn": "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644"
 }

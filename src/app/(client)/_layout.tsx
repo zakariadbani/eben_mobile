@@ -1,5 +1,5 @@
 import { Href, Tabs, useRouter } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import { Image, Platform, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -12,6 +12,7 @@ import CustomHeader from "@/components/common/CustomHeader";
 import CustomIcon from "@/components/common/CustomIcon";
 import GoBack from "@/components/common/GoBack";
 import { Text } from "@/components/common/Text";
+import ConfirmModal from "@/components/common/ConfirmModal";
 import { useSession } from "@/context/AuthContext";
 
 // Minimal type alias so tabBarIcon/tabBarLabel callbacks are typed without
@@ -119,6 +120,10 @@ const styles = StyleSheet.create({
   textRtl: {
     textAlign: "right",
   },
+  guestAuthContent: {
+    paddingVertical: 20,
+    gap: 12,
+  },
 });
 
 const TyreSearchHeader: React.FC = () => {
@@ -182,7 +187,9 @@ const ClientHomeHeader: React.FC = () => {
 // ---------------------------------------------------------------------------
 export default function ClientLayout() {
   const { t } = useTranslation();
+  const { session } = useSession();
   const router = useRouter();
+  const [guestAuthVisible, setGuestAuthVisible] = useState(false);
 
   const customHeader = (props: { options: { title?: string } }) => (
     <CustomHeader
@@ -275,16 +282,17 @@ export default function ClientLayout() {
   const mainHeaderFn = () => <MainHeader />;
 
   return (
-    <Tabs
-      initialRouteName="index"
-      backBehavior="history"
-      screenOptions={{
-        headerShown: true,
-        header: customHeader,
-        tabBarStyle: TAB_BAR_STYLE.bar,
-        tabBarItemStyle: TAB_BAR_STYLE.item,
-      }}
-    >
+    <>
+      <Tabs
+        initialRouteName="index"
+        backBehavior="history"
+        screenOptions={{
+          headerShown: true,
+          header: customHeader,
+          tabBarStyle: TAB_BAR_STYLE.bar,
+          tabBarItemStyle: TAB_BAR_STYLE.item,
+        }}
+      >
       {/* ================================================================
           TAB 1 — Home
           ================================================================ */}
@@ -519,6 +527,14 @@ export default function ClientLayout() {
           ================================================================ */}
       <Tabs.Screen
         name="settings/index"
+        listeners={{
+          tabPress: (event: { preventDefault: () => void }) => {
+            if (!session) {
+              event.preventDefault();
+              setGuestAuthVisible(true);
+            }
+          },
+        }}
         options={{
           title: t("Profil"),
           tabBarIcon: ({ focused }: FocusedParam) => (
@@ -589,6 +605,36 @@ export default function ClientLayout() {
         options={{ title: t("Langue"), tabBarButton: () => null }}
       />
 
-    </Tabs>
+      </Tabs>
+      <ConfirmModal
+        visible={guestAuthVisible}
+        onClose={() => setGuestAuthVisible(false)}
+        secondaryButton={{
+          title: t("guestAuth.createAccount"),
+          variant: "brand",
+          outline: true,
+          onPress: () => {
+            setGuestAuthVisible(false);
+            router.push("/(auth)/ClientRegisterScreen" as Href);
+          },
+        }}
+        primaryButton={{
+          title: t("guestAuth.signIn"),
+          onPress: () => {
+            setGuestAuthVisible(false);
+            router.push("/(auth)/ClientLoginScreen" as Href);
+          },
+        }}
+      >
+        <View style={styles.guestAuthContent}>
+          <Text type="headerTitle" center>
+            {t("guestAuth.title")}
+          </Text>
+          <Text type="text" center>
+            {t("guestAuth.body")}
+          </Text>
+        </View>
+      </ConfirmModal>
+    </>
   );
 }

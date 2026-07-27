@@ -16,6 +16,7 @@ import { NotificationProvider } from "@/context/NotificationContext";
 import { useTranslation } from "react-i18next";
 import {
   canAccessRoute,
+  getUnauthenticatedRedirect,
   type AuthenticatedRole,
 } from "@/constants/routesPermission";
 import { ConfirmationProvider } from "@/context/ConfirmationContext";
@@ -107,7 +108,7 @@ const StackLayout = () => {
       if (canAccessRoute(currentRoute)) {
         return;
       }
-      router.replace("/(auth)" as Href);
+      router.replace(getUnauthenticatedRedirect(currentRoute) as Href);
       return;
     }
 

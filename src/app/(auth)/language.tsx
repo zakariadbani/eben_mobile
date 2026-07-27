@@ -34,7 +34,7 @@ const LanguageScreen = () => {
         <Text type="loginTitle" style={styles.title}>
           Choisissez votre langue
         </Text>
-        <LanguagePicker style={styles.picker} />
+        <LanguagePicker />
         <Button
           title="Continuer"
           navigateTo="/(auth)/WelcomeRoleSelectionScreen"
@@ -49,20 +49,20 @@ const styles = StyleSheet.create({
   background: {
     flex: 1,
     paddingHorizontal: 16,
+    justifyContent: "center",
   },
   title: {
     fontSize: 28,
-    marginTop: "auto",
     marginBottom: 12,
   },
-  picker: {
-    marginTop: -30,
-  },
   button: {
-    marginTop: 116,
-    marginBottom: 95,
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 176,
     borderRadius: 4,
     minHeight: 44,
+    width: "auto",
   },
 });
 

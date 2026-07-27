@@ -704,5 +704,9 @@
   "Occasion": "Occasion",
   "requestList.reference": "Liste Nº {{reference}}",
   "requestList.condition": "État : {{condition}}",
-  "requestList.quantity": "Qté : {{count}}"
+  "requestList.quantity": "Qté : {{count}}",
+  "guestAuth.title": "Connectez-vous",
+  "guestAuth.body": "Vous devez vous connecter ou cr\u00e9er un compte pour acc\u00e9der \u00e0 votre profil.",
+  "guestAuth.createAccount": "Cr\u00e9er un compte",
+  "guestAuth.signIn": "Se connecter"
 }

@@ -190,6 +190,12 @@ const allowedRoutes: Record<AllowedRole, string[]> = {
   ],
 };
 
+export function getUnauthenticatedRedirect(route: string): string {
+  return route.startsWith("(client)")
+    ? "/(auth)/ClientAuthenticationOptionsScreen"
+    : "/(auth)";
+}
+
 export function canAccessRoute(
   route: string,
   role?: AuthenticatedRole,
