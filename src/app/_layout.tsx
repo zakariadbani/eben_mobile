@@ -12,6 +12,7 @@ import { View, ActivityIndicator } from "react-native";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { SessionProvider, useSession } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
+import "@/localization/i18n";
 
 import { useTranslation } from "react-i18next";
 import {

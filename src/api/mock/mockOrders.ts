@@ -10,11 +10,11 @@ import type { ClientProfile } from '@/interfaces/User';
 
 export const mockProfile: ClientProfile = {
   id: 1,
-  name: 'Zak Laktir',
-  firstName: 'Zak',
-  lastName: 'Laktir',
-  email: 'z.laktir@eben.com',
-  phone: '+212655667799',
+  name: 'Client EBEN',
+  firstName: 'Client',
+  lastName: 'EBEN',
+  email: 'client@example.com',
+  phone: '+212600000000',
   avatar: null,
   status: 'active',
   createdAt: '2024-01-01T00:00:00Z',
