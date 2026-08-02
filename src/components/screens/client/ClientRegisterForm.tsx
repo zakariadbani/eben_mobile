@@ -1,10 +1,11 @@
 import React from "react";
 import { StyleSheet } from "react-native";
+import type { FormikHelpers } from "formik";
+import { useTranslation } from "react-i18next";
 import View from "@/components/common/View";
 import {
   Form,
   FormField,
-  FormCheckbox,
   FormSubmit,
 } from "@/components/common/forms";
 import { useGlobalValidation } from "@/helpers/validationHelper";
@@ -16,19 +17,19 @@ export interface RegisterFormValues {
   phone: string;
   password: string;
   passwordConfirmation: string;
-  acceptTerms: boolean;
   phoneNumberFormated?: string;
 }
 
 interface ClientRegisterFormProps {
-  onSubmit: (values: RegisterFormValues) => Promise<void>;
+  onSubmit: (
+    values: RegisterFormValues,
+    helpers: FormikHelpers<RegisterFormValues>,
+  ) => Promise<void>;
 }
 
-const ClientRegisterForm: React.FC<ClientRegisterFormProps> = ({
-  onSubmit,
-}) => {
+const ClientRegisterForm: React.FC<ClientRegisterFormProps> = ({ onSubmit }) => {
   const { createValidationSchema } = useGlobalValidation();
-
+  const { t } = useTranslation();
   const initialValues: RegisterFormValues = {
     first_name: "",
     last_name: "",
@@ -36,39 +37,27 @@ const ClientRegisterForm: React.FC<ClientRegisterFormProps> = ({
     phone: "",
     password: "",
     passwordConfirmation: "",
-    acceptTerms: false,
     phoneNumberFormated: "",
   };
-
   const validationSchema = createValidationSchema([
-    { name: "first_name", rules: ["required"], label: "Prénom" },
-    { name: "last_name", rules: ["required"], label: "Nom" },
-    { name: "email", rules: ["required", "email"], label: "Adresse e-mail" },
-    { name: "phone", rules: ["required", "numeric"], label: "Téléphone" },
+    { name: "first_name", rules: ["required"], label: "auth.fields.firstName" },
+    { name: "last_name", rules: ["required"], label: "auth.fields.lastName" },
+    { name: "email", rules: ["email"], label: "auth.fields.email" },
+    { name: "phone", rules: ["required", "numeric"], label: "auth.fields.phone" },
     {
       name: "password",
-      rules: ["required", "min:6"],
-      label: "Mot de passe",
-      errorMessages: {
-        min: "Le mot de passe doit au moins contenir 6 caractères",
-      },
+      rules: ["required", "min:8"],
+      label: "auth.fields.password",
+      errorMessages: { min: t("auth.register.passwordLength") },
     },
     {
       name: "passwordConfirmation",
       rules: ["required", "oneOf"],
-      label: "Confirmation du mot de passe",
+      label: "auth.fields.passwordConfirmation",
       refField: "password",
       errorMessages: {
-        required: "Vous devez confirmer votre mot de passe",
-        oneOf: "Les mots de passe doivent correspondre",
-      },
-    },
-    {
-      name: "acceptTerms",
-      rules: ["checkbox"],
-      label: "Conditions",
-      errorMessages: {
-        oneOf: "Vous devez accepter les conditions",
+        required: t("auth.register.passwordConfirmationRequired"),
+        oneOf: t("auth.register.passwordMismatch"),
       },
     },
   ]);
@@ -81,60 +70,56 @@ const ClientRegisterForm: React.FC<ClientRegisterFormProps> = ({
     >
       <View style={styles.splitView} flexDirection="row" gap={20}>
         <FormField
-          label="Prénom"
-          placeholder="Prénom"
+          label="auth.fields.firstName"
+          placeholder="auth.fields.firstName"
           name="first_name"
           variant="secondary"
         />
         <FormField
-          label="Nom"
-          placeholder="Nom"
+          label="auth.fields.lastName"
+          placeholder="auth.fields.lastName"
           name="last_name"
           variant="secondary"
         />
       </View>
-
       <FormField
         autoCapitalize="none"
         name="email"
-        label="Email"
-        placeholder="Email"
+        label="auth.fields.email"
+        placeholder="auth.fields.email"
         textContentType="emailAddress"
         keyboardType="email-address"
         variant="secondary"
       />
       <FormField
-        label="Numéro de téléphone"
-        placeholder="06 77 77 77 77"
+        label="auth.fields.phone"
+        placeholder="auth.fields.phonePlaceholder"
         name="phone"
         variant="secondary"
         keyboardType="numeric"
       />
       <FormField
-        label="Mot de passe"
+        label="auth.fields.password"
         autoCapitalize="none"
         name="password"
-        placeholder="Mot de passe"
+        placeholder="auth.fields.password"
         secureTextEntry
         textContentType="password"
         variant="secondary"
       />
       <FormField
-        label="Répéter le mot de passe"
+        label="auth.fields.passwordConfirmation"
         autoCapitalize="none"
         name="passwordConfirmation"
-        placeholder="Répéter le mot de passe"
+        placeholder="auth.fields.passwordConfirmation"
         secureTextEntry
         textContentType="password"
         variant="secondary"
       />
-      <FormCheckbox
-        name="acceptTerms"
-        text="J'ai lu et accepté les Conditions D'utilisation"
-        variant="secondary"
+      <FormSubmit
+        title={t("auth.register.submit")}
+        submittingTitle={t("auth.register.submitting")}
       />
-
-      <FormSubmit title="S'inscrire" />
     </Form>
   );
 };

@@ -1,87 +1,85 @@
-/**
- * /(prestataire)/profile/wallet/verification.tsx
- *
- * "Retrait de fonds - Vérification" — Figma: Profile-Mon-portefeuille-Verification
- *
- * Receives params:  amount, method, withdrawalId
- *
- * Layout:
- *  • Custom header "Retrait de fonds - Vérification"
- *  • Centered dark card containing <PhoneVerificationComponent>
- *    (re-uses the shared OTP component — 4-cell code field, resend link, Verify CTA)
- *  • On validate(true) from the component → push success with amount + method
- *  • RTL-aware via View + Text primitives. All strings i18n except phone number.
- */
+import React, { useRef, useState } from "react";
+import { StyleSheet } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 
-import React, { useState } from 'react';
-import { StyleSheet } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
+import { confirmWithdrawal } from "@/api/resources/prestataire";
+import { ApiClientError } from "@/api/types";
+import CustomHeader from "@/components/common/CustomHeader";
+import Screen from "@/components/common/Screen";
+import View from "@/components/common/View";
+import { Text } from "@/components/common/Text";
+import PhoneVerificationComponent from "@/components/screens/shared/PhoneVerificationComponent";
+import Colors from "@/constants/Colors";
+import { useSession } from "@/context/AuthContext";
 
-import Screen from '@/components/common/Screen';
-import View from '@/components/common/View';
-import CustomHeader from '@/components/common/CustomHeader';
-import PhoneVerificationComponent from '@/components/screens/shared/PhoneVerificationComponent';
-import Colors from '@/constants/Colors';
-
-// ── Main screen ───────────────────────────────────────────────────────────────
+function positiveId(value: string | undefined): number | null {
+  if (!value || !/^\d+$/.test(value)) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
 
 export default function PrestataireWalletVerificationScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
-  const params = useLocalSearchParams<{
-    amount: string;
-    method: string;
-    withdrawalId: string;
-  }>();
-
+  const { session } = useSession();
+  const { withdrawalId: rawWithdrawalId } = useLocalSearchParams<{ withdrawalId?: string }>();
+  const withdrawalId = positiveId(rawWithdrawalId);
+  const confirming = useRef(false);
   const [isValid, setIsValid] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // When PhoneVerificationComponent calls back with true → proceed to success
-  const handleValidate = (valid: boolean) => {
-    setIsValid(valid);
-    if (valid) {
+  const handleValidate = async (valid: boolean, code: string) => {
+    if (!valid || withdrawalId === null || confirming.current) return;
+    confirming.current = true;
+    setError(null);
+    try {
+      const response = await confirmWithdrawal(withdrawalId, code);
+      if (response.data.id !== withdrawalId || response.data.status !== "pending") throw new Error("Invalid withdrawal confirmation");
+      setIsValid(true);
       router.replace({
-        pathname: '/(prestataire)/profile/wallet/success',
-        params: {
-          amount: params.amount ?? '0',
-          method: params.method ?? 'virement',
-        },
+        pathname: "/(prestataire)/profile/wallet/success",
+        params: { withdrawalId: String(response.data.id) },
       } as never);
+    } catch (caught) {
+      const fieldMessage = caught instanceof ApiClientError
+        ? Object.values(caught.errors)[0]?.[0]
+        : undefined;
+      setError(fieldMessage ?? (caught instanceof ApiClientError ? caught.message : t("auth.error.generic")));
+    } finally {
+      confirming.current = false;
     }
   };
 
-  // Use the mock profile phone; in production this would come from session/profile.
-  const phoneNumber = '+212 661 234 567';
+  const phone = session?.user.phone;
+  const invalidRoute = withdrawalId === null || !phone;
 
   return (
     <Screen whatsapp={false} scrollable={false} avoidKeyboard={false}>
-      {/* Header */}
-      <CustomHeader title={t('partner.verification.screenTitle')} />
-
-      {/* Body — centred, sparse layout matching Figma */}
+      <CustomHeader title={t("partner.verification.screenTitle")} />
       <View flex style={styles.body} alignItems="center" justifyContent="center">
-        {/* Dark verification card */}
         <View style={styles.card}>
-          <PhoneVerificationComponent
-            validate={handleValidate}
-            isValid={isValid}
-            phoneNumber={phoneNumber}
-          />
+          {invalidRoute ? (
+            <Text accessibilityRole="alert">requestFlow.invalidRoute</Text>
+          ) : (
+            <PhoneVerificationComponent
+              validate={handleValidate}
+              isValid={isValid}
+              phoneNumber={phone}
+              error={error}
+              showResend={false}
+            />
+          )}
         </View>
       </View>
     </Screen>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  body: {
-    paddingHorizontal: 20,
-  },
+  body: { paddingHorizontal: 20 },
   card: {
-    width: '100%',
+    width: "100%",
     backgroundColor: Colors.brand,
     borderRadius: 16,
     padding: 24,

@@ -1,181 +1,91 @@
-/**
- * OffersListScreen — offers received for a given request.
- *
- * Route: /(client)/requests/[requestId]/offers
- *
- * Matches Figma: List-Commandez_Parts-Specific-parts
- *
- * Layout:
- *   - Expiry warning banner
- *   - FlatList of ItemOfferComponent cards (sectioned Nouveau / Occasion / Vos autres offres)
- *   - Empty state via EmptyListComponent
- *
- * Each card navigates to the offer detail:
- *   /(client)/requests/[requestId]/offers/[offerId]
- */
-
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, ListRenderItemInfo } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import type { Href } from "expo-router";
-import CustomIcon from "@/components/common/CustomIcon";
-
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, TouchableOpacity } from "react-native";
+import { Href, useLocalSearchParams, useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import Screen from "@/components/common/Screen";
 import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
+import Button from "@/components/common/Button";
 import Colors from "@/constants/Colors";
-import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
-import ItemOfferComponent from "@/components/screens/shared/app/ItemOfferComponent";
+import { getOffers } from "@/api/resources/requests";
+import type { ClientOfferItem } from "@/interfaces/Offer";
 
-import { getOffers } from "@/api";
-import type { ClientOffer, ClientOfferItem } from "@/interfaces/Offer";
-
-type LoadState = "loading" | "success" | "error";
-
-/** Adapter: enrich a raw Offer into the OfferItem shape for the card. */
-function offerToItem(offer: ClientOffer): ClientOfferItem {
-  return {
-    ...offer,
-    categoryTitle: undefined,
-    categoryTitleAr: undefined,
-    categoryImage: null,
-    ferrailleurName: undefined,
-  };
+function positiveId(value: string | undefined): number | null {
+  if (!value || !/^\d+$/.test(value)) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
-// ── Screen ────────────────────────────────────────────────────────────────────
-
-const OffersListScreen: React.FC = () => {
+export default function OffersListScreen() {
+  const { t, i18n } = useTranslation();
   const router = useRouter();
-
-  const rawParams = useLocalSearchParams();
-  const requestId = Number(
-    typeof rawParams.requestId === "string" ? rawParams.requestId : 0
-  );
-
-  const [loadState, setLoadState] = useState<LoadState>("loading");
+  const params = useLocalSearchParams<{ requestId?: string }>();
+  const requestId = positiveId(params.requestId);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [offers, setOffers] = useState<ClientOfferItem[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const locale = i18n.language === "ar" ? "ar-MA" : "fr-MA";
 
-  useEffect(() => {
-    if (!requestId) {
-      setLoadState("error");
-      return;
+  const load = useCallback(async (refresh = false) => {
+    if (requestId === null) { setState("error"); return; }
+    if (refresh) setRefreshing(true); else setState("loading");
+    try {
+      const response = await getOffers(requestId);
+      setOffers(response.data);
+      setState("ready");
+    } catch {
+      setState("error");
+    } finally {
+      setRefreshing(false);
     }
-    setLoadState("loading");
-    getOffers(requestId)
-      .then((res) => {
-        if (res.success && res.data) {
-          setOffers(res.data.map(offerToItem));
-          setLoadState("success");
-        } else {
-          setLoadState("error");
-        }
-      })
-      .catch(() => setLoadState("error"));
   }, [requestId]);
 
-  const handleOfferPress = useCallback(
-    (offerId: number) => {
-      router.push({
-        pathname: "/(client)/requests/[requestId]/offers/[offerId]",
-        params: { requestId: String(requestId), offerId: String(offerId) },
-      } as Href);
-    },
-    [router, requestId]
-  );
+  useEffect(() => { void load(); }, [load]);
 
-  // ── Loading ───────────────────────────────────────────────────────────────
-
-  if (loadState === "loading") {
-    return (
-      <Screen>
-        <View flex style={styles.centered}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-        </View>
-      </Screen>
-    );
+  if (state === "loading") return <Screen><View flex style={styles.centered}><ActivityIndicator color={Colors.primary} /></View></Screen>;
+  if (state === "error") {
+    return <Screen padding><View flex style={styles.centered} gap={12}><Text accessibilityRole="alert">{requestId === null ? "requestFlow.invalidRoute" : "requestFlow.loadError"}</Text>{requestId !== null ? <Button title="requestFlow.retry" onPress={() => void load()} /> : null}</View></Screen>;
   }
-
-  if (loadState === "error") {
-    return (
-      <Screen padding>
-        <View flex style={styles.centered}>
-          <Text type="default" color={Colors.gray}>
-            Erreur lors du chargement des offres
-          </Text>
-        </View>
-      </Screen>
-    );
-  }
-
-  // ── Render ────────────────────────────────────────────────────────────────
-
-  const renderItem = ({ item }: ListRenderItemInfo<ClientOfferItem>) => (
-    <ItemOfferComponent
-      key={item.id}
-      item={item}
-      onPress={() => handleOfferPress(item.id)}
-    />
-  );
 
   return (
     <Screen>
       <View style={styles.container}>
-        {/* Expiry warning banner */}
-        <View style={styles.warningBanner} flexDirection="row" alignItems="flex-start" gap={8}>
-          <CustomIcon name="clock" size={16} tintColor={Colors.noticeUnread} />
-          <Text type="small" color={Colors.grayMidDark} style={styles.warningText}>
-            Veuillez remplir votre commande avant la date d&apos;expiration
-          </Text>
-        </View>
-
-        {/* List */}
-        <FlatList<ClientOfferItem>
+        <Text type="headerTitle" semiBold style={styles.title}>requestFlow.offersTitle</Text>
+        <FlatList
           data={offers}
           keyExtractor={(item) => String(item.id)}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <EmptyListComponent
-              title="Aucune offre reçue pour cette demande"
-              styleContainer={styles.emptyContainer}
-            />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />}
+          contentContainerStyle={offers.length === 0 ? styles.emptyList : styles.list}
+          ListEmptyComponent={<Text center color={Colors.gray}>requestFlow.offersEmpty</Text>}
+          renderItem={({ item }) => {
+            const title = i18n.language === "ar" ? item.categoryTitleAr ?? item.categoryTitle : item.categoryTitle;
+            return (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t("requestFlow.reference", { value: item.reference })}
+                style={styles.card}
+                onPress={() => router.push({
+                  pathname: "/(client)/requests/[requestId]/offers/[offerId]",
+                  params: { requestId: String(requestId), offerId: String(item.id) },
+                } as Href)}
+              >
+                {title ? <Text semiBold translate={false}>{title}</Text> : null}
+                <Text type="small" color={Colors.gray}>{t("requestFlow.reference", { value: item.reference })}</Text>
+                <Text type="subTitle" bold translate={false}>{`${item.priceClient.toLocaleString(locale)} Dhs`}</Text>
+              </TouchableOpacity>
+            );
+          }}
         />
       </View>
     </Screen>
   );
-};
-
-// ── Styles ────────────────────────────────────────────────────────────────────
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: 16,
-    paddingHorizontal: 16,
-  },
-  centered: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  warningBanner: {
-    backgroundColor: Colors.noticeRead,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
-  },
-  warningText: {
-    flex: 1,
-  },
-  listContent: {
-    paddingBottom: 32,
-  },
-  emptyContainer: {
-    marginTop: 32,
-  },
+  container: { flex: 1, padding: 16 },
+  centered: { justifyContent: "center", alignItems: "center" },
+  title: { marginBottom: 16 },
+  list: { paddingBottom: 24 },
+  emptyList: { flexGrow: 1, justifyContent: "center" },
+  card: { padding: 14, marginBottom: 10, borderRadius: 8, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderLight, gap: 4 },
 });
-
-export default OffersListScreen;

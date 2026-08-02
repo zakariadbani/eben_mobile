@@ -15,14 +15,13 @@
  * Validation: rating and title are required; comment required per Figma.
  */
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   StyleSheet,
   TextInput as RNTextInput,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  TouchableOpacity,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -36,6 +35,8 @@ import Icon from "@/components/common/Icon";
 import RatingStars from "@/components/screens/shared/app/RatingStars";
 
 import { postReview } from "@/api";
+import { ApiClientError } from "@/api/client";
+import { Role, useSession } from "@/context/AuthContext";
 import Colors from "@/constants/Colors";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -48,8 +49,12 @@ const LeaveReviewScreen: React.FC = () => {
   const { productId } = useLocalSearchParams<{ productId: string }>();
   const router = useRouter();
   const { t, i18n } = useTranslation();
+  const { role } = useSession();
 
-  const numericProductId = Number(productId ?? 0);
+  const rawProductId = productId ?? "";
+  const numericProductId = /^\d+$/.test(rawProductId) ? Number(rawProductId) : Number.NaN;
+  const validProductId = Number.isSafeInteger(numericProductId) && numericProductId > 0;
+  const submittingRef = useRef(false);
 
   const [rating, setRating] = useState<StarValue | 0>(0);
   const [reviewTitle, setReviewTitle] = useState("");
@@ -67,6 +72,11 @@ const LeaveReviewScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (submittingRef.current) return;
+    if (role !== Role.CLIENT) {
+      router.push("/(auth)/ClientLoginScreen");
+      return;
+    }
     let valid = true;
     if (rating === 0) {
       setRatingError(true);
@@ -80,20 +90,29 @@ const LeaveReviewScreen: React.FC = () => {
       setCommentError(true);
       valid = false;
     }
-    if (!valid) return;
+    if (!valid || !validProductId) {
+      if (!validProductId) setSubmitError(t("review.submitError"));
+      return;
+    }
 
+    submittingRef.current = true;
     setSubmitting(true);
     setSubmitError(null);
 
     try {
       await postReview(numericProductId, {
         rating: rating as StarValue,
+        title: reviewTitle.trim(),
         comment: comment.trim(),
       });
       setSuccessVisible(true);
-    } catch {
-      setSubmitError(t("review.submitError"));
+    } catch (error) {
+      const fieldMessage = error instanceof ApiClientError
+        ? Object.values(error.errors)[0]?.[0]
+        : undefined;
+      setSubmitError(fieldMessage ?? (error instanceof ApiClientError ? error.message : t("review.submitError")));
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -154,7 +173,7 @@ const LeaveReviewScreen: React.FC = () => {
               />
               {titleError && (
                 <Text type="small" color={Colors.error} translate={false} style={styles.fieldError}>
-                  {t("review.ratingRequired")}
+                  {t("review.titleRequired")}
                 </Text>
               )}
             </View>
@@ -177,7 +196,7 @@ const LeaveReviewScreen: React.FC = () => {
               />
               {commentError && (
                 <Text type="small" color={Colors.error} translate={false} style={styles.fieldError}>
-                  {t("review.ratingRequired")}
+                  {t("review.commentRequired")}
                 </Text>
               )}
             </View>
@@ -202,6 +221,7 @@ const LeaveReviewScreen: React.FC = () => {
                 variant="primary"
                 onPress={() => void handleSubmit()}
                 style={submitting ? styles.disabledBtn : undefined}
+                disabled={submitting}
                 rightIcon="send"
                 iconTypeName="Feather"
                 sizeIcon={16}
@@ -222,11 +242,9 @@ const LeaveReviewScreen: React.FC = () => {
                 <Text type="small" color={Colors.grayMidDark} translate={false}>
                   {t("review.privacyNotice")}
                 </Text>
-                <TouchableOpacity activeOpacity={0.7} onPress={() => router.push("/(client)/settings/pages/Legal")}>
-                  <Text type="small" style={styles.privacyLink} translate={false}>
-                    {t("review.privacyLink")}
-                  </Text>
-                </TouchableOpacity>
+                <Text type="small" style={styles.privacyLink} translate={false}>
+                  {t("review.privacyLink")}
+                </Text>
               </View>
             </View>
           </View>

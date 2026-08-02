@@ -7,7 +7,12 @@
 
 export type BalanceTransactionType = 'credit' | 'debit';
 
-export type WithdrawalStatus = 'pending' | 'processing' | 'completed' | 'rejected';
+export type WithdrawalStatus =
+  | 'awaiting_verification'
+  | 'pending'
+  | 'processing'
+  | 'completed'
+  | 'rejected';
 
 /** Running wallet balance for a user. Maps to `user_balances`. */
 export interface Wallet {

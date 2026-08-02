@@ -18,11 +18,11 @@ import Icon from "@/components/common/Icon";
 import PartnerRevenueHeroCard from "@/components/screens/prestataire/dashboard/PartnerRevenueHeroCard";
 import PartnerStatCard from "@/components/screens/prestataire/dashboard/PartnerStatCard";
 import PartnerOfferRow from "@/components/screens/prestataire/dashboard/PartnerOfferRow";
-import { getPrestataireStats, getPrestataireOffers } from "@/api";
+import { getPrestataireIncomingRequests, getPrestataireStats, getPrestataireOffers } from "@/api/resources/prestataire";
 import type { PrestataireDashboardStats } from "@/interfaces/PrestataireDashboard";
-import type { Offer } from "@/interfaces/Offer";
+import type { PrestataireOffer } from "@/interfaces/Offer";
+import type { Request } from "@/interfaces/Request";
 import Colors from "@/constants/Colors";
-import { shadows } from "@/constants/theme";
 
 interface SectionHeaderProps {
   title: string;
@@ -49,36 +49,57 @@ const Dashboard: React.FC = () => {
   const { t } = useTranslation();
   const router = useRouter();
   const [stats, setStats] = useState<PrestataireDashboardStats | null>(null);
-  const [activeOffers, setActiveOffers] = useState<Offer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [incomingRequests, setIncomingRequests] = useState<Request[]>([]);
+  const [sentOffers, setSentOffers] = useState<PrestataireOffer[]>([]);
+  const [activeOffers, setActiveOffers] = useState<PrestataireOffer[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [offersLoading, setOffersLoading] = useState(true);
+  const [statsError, setStatsError] = useState(false);
+  const [offersError, setOffersError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadDashboard = useCallback(async () => {
+  const loadStats = useCallback(async () => {
     try {
-      setError(false);
-      const [statsRes, offersRes] = await Promise.all([
-        getPrestataireStats(),
-        getPrestataireOffers("active"),
-      ]);
-      if (statsRes.success) setStats(statsRes.data);
-      if (offersRes.success) setActiveOffers(offersRes.data);
+      setStatsError(false);
+      const result = await getPrestataireStats();
+      setStats(result.data);
     } catch {
-      setError(true);
+      setStatsError(true);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      setStatsLoading(false);
     }
   }, []);
 
-  useEffect(() => { void loadDashboard(); }, [loadDashboard]);
+  const loadOffers = useCallback(async () => {
+    try {
+      setOffersError(false);
+      const [incoming, sent, active] = await Promise.all([
+        getPrestataireIncomingRequests(),
+        getPrestataireOffers("sent"),
+        getPrestataireOffers("active"),
+      ]);
+      setIncomingRequests(incoming.data);
+      setSentOffers(sent.data);
+      setActiveOffers(active.data);
+    } catch {
+      setOffersError(true);
+    } finally {
+      setOffersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadStats();
+    void loadOffers();
+  }, [loadOffers, loadStats]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    void loadDashboard();
-  }, [loadDashboard]);
+    void Promise.allSettled([loadStats(), loadOffers()])
+      .finally(() => setRefreshing(false));
+  }, [loadOffers, loadStats]);
 
-  if (loading) {
+  if (statsLoading) {
     return (
       <View style={styles.centered} flex alignItems="center" justifyContent="center">
         <ActivityIndicator size="large" color={Colors.primary} />
@@ -86,30 +107,46 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  if (error || !stats) {
+  if (statsError || !stats) {
     return (
       <View style={styles.centered} flex alignItems="center" justifyContent="center" gap={12}>
         <Text type="default" color={Colors.grayMidDark}>{"partner.dashboard.loadError"}</Text>
-        <Button title={t("partner.dashboard.retry")} fit onPress={() => { setLoading(true); void loadDashboard(); }} />
+        <Button title={t("partner.dashboard.retry")} fit onPress={() => { setStatsLoading(true); void loadStats(); }} />
       </View>
     );
   }
 
-  const feedOffers = stats.recentOffers?.slice(0, 3) ?? [];
-  const activeOfferRows = activeOffers.slice(0, 3).map((offer) => {
-    const summary = stats.recentOffers?.find((item) => item.offerId === offer.id);
+  const offerRow = (offer: PrestataireOffer) => ({
+    offerId: offer.id,
+    offerReference: offer.reference,
+    requestReference: String(offer.requestId),
+    priceFerrailleur: offer.priceFerrailleur,
+    quantity: offer.quantity,
+    status: offer.status,
+    categoryTitle: offer.categoryTitle,
+    categoryTitleAr: offer.categoryTitleAr,
+    categoryImage: offer.categoryImage,
+    createdAt: offer.createdAt,
+    expiresAt: null,
+  });
+  const incomingRows = incomingRequests.slice(0, 3).map((request) => {
+    const item = request.items?.[0];
     return {
-      offerId: offer.id,
-      offerReference: offer.reference,
-      requestReference: String(offer.requestId),
-      priceFerrailleur: offer.priceFerrailleur,
-      status: offer.status,
-      categoryTitle: summary?.categoryTitle,
-      categoryTitleAr: summary?.categoryTitleAr,
-      categoryImage: summary?.categoryImage,
-      createdAt: offer.createdAt,
+      offerId: request.id,
+      offerReference: request.reference,
+      requestReference: request.reference,
+      priceFerrailleur: 0,
+      quantity: item?.quantity ?? 0,
+      status: "pending" as const,
+      categoryTitle: item?.categoryTitle ?? null,
+      categoryTitleAr: item?.categoryTitleAr ?? null,
+      categoryImage: item?.categoryImage ?? null,
+      createdAt: request.createdAt,
+      expiresAt: request.expiresAt,
     };
   });
+  const sentOfferRows = sentOffers.slice(0, 3).map(offerRow);
+  const activeOfferRows = activeOffers.slice(0, 3).map(offerRow);
   const goToOffers = () => router.push("/(prestataire)/offers" as Href);
   const goToOffer = (offerId: number) => router.push(`/(prestataire)/offers/${offerId}` as Href);
 
@@ -128,8 +165,8 @@ const Dashboard: React.FC = () => {
 
       <View style={styles.section}>
         <SectionHeader title="partner.dashboard.openOffers" onPress={goToOffers} />
-        {feedOffers.length ? feedOffers.map((offer) => (
-          <PartnerOfferRow key={offer.offerId} item={offer} onPress={() => goToOffer(offer.offerId)} />
+        {incomingRows.length ? incomingRows.map((offer) => (
+          <PartnerOfferRow key={offer.offerId} item={offer} onPress={() => router.push(`/(prestataire)/offers/${offer.offerId}/fill` as Href)} />
         )) : <Text color={Colors.grayMidDark}>{"partner.dashboard.emptyOffers"}</Text>}
         <View flexDirection="row" alignItems="flex-start" gap={10} style={styles.windowNotice}>
           <Icon name="info" type="Feather" size={20} iconColor={Colors.gray} />
@@ -139,39 +176,35 @@ const Dashboard: React.FC = () => {
 
       <View style={styles.section}>
         <SectionHeader title="partner.dashboard.sentStatus" onPress={goToOffers} />
-        {feedOffers.map((offer) => (
+        {sentOfferRows.map((offer) => (
           <PartnerOfferRow key={`sent-${offer.offerId}`} item={offer} variant="sent" onPress={() => goToOffer(offer.offerId)} />
         ))}
+        {!sentOfferRows.length ? <Text color={Colors.grayMidDark}>{"partner.dashboard.emptyOffers"}</Text> : null}
       </View>
 
       <View style={styles.section}>
         <SectionHeader title="partner.dashboard.activeOffers" onPress={goToOffers} />
-        {activeOfferRows.length ? activeOfferRows.map((offer) => (
+        {offersLoading ? (
+          <ActivityIndicator color={Colors.primary} />
+        ) : offersError ? (
+          <View alignItems="center" gap={10}>
+            <Text color={Colors.grayMidDark}>{"partner.dashboard.offersLoadError"}</Text>
+            <Button title={t("partner.dashboard.retry")} fit onPress={() => { setOffersLoading(true); void loadOffers(); }} />
+          </View>
+        ) : activeOfferRows.length ? activeOfferRows.map((offer) => (
           <PartnerOfferRow key={`active-${offer.offerId}`} item={offer} variant="active" onPress={() => goToOffer(offer.offerId)} />
         )) : <Text color={Colors.grayMidDark}>{"partner.dashboard.emptyOffers"}</Text>}
       </View>
 
       <View style={styles.section}>
         <SectionHeader title="partner.dashboard.stats30d" onPress={goToOffers} />
-        <View style={styles.salesCard}>
-          <Text type="labelTwo" color={Colors.greenDark} translate={false} style={styles.salesTrend}>+35%</Text>
-          <Icon name="sack" type="MaterialCommunityIcons" size={25} iconColor={Colors.brand} />
-          <Text type="labelTwo" semiBold>{"partner.dashboard.salesMonth"}</Text>
-          <View flexDirection="row" alignItems="center" justifyContent="space-between" style={styles.salesBottom}>
-            <Text type="subTitleTwo" bold translate={false}>
-              {`${stats.revenue30d.toLocaleString("fr-MA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Dhs`}
-            </Text>
-            <Button title={t("partner.dashboard.seeMore")} fit style={styles.moreButton} styleTitle={styles.moreText} onPress={() => router.push("/(prestataire)/profile/wallet" as Href)} />
-          </View>
-        </View>
         <View flexDirection="row" gap={12} style={styles.statRow}>
           <PartnerStatCard label="partner.dashboard.revenueLabel" value={stats.pendingPayout} isCurrency icon="wallet-outline" wide />
-          <PartnerStatCard label="partner.dashboard.receivedCount" value={stats.offersReceivedCount} trend="+13%" />
+          <PartnerStatCard label="partner.dashboard.receivedCount" value={stats.offersReceivedCount} />
         </View>
         <View flexDirection="row" gap={12} style={styles.statRow}>
-          <PartnerStatCard label="partner.dashboard.acceptedCount" value={stats.offersAcceptedCount} trend="+13%" icon="file-check-outline" />
-          <PartnerStatCard label="partner.dashboard.missedCount" value={Math.max(0, stats.offersSentCount - stats.offersAcceptedCount)} trend="+13%" trendPositive={false} icon="file-remove-outline" />
-          <PartnerStatCard label="partner.dashboard.sentCount" value={stats.offersSentCount} trend="+13%" icon="file-send-outline" />
+          <PartnerStatCard label="partner.dashboard.acceptedCount" value={stats.offersAcceptedCount} icon="file-check-outline" />
+          <PartnerStatCard label="partner.dashboard.sentCount" value={stats.offersSentCount} icon="file-send-outline" />
         </View>
       </View>
 
@@ -201,11 +234,6 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 28, lineHeight: 34 },
   seeAll: { minHeight: 44, justifyContent: "center", paddingStart: 8 },
   windowNotice: { marginTop: 4, paddingHorizontal: 4 },
-  salesCard: { minHeight: 148, backgroundColor: Colors.white, borderRadius: 5, padding: 12, ...shadows.main },
-  salesTrend: { alignSelf: "flex-end" },
-  salesBottom: { marginTop: "auto" },
-  moreButton: { paddingHorizontal: 10, paddingVertical: 5 },
-  moreText: { fontSize: 14, marginHorizontal: 0 },
   statRow: { marginTop: 12 },
   support: { minHeight: 230, marginTop: 8, borderRadius: 5, overflow: "hidden", justifyContent: "center" },
   supportImage: { resizeMode: "cover" },

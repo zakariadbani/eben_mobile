@@ -1,10 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import { StyleSheet } from "react-native";
-import View from "@/components/common/View";
+import { useTranslation } from "react-i18next";
+import { useRouter } from "expo-router";
 import Screen from "@/components/common/Screen";
-import Colors from "@/constants/Colors";
+import View from "@/components/common/View";
 import ResetPasswordForm from "@/components/screens/shared/ResetPasswordForm";
-import { useRouter, Href } from "expo-router";
+import Colors from "@/constants/Colors";
+import { useSession } from "@/context/AuthContext";
 
 interface ResetPasswordFormValues {
   password: string;
@@ -13,17 +15,31 @@ interface ResetPasswordFormValues {
 
 const ForgotPasswordNewPasswordScreen = () => {
   const router = useRouter();
+  const { completePasswordReset, pendingPasswordResetPhone } = useSession();
+  const { t } = useTranslation();
+  const [error, setError] = useState<string | null>(
+    pendingPasswordResetPhone ? null : t("auth.recovery.noPending"),
+  );
 
-  const handleSubmit = async (_values: ResetPasswordFormValues) => {
-    // API call to set new password would go here
-    router.push("/(auth)/forgot-password/success" as Href);
+  const handleSubmit = async (values: ResetPasswordFormValues) => {
+    if (!pendingPasswordResetPhone) {
+      setError(t("auth.recovery.noPending"));
+      return;
+    }
+    setError(null);
+    try {
+      await completePasswordReset(values.password);
+      router.push("/(auth)/forgot-password/success");
+    } catch {
+      setError(t("auth.recovery.resetError"));
+    }
   };
 
   return (
     <Screen scrollable whatsapp={false}>
       <View style={styles.container}>
         <View style={styles.formContainer}>
-          <ResetPasswordForm onSubmit={handleSubmit} />
+          <ResetPasswordForm onSubmit={handleSubmit} error={error} />
         </View>
       </View>
     </Screen>

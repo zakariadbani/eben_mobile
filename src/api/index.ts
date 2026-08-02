@@ -19,5 +19,8 @@ export * from './resources/basket';
 export * from './resources/wishlist';
 export * from './resources/report';
 export * from './resources/prestataire';
+export * from './resources/auth';
+export * from './resources/uploads';
+export * from './resources/pneumatics';
 export type { ApiResponse, Paginated, ApiError, PaginationMeta } from './types';
 export { apiClient } from './client';

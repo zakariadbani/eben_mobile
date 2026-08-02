@@ -11,6 +11,7 @@ import View from '@/components/common/View';
 import { Text } from '@/components/common/Text';
 import Colors from '@/constants/Colors';
 import type { Address } from '@/interfaces/Address';
+import { useTranslation } from 'react-i18next';
 
 interface ItemAddressComponentProps {
   address: Address;
@@ -25,6 +26,7 @@ export default function ItemAddressComponent({
   onDelete,
   onSetDefault,
 }: ItemAddressComponentProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.card}>
       {/* Header row: label + edit */}
@@ -32,27 +34,27 @@ export default function ItemAddressComponent({
         <Text type="text" bold style={styles.label}>
           {address.label ?? address.city}
         </Text>
-        <TouchableOpacity onPress={() => onEdit(address)} activeOpacity={0.7} style={styles.editBtn}>
+        <TouchableOpacity onPress={() => onEdit(address)} activeOpacity={0.7} style={styles.editBtn} accessibilityRole="button" accessibilityLabel={t('settings.address.card.edit')}>
           <Text type="small" color={Colors.grayMidDark}>
-            {'Modifier'}
+            {t('settings.address.card.edit')}
           </Text>
         </TouchableOpacity>
       </View>
 
       {/* Address lines */}
       <Text type="small" color={Colors.grayMidDark}>
-        {'Rue : '}
+        {t('settings.address.card.street')}
         {address.addressLine1.replace(/^Rue\s*:\s*/i, '')}
       </Text>
       {address.city ? (
         <Text type="small" color={Colors.grayMidDark}>
-          {'Ville : '}
+          {t('settings.address.card.city')}
           {address.city}
         </Text>
       ) : null}
       {address.region ? (
         <Text type="small" color={Colors.grayMidDark}>
-          {'État/province/région : '}
+          {t('settings.address.card.region')}
           {address.region}
         </Text>
       ) : null}
@@ -60,7 +62,7 @@ export default function ItemAddressComponent({
       {/* Default badge */}
       {address.isDefault && (
         <Text type="small" bold color={Colors.greenDark} style={styles.defaultBadge}>
-          {'Adresse par defaut'}
+          {t('settings.address.card.default')}
         </Text>
       )}
 
@@ -68,16 +70,16 @@ export default function ItemAddressComponent({
       {(onSetDefault ?? onDelete) && (
         <View flexDirection="row" style={styles.actions} gap={12}>
           {onSetDefault && !address.isDefault && (
-            <TouchableOpacity onPress={() => onSetDefault(address)} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => onSetDefault(address)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('settings.address.card.setDefault')}>
               <Text type="small" color={Colors.primary300 ?? Colors.blue}>
-                {'Définir par défaut'}
+                {t('settings.address.card.setDefault')}
               </Text>
             </TouchableOpacity>
           )}
           {onDelete && (
-            <TouchableOpacity onPress={() => onDelete(address)} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => onDelete(address)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('settings.address.card.delete')}>
               <Text type="small" color={Colors.red}>
-                {'Supprimer'}
+                {t('settings.address.card.delete')}
               </Text>
             </TouchableOpacity>
           )}

@@ -7,14 +7,14 @@
  * Mirrors the orders screen pattern exactly.
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import Screen from '@/components/common/Screen';
 import View from '@/components/common/View';
@@ -23,10 +23,12 @@ import Colors from '@/constants/Colors';
 import EmptyListComponent from '@/components/screens/shared/app/EmptyListComponent';
 import CustomIcon from '@/components/common/CustomIcon';
 import Icon from '@/components/common/Icon';
-import Button from '@/components/common/Button';
 import ConfirmModal from '@/components/common/ConfirmModal';
 import { getRequests } from '@/api/resources/requests';
+import Button from '@/components/common/Button';
 import type { RequestSummary, RequestStatus } from '@/interfaces/Request';
+
+const ARCHIVED_REQUEST_STATUSES = new Set<RequestStatus>(['ordered', 'expired', 'cancelled']);
 
 // ── Status display config ────────────────────────────────────────────────────
 
@@ -45,6 +47,7 @@ function getStatusConfig(
       };
     case 'expired':
     case 'cancelled':
+    case 'ordered':
       return {
         label: isAr ? 'مغلق' : 'Fermé',
         color: Colors.white,
@@ -233,8 +236,7 @@ const ArchivedOfferCard: React.FC<ArchivedOfferCardProps> = ({ request, onPress 
 
 const ArchivedOffersScreen: React.FC = () => {
   const router = useRouter();
-  const { state } = useLocalSearchParams<{ state?: string }>();
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const isAr = i18n.language === 'ar';
   const locale = isAr ? 'ar-MA' : 'fr-MA';
 
@@ -254,29 +256,29 @@ const ArchivedOffersScreen: React.FC = () => {
   // Month picker modal state
   const [monthPickerVisible, setMonthPickerVisible] = useState(false);
 
-  useEffect(() => {
-    loadRequests();
-  }, []);
-
-  const loadRequests = async () => {
+  const loadRequests = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const res = await getRequests();
-      const data: RequestSummary[] = res.data;
+      const data = res.data.filter((request) => ARCHIVED_REQUEST_STATUSES.has(request.status));
       setRequests(data);
 
       // Default to most recent month
       if (data.length > 0) {
         const keys = data.map((r) => monthKey(r.createdAt)).sort().reverse();
         setSelectedMonth(keys[0]);
+      } else {
+        setSelectedMonth('');
       }
     } catch {
-      setError('Impossible de charger les offres archivées');
+      setError(t('settings.archived.loadError'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => { void loadRequests(); }, [loadRequests]);
 
   /** Distinct month keys sorted newest-first. */
   const availableMonths = useMemo(() => {
@@ -291,7 +293,6 @@ const ArchivedOffersScreen: React.FC = () => {
 
   /** Visible requests after month + status filters + sort. */
   const visibleRequests = useMemo(() => {
-    if (state === 'empty') return [];
     let filtered = requests.filter((r) => monthKey(r.createdAt) === selectedMonth);
     if (activeStatuses.size > 0) {
       filtered = filtered.filter((r) => activeStatuses.has(r.status));
@@ -300,7 +301,7 @@ const ArchivedOffersScreen: React.FC = () => {
       const diff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       return sortDir === 'asc' ? diff : -diff;
     });
-  }, [requests, selectedMonth, activeStatuses, sortDir, state]);
+  }, [requests, selectedMonth, activeStatuses, sortDir]);
 
   const monthLabel = selectedMonth ? formatMonthLabel(selectedMonth, locale) : '';
 
@@ -350,6 +351,7 @@ const ArchivedOffersScreen: React.FC = () => {
           <Text type="label" color={Colors.error} center>
             {error}
           </Text>
+          <Button title={t('settings.retry')} onPress={() => { void loadRequests(); }} variant="primary" />
         </View>
       </Screen>
     );

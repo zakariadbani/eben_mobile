@@ -2,10 +2,6 @@
  * Mock data for the prestataire (ferrailleur/partner) API.
  *
  * All monetary values are in MAD (Moroccan Dirham).
- * Prices follow the margin rule:
- *   priceClient = priceFerrailleur × 1.06
- *   priceBc     = priceFerrailleur × 0.94
- *
  * The dashboard and offers screens show priceFerrailleur (the partner's own price).
  */
 
@@ -33,6 +29,7 @@ function getMockRecentOffers(): RecentOfferSummary[] {
       offerId: 101,
       offerReference: '34901',
       requestReference: '268303280',
+      quantity: 1,
       priceFerrailleur: 2675.99,
       status: 'validated',
       categoryTitle: 'Plaquettes de frein avant',
@@ -45,6 +42,7 @@ function getMockRecentOffers(): RecentOfferSummary[] {
       offerId: 102,
       offerReference: '34902',
       requestReference: '381379033',
+      quantity: 1,
       priceFerrailleur: 480.00,
       status: 'selected',
       categoryTitle: 'Kit de distribution',
@@ -57,6 +55,7 @@ function getMockRecentOffers(): RecentOfferSummary[] {
       offerId: 103,
       offerReference: '34903',
       requestReference: '492837293',
+      quantity: 1,
       priceFerrailleur: 850.00,
       status: 'pending',
       categoryTitle: 'Pare-chocs avant',
@@ -69,6 +68,7 @@ function getMockRecentOffers(): RecentOfferSummary[] {
       offerId: 104,
       offerReference: '34904',
       requestReference: '573839202',
+      quantity: 1,
       priceFerrailleur: 320.00,
       status: 'validated',
       categoryTitle: 'Flexible de frein avant',
@@ -460,6 +460,7 @@ export const mockPartnerOrders: Order[] = [
     subtotal: 720.80,
     discountAmount: 0,
     shippingFee: 30.00,
+    taxAmount: 0,
     total: 750.80,
     status: 'confirmed',
     paymentMethod: 'cod',
@@ -481,6 +482,7 @@ export const mockPartnerOrders: Order[] = [
     subtotal: 2836.55,
     discountAmount: 0,
     shippingFee: 30.00,
+    taxAmount: 0,
     total: 2866.55,
     status: 'shipped',
     paymentMethod: 'virement',
@@ -502,6 +504,7 @@ export const mockPartnerOrders: Order[] = [
     subtotal: 190.80,
     discountAmount: 0,
     shippingFee: 30.00,
+    taxAmount: 0,
     total: 220.80,
     status: 'delivered',
     paymentMethod: 'cod',

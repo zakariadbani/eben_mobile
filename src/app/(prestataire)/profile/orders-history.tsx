@@ -10,7 +10,7 @@
  * translate={false} for prices, refs, dates
  */
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -18,7 +18,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { useTranslation } from "react-i18next";
-import { Href, useLocalSearchParams, useRouter } from "expo-router";
+import { Href, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 
 import { Screen } from "@/components/common/Screen";
 import View from "@/components/common/View";
@@ -29,62 +29,54 @@ import EmptyListComponent from "@/components/screens/shared/app/EmptyListCompone
 import PartnerHistoryToolbar from "@/components/screens/prestataire/PartnerHistoryToolbar";
 
 import { getPrestataireOrders } from "@/api/resources/prestataire";
-import type { Order } from "@/interfaces/Order";
+import type { PrestataireOrder } from "@/interfaces/Order";
 
 // ── Status badge config ────────────────────────────────────────────────────────
 
-type StatusCfg = { label: string; labelAr: string; color: string; bg: string };
+type StatusCfg = { translationKey: string; color: string; bg: string };
 
 const ORDER_STATUS_BADGE: Record<string, StatusCfg> = {
-  pending: {
-    label: "En attente",
-    labelAr: "في الانتظار",
+  sent: {
+    translationKey: "partner.orders.purchaseOrderStatus.sent",
     color: Colors.grayMidDark,
     bg: Colors.backgroundGray,
   },
-  confirmed: {
-    label: "Confirmée",
-    labelAr: "مؤكدة",
+  acknowledged: {
+    translationKey: "partner.orders.purchaseOrderStatus.acknowledged",
     color: Colors.greenDark,
     bg: "#D1FAE5",
   },
-  processing: {
-    label: "En traitement",
-    labelAr: "قيد المعالجة",
+  preparing: {
+    translationKey: "partner.orders.purchaseOrderStatus.preparing",
     color: Colors.grayMidDark,
     bg: Colors.backgroundGray,
   },
+  ready: {
+    translationKey: "partner.orders.purchaseOrderStatus.ready",
+    color: Colors.greenDark,
+    bg: "#D1FAE5",
+  },
   shipped: {
-    label: "Expédié",
-    labelAr: "تم الشحن",
+    translationKey: "partner.orders.purchaseOrderStatus.shipped",
     color: Colors.white,
     bg: Colors.blue,
   },
-  delivered: {
-    label: "Livré",
-    labelAr: "تم التوصيل",
+  received: {
+    translationKey: "partner.orders.purchaseOrderStatus.received",
     color: Colors.white,
     bg: Colors.greenDark,
   },
   cancelled: {
-    label: "Annulé",
-    labelAr: "ملغى",
+    translationKey: "partner.orders.purchaseOrderStatus.cancelled",
     color: Colors.white,
     bg: Colors.red,
-  },
-  refunded: {
-    label: "Remboursé",
-    labelAr: "مسترد",
-    color: Colors.grayMidDark,
-    bg: Colors.pink,
   },
 };
 
 function fallbackStatus(status: string): StatusCfg {
   return (
     ORDER_STATUS_BADGE[status] ?? {
-      label: status,
-      labelAr: status,
+      translationKey: status,
       color: Colors.grayMidDark,
       bg: Colors.backgroundGray,
     }
@@ -93,29 +85,19 @@ function fallbackStatus(status: string): StatusCfg {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function formatDateShort(iso: string): string {
-  return new Date(iso).toLocaleDateString("fr-MA", {
+function formatDateShort(iso: string, locale: string): string {
+  return new Date(iso).toLocaleDateString(locale, {
     day: "2-digit",
     month: "short",
     year: "numeric",
   });
 }
 
-/**
- * Partner net revenue approximation.
- * priceBc = priceClient × (0.94 / 1.06) — see orders/index.tsx for derivation.
- */
-function partnerNet(order: Order): number {
-  const itemsTotal =
-    order.items?.reduce((acc, i) => acc + i.totalPrice, 0) ?? order.subtotal;
-  return Math.round(itemsTotal * (0.94 / 1.06) * 100) / 100;
-}
-
 /** Group orders by month-year string key. */
-function groupByMonth(orders: Order[]): { key: string; data: Order[] }[] {
-  const map = new Map<string, Order[]>();
+function groupByMonth(orders: PrestataireOrder[], locale: string): { key: string; data: PrestataireOrder[] }[] {
+  const map = new Map<string, PrestataireOrder[]>();
   for (const order of orders) {
-    const key = new Date(order.createdAt).toLocaleDateString("fr-MA", {
+    const key = new Date(order.createdAt).toLocaleDateString(locale, {
       month: "long",
       year: "numeric",
     });
@@ -129,14 +111,15 @@ function groupByMonth(orders: Order[]): { key: string; data: Order[] }[] {
 // ── Order card ─────────────────────────────────────────────────────────────────
 
 interface OrderCardProps {
-  item: Order;
-  isArabic: boolean;
+  item: PrestataireOrder;
+  locale: string;
+  t: (key: string) => string;
   onPress: () => void;
 }
 
-function OrderCard({ item, isArabic, onPress }: OrderCardProps): React.ReactElement {
-  const statusCfg = fallbackStatus(item.status);
-  const net = partnerNet(item);
+function OrderCard({ item, locale, t, onPress }: OrderCardProps): React.ReactElement {
+  const statusCfg = fallbackStatus(item.fulfillmentStatus);
+  const net = item.netTotal;
   const partCount = item.items?.length ?? 0;
 
   return (
@@ -144,25 +127,27 @@ function OrderCard({ item, isArabic, onPress }: OrderCardProps): React.ReactElem
       onPress={onPress}
       activeOpacity={0.75}
       style={styles.card}
+      accessibilityRole="button"
+      accessibilityLabel={`${t("partner.orders.details")} ${item.reference}`}
     >
       {/* Top: ref + status badge */}
       <View flexDirection="row" alignItems="center" gap={8} style={styles.cardRow}>
         <View flex gap={2}>
           <View flexDirection="row" alignItems="center" gap={4}>
             <Text type="small" color={Colors.gray}>
-              Réf :
+              {t("partner.orders.referenceLabel")}
             </Text>
             <Text type="small" semiBold color={Colors.brand} translate={false}>
               {item.reference}
             </Text>
           </View>
           <Text type="small" color={Colors.gray} translate={false}>
-            {formatDateShort(item.createdAt)}
+            {formatDateShort(item.createdAt, locale)}
           </Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: statusCfg.bg }]}>
           <Text type="small" color={statusCfg.color} translate={false}>
-            {isArabic ? statusCfg.labelAr : statusCfg.label}
+            {t(statusCfg.translationKey)}
           </Text>
         </View>
       </View>
@@ -176,7 +161,7 @@ function OrderCard({ item, isArabic, onPress }: OrderCardProps): React.ReactElem
                 {"•"}
               </Text>
               <Text type="small" color={Colors.brand} translate={false} flex>
-                {isArabic
+                {locale === "ar-MA"
                   ? (part.categoryTitleAr ?? part.categoryTitle ?? "—")
                   : (part.categoryTitle ?? "—")}
               </Text>
@@ -199,15 +184,15 @@ function OrderCard({ item, isArabic, onPress }: OrderCardProps): React.ReactElem
       <View flexDirection="row" alignItems="center" gap={10} style={styles.cardBottom}>
         <View flex gap={2}>
           <Text type="text" bold color={Colors.brand} translate={false}>
-            {`${net.toLocaleString("fr-MA")} Dhs`}
+            {`${net.toLocaleString(locale)} Dhs`}
           </Text>
           <Text type="small" color={Colors.gray}>
-            Votre revenu net
+            {t("partner.ordersHistory.netRevenue")}
           </Text>
         </View>
         <View style={styles.ctaBadge}>
           <Text type="small" semiBold color={Colors.brand} translate={false}>
-            {isArabic ? "التفاصيل" : "Détails"}
+            {t("partner.orders.details")}
           </Text>
         </View>
       </View>
@@ -220,10 +205,9 @@ function OrderCard({ item, isArabic, onPress }: OrderCardProps): React.ReactElem
 interface SectionHeaderProps {
   label: string;
   count: number;
-  isArabic: boolean;
 }
 
-function SectionHeader({ label, count, isArabic }: SectionHeaderProps): React.ReactElement {
+function SectionHeader({ label, count }: SectionHeaderProps): React.ReactElement {
   return (
     <View style={styles.sectionHeader} flexDirection="row" alignItems="center" gap={8}>
       <Text type="label" semiBold color={Colors.brand} translate={false}>
@@ -242,37 +226,45 @@ function SectionHeader({ label, count, isArabic }: SectionHeaderProps): React.Re
 
 type ListItem =
   | { kind: "header"; key: string; label: string; count: number }
-  | { kind: "order"; key: string; order: Order };
+  | { kind: "order"; key: string; order: PrestataireOrder };
 
 // ── Main screen ────────────────────────────────────────────────────────────────
 
 export default function PrestataireOrdersHistoryScreen(): React.ReactElement {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === "ar";
+  const locale = isArabic ? "ar-MA" : "fr-MA";
   const router = useRouter();
   const { state } = useLocalSearchParams<{ state?: string }>();
 
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<PrestataireOrder[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const requestEpoch = useRef(0);
 
   const fetchOrders = useCallback(async () => {
+    const epoch = ++requestEpoch.current;
     setLoading(true);
     setError(null);
     try {
       const res = await getPrestataireOrders();
+      if (epoch !== requestEpoch.current) return;
       setOrders(res.data);
     } catch {
-      setError("Impossible de charger les commandes");
+      if (epoch !== requestEpoch.current) return;
+      setError("partner.ordersHistory.loadError");
     } finally {
-      setLoading(false);
+      if (epoch === requestEpoch.current) setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+  useFocusEffect(useCallback(() => {
+    void fetchOrders();
+    return () => {
+      requestEpoch.current += 1;
+    };
+  }, [fetchOrders]));
 
   // ── Build flat list ────────────────────────────────────────────────────────
 
@@ -291,7 +283,7 @@ export default function PrestataireOrdersHistoryScreen(): React.ReactElement {
           ) === true
         );
       });
-  const groups = groupByMonth(visibleOrders);
+  const groups = groupByMonth(visibleOrders, locale);
   for (const g of groups) {
     listItems.push({ kind: "header", key: `h-${g.key}`, label: g.key, count: g.data.length });
     for (const order of g.data) {
@@ -313,9 +305,9 @@ export default function PrestataireOrdersHistoryScreen(): React.ReactElement {
     if (error) {
       return (
         <EmptyListComponent
-          title={error}
+          title={t(error)}
           actionButton={{
-            title: "Réessayer",
+            title: "partner.ordersHistory.retry",
             variant: "primary",
             onPress: fetchOrders,
           }}
@@ -325,7 +317,7 @@ export default function PrestataireOrdersHistoryScreen(): React.ReactElement {
 
     if (visibleOrders.length === 0) {
       return (
-        <EmptyListComponent title="Vous n'avez pas de commandes" />
+        <EmptyListComponent title={t("partner.ordersHistory.empty")} />
       );
     }
 
@@ -339,14 +331,14 @@ export default function PrestataireOrdersHistoryScreen(): React.ReactElement {
               <SectionHeader
                 label={item.label}
                 count={item.count}
-                isArabic={isArabic}
               />
             );
           }
           return (
             <OrderCard
               item={item.order}
-              isArabic={isArabic}
+              locale={locale}
+              t={t}
               onPress={() =>
                 router.push(
                   `/(prestataire)/orders/${item.order.id}` as Href,

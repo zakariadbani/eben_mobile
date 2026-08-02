@@ -1,10 +1,11 @@
 import { apiClient } from '../client';
 import type { Paginated, ApiResponse } from '../types';
 import type { Category } from '@/interfaces/Category';
+import { getAllPages } from './paginate';
 
 /** Flat list of level-1 categories (for home screen + categories screen). */
 export async function getCategories(): Promise<Paginated<Category>> {
-  return apiClient.get<Category>('/categories') as Promise<Paginated<Category>>;
+  return getAllPages<Category>('/categories');
 }
 
 /**

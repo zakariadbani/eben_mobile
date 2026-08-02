@@ -10,6 +10,8 @@ export interface UpdateProfilePayload {
   email?: string | null;
   phone?: string;
   avatar?: string | null;
+  /** Required by the backend when changing email or phone. */
+  currentPassword?: string;
 }
 
 /** Fetch the current user's profile. */
@@ -21,5 +23,11 @@ export async function getProfile(): Promise<ApiResponse<ClientProfile>> {
 export async function updateProfile(
   payload: UpdateProfilePayload,
 ): Promise<ApiResponse<ClientProfile>> {
+  if (payload.name !== undefined && !payload.name.trim()) {
+    throw new TypeError('name must not be empty');
+  }
+  if ((payload.email !== undefined || payload.phone !== undefined) && !payload.currentPassword?.trim()) {
+    throw new TypeError('currentPassword is required when changing email or phone');
+  }
   return apiClient.put<ClientProfile>('/profile', payload) as Promise<ApiResponse<ClientProfile>>;
 }

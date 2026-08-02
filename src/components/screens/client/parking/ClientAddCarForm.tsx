@@ -5,16 +5,17 @@
  * Pattern mirrors (auth)/register/car-selection.tsx exactly.
  */
 
-import React, { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet } from 'react-native';
+import { useFormikContext } from 'formik';
+import { useTranslation } from 'react-i18next';
 import View from '@/components/common/View';
 import { Text } from '@/components/common/Text';
+import Button from '@/components/common/Button';
 import { Form, FormPicker, FormSubmit } from '@/components/common/forms';
 import Colors from '@/constants/Colors';
-import { getBrands, getMotorizations, getCarYears, addVehicle } from '@/api';
-import { mockCarModels } from '@/api/mock/mockVehicles';
-import type { CarBrand, CarMotorization, CarYear, CarModel, Vehicle } from '@/interfaces/Vehicle';
-import type { Paginated, ApiResponse } from '@/api/types';
+import { getBrands, getBrandModels, getMotorizations, getCarYears, addVehicle } from '@/api';
+import type { Vehicle } from '@/interfaces/Vehicle';
 
 interface PickerItem {
   id: number;
@@ -30,34 +31,96 @@ interface AddCarFormValues {
 
 interface ClientAddCarFormProps {
   onSuccess: (vehicle: Vehicle) => void;
+  canSubmit?: boolean;
+  onAuthRequired?: () => void;
 }
 
-export default function ClientAddCarForm({ onSuccess }: ClientAddCarFormProps) {
+function isPositiveInteger(value: number | null): value is number {
+  return value !== null && Number.isSafeInteger(value) && value > 0;
+}
+
+function ClearModelOnBrandChange({ brandId }: { brandId: number | null }) {
+  const { setFieldValue } = useFormikContext<AddCarFormValues>();
+  const previousBrand = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (previousBrand.current !== brandId) {
+      previousBrand.current = brandId;
+      void setFieldValue('modelId', null, false);
+    }
+  }, [brandId, setFieldValue]);
+  return null;
+}
+
+function ValidatedSubmit({ submitting }: { submitting: boolean }) {
+  const { values } = useFormikContext<AddCarFormValues>();
+  const valid =
+    isPositiveInteger(values.brandId) &&
+    isPositiveInteger(values.modelId) &&
+    isPositiveInteger(values.year) &&
+    (values.motorizationId === null || isPositiveInteger(values.motorizationId));
+
+  return (
+    <FormSubmit
+      title={submitting ? 'Ajout...' : 'Ajouter la voiture à mon garage'}
+      disabled={submitting || !valid}
+    />
+  );
+}
+
+export default function ClientAddCarForm({
+  onSuccess,
+  canSubmit = true,
+  onAuthRequired,
+}: ClientAddCarFormProps) {
+  const { t } = useTranslation();
   const [brands, setBrands] = useState<PickerItem[]>([]);
   const [years, setYears] = useState<PickerItem[]>([]);
   const [motorizations, setMotorizations] = useState<PickerItem[]>([]);
   const [filteredModels, setFilteredModels] = useState<PickerItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedBrandId, setSelectedBrandId] = useState<number | null>(null);
+  const [catalogState, setCatalogState] = useState<'loading' | 'error' | 'ready'>('loading');
+  const [modelLoading, setModelLoading] = useState(false);
+  const [modelError, setModelError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const modelRequest = useRef(0);
+  const submittingRef = useRef(false);
 
-  useEffect(() => {
-    const load = async () => {
+  const loadCatalog = useCallback(async () => {
+    setCatalogState('loading');
+    try {
       const [brandsRes, yearsRes, motorizationsRes] = await Promise.all([
-        getBrands() as Promise<Paginated<CarBrand>>,
-        getCarYears() as Promise<ApiResponse<CarYear[]>>,
-        getMotorizations() as Promise<Paginated<CarMotorization>>,
+        getBrands(),
+        getCarYears(),
+        getMotorizations(),
       ]);
       setBrands(brandsRes.data.map((b) => ({ id: b.id, title: b.name })));
-      setYears((yearsRes.data as CarYear[]).map((y) => ({ id: y.id, title: y.title })));
+      setYears(yearsRes.data.map((y) => ({ id: y.id, title: y.title })));
       setMotorizations(motorizationsRes.data.map((m) => ({ id: m.id, title: m.name })));
-    };
-    load();
+      setCatalogState('ready');
+    } catch {
+      setCatalogState('error');
+    }
   }, []);
 
-  const handleBrandChange = (item: PickerItem) => {
-    const models = mockCarModels
-      .filter((m: CarModel) => m.brandId === item.id)
-      .map((m: CarModel) => ({ id: m.id, title: m.name }));
-    setFilteredModels(models);
+  useEffect(() => { void loadCatalog(); }, [loadCatalog]);
+
+  const handleBrandChange = async (item: PickerItem) => {
+    const request = ++modelRequest.current;
+    setSelectedBrandId(item.id);
+    setFilteredModels([]);
+    setModelError(null);
+    setModelLoading(true);
+    try {
+      const response = await getBrandModels(item.id);
+      if (request !== modelRequest.current) return;
+      setFilteredModels(response.data.map((model) => ({ id: model.id, title: model.name })));
+    } catch {
+      if (request === modelRequest.current) setModelError(t('auth.error.generic'));
+    } finally {
+      if (request === modelRequest.current) setModelLoading(false);
+    }
   };
 
   const initialValues: AddCarFormValues = {
@@ -68,8 +131,23 @@ export default function ClientAddCarForm({ onSuccess }: ClientAddCarFormProps) {
   };
 
   const handleSubmit = async (values: AddCarFormValues) => {
-    if (!values.brandId || !values.modelId || !values.year) return;
+    if (submittingRef.current) return;
+    if (!canSubmit) {
+      onAuthRequired?.();
+      return;
+    }
+    if (
+      !isPositiveInteger(values.brandId) ||
+      !isPositiveInteger(values.modelId) ||
+      !isPositiveInteger(values.year) ||
+      (values.motorizationId !== null && !isPositiveInteger(values.motorizationId))
+    ) {
+      setFormError(t('auth.error.generic'));
+      return;
+    }
+    submittingRef.current = true;
     setSubmitting(true);
+    setFormError(null);
     try {
       const res = await addVehicle({
         brandId: values.brandId,
@@ -78,10 +156,26 @@ export default function ClientAddCarForm({ onSuccess }: ClientAddCarFormProps) {
         motorizationId: values.motorizationId,
       });
       onSuccess(res.data);
+    } catch {
+      setFormError(t('auth.error.generic'));
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
+
+  if (catalogState === 'loading') {
+    return <ActivityIndicator color={Colors.primary} size="large" />;
+  }
+
+  if (catalogState === 'error') {
+    return (
+      <View style={styles.container}>
+        <Text accessibilityRole="alert">auth.error.generic</Text>
+        <Button title="reviews.retry" fit onPress={() => void loadCatalog()} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -90,14 +184,30 @@ export default function ClientAddCarForm({ onSuccess }: ClientAddCarFormProps) {
       </Text>
 
       <Form initialValues={initialValues} onSubmit={handleSubmit}>
+        <ClearModelOnBrandChange brandId={selectedBrandId} />
         <FormPicker
           name="brandId"
           label="Marque"
           placeholder="Choisir la marque"
           items={brands}
           searchable
-          handleChange={(item: PickerItem) => handleBrandChange(item)}
+          handleChange={(item: PickerItem) => { void handleBrandChange(item); }}
         />
+        {modelLoading ? <ActivityIndicator color={Colors.primary} size="small" /> : null}
+        {modelError ? (
+          <View>
+            <Text accessibilityRole="alert" translate={false}>{modelError}</Text>
+            <Button
+              title="reviews.retry"
+              fit
+              onPress={() => {
+                if (selectedBrandId !== null) {
+                  void handleBrandChange({ id: selectedBrandId, title: '' });
+                }
+              }}
+            />
+          </View>
+        ) : null}
 
         <FormPicker
           name="modelId"
@@ -121,10 +231,8 @@ export default function ClientAddCarForm({ onSuccess }: ClientAddCarFormProps) {
           items={motorizations}
         />
 
-        <FormSubmit
-          title={submitting ? 'Ajout...' : 'Ajouter la voiture à mon garage'}
-          disabled={submitting}
-        />
+        <ValidatedSubmit submitting={submitting} />
+        {formError ? <Text accessibilityRole="alert" translate={false}>{formError}</Text> : null}
       </Form>
     </View>
   );

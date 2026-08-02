@@ -15,7 +15,7 @@
  * Validation: email, raison, and consent are required.
  */
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   StyleSheet,
   TextInput as RNTextInput,
@@ -34,6 +34,8 @@ import CustomModal from "@/components/common/CustomModal";
 import Icon from "@/components/common/Icon";
 
 import { reportAbuse } from "@/api";
+import { ApiClientError } from "@/api/client";
+import { Role, useSession } from "@/context/AuthContext";
 import Colors from "@/constants/Colors";
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -42,8 +44,12 @@ const ReportAbuseScreen: React.FC = () => {
   const { productId } = useLocalSearchParams<{ productId: string }>();
   const router = useRouter();
   const { t, i18n } = useTranslation();
+  const { role } = useSession();
 
-  const numericProductId = Number(productId ?? 0);
+  const rawProductId = productId ?? "";
+  const numericProductId = /^\d+$/.test(rawProductId) ? Number(rawProductId) : Number.NaN;
+  const validProductId = Number.isSafeInteger(numericProductId) && numericProductId > 0;
+  const submittingRef = useRef(false);
 
   const [email, setEmail] = useState("");
   const [raison, setRaison] = useState("");
@@ -56,6 +62,11 @@ const ReportAbuseScreen: React.FC = () => {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
+    if (submittingRef.current) return;
+    if (role !== Role.CLIENT) {
+      router.push("/(auth)/ClientLoginScreen");
+      return;
+    }
     let valid = true;
     if (email.trim().length === 0) {
       setEmailError(true);
@@ -69,21 +80,31 @@ const ReportAbuseScreen: React.FC = () => {
       setConsentError(true);
       valid = false;
     }
-    if (!valid) return;
+    if (!valid || !validProductId) {
+      if (!validProductId) setSubmitError(t("report.submitError"));
+      return;
+    }
 
+    submittingRef.current = true;
     setSubmitting(true);
     setSubmitError(null);
 
     try {
-      await reportAbuse(
+      const response = await reportAbuse(
         numericProductId,
         "other",
         raison.trim(),
+        email.trim(),
+        true,
       );
-      setSuccessVisible(true);
-    } catch {
-      setSubmitError(t("report.submitError"));
+      if (response.data.reported && response.data.productId === numericProductId) setSuccessVisible(true);
+    } catch (error) {
+      const fieldMessage = error instanceof ApiClientError
+        ? Object.values(error.errors)[0]?.[0]
+        : undefined;
+      setSubmitError(fieldMessage ?? (error instanceof ApiClientError ? error.message : t("report.submitError")));
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -113,11 +134,9 @@ const ReportAbuseScreen: React.FC = () => {
             <Text type="default" color={Colors.brand} style={styles.introInline} translate={false}>
               {t("report.intro2part1")}
             </Text>
-            <TouchableOpacity activeOpacity={0.7} onPress={() => router.push("/(client)/settings/pages/Legal")}>
-              <Text type="default" style={[styles.blueLink, styles.introInline]} translate={false}>
-                {t("report.intro2link")}
-              </Text>
-            </TouchableOpacity>
+            <Text type="default" style={[styles.blueLink, styles.introInline]} translate={false}>
+              {t("report.intro2link")}
+            </Text>
             <Text type="default" color={Colors.brand} style={styles.introInline} translate={false}>
               {t("report.intro2part2")}
             </Text>
@@ -193,11 +212,9 @@ const ReportAbuseScreen: React.FC = () => {
               <Text type="small" color={Colors.brand} translate={false} style={styles.consentText}>
                 {t("report.consentText")}
               </Text>
-              <TouchableOpacity activeOpacity={0.7} onPress={() => router.push("/(client)/settings/pages/Legal")}>
-                <Text type="small" style={[styles.blueLink, styles.consentText]} translate={false}>
-                  {t("report.consentLink")}
-                </Text>
-              </TouchableOpacity>
+              <Text type="small" style={[styles.blueLink, styles.consentText]} translate={false}>
+                {t("report.consentLink")}
+              </Text>
             </View>
           </TouchableOpacity>
           {consentError && (
@@ -226,6 +243,7 @@ const ReportAbuseScreen: React.FC = () => {
             textColor={Colors.brand}
             onPress={() => void handleSubmit()}
             style={[styles.submitBtn, submitting ? styles.disabledBtn : undefined]}
+            disabled={submitting}
             rightIcon="times-circle"
             iconTypeName="FontAwesome5"
             iconColor={Colors.brand}

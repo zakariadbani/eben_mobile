@@ -7,12 +7,14 @@
 
 import React from "react";
 import { StyleSheet, Image, ImageBackground, Dimensions } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import Screen from "@/components/common/Screen";
 import { Text } from "@/components/common/Text";
 import View from "@/components/common/View";
 import Icon from "@/components/common/Icon";
 import Colors from "@/constants/Colors";
+import Footer from "@/components/common/Footer";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -28,10 +30,10 @@ interface AboutSectionProps {
 const AboutSection: React.FC<AboutSectionProps> = ({ iconName, iconType = "Ionicons", title, body }) => (
   <View style={styles.section} gap={8}>
     <Icon name={iconName} type={iconType} size={32} iconColor={Colors.brand} />
-    <Text type="subTitle" semiBold color={Colors.brand}>
+    <Text type="subTitle" semiBold color={Colors.brand} translate={false}>
       {title}
     </Text>
-    <Text type="default" color={Colors.grayMidDark}>
+    <Text type="default" color={Colors.grayMidDark} translate={false}>
       {body}
     </Text>
   </View>
@@ -40,6 +42,8 @@ const AboutSection: React.FC<AboutSectionProps> = ({ iconName, iconType = "Ionic
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 const AboutScreen: React.FC = () => {
+  const { t } = useTranslation();
+
   return (
     <Screen scrollable>
       {/* Hero banner */}
@@ -64,7 +68,7 @@ const AboutScreen: React.FC = () => {
             }}
           >
             <Text type="label" color={Colors.white} semiBold center>
-              {"Made in Morocco"}
+              {t("about.madeInMorocco")}
             </Text>
           </View>
         </View>
@@ -75,29 +79,25 @@ const AboutScreen: React.FC = () => {
         <AboutSection
           iconName="crosshair"
           iconType="Feather"
-          title={"NOTRE MISSION"}
-          body={
-            "Faciliter la commande et l'achat de pièces automobiles dans tout le Maroc en supprimant toutes les barrières d'achat et de vente associées à l'industrie."
-          }
+          title={t("about.missionTitle")}
+          body={t("about.missionBody")}
         />
 
         <AboutSection
           iconName="rocket-outline"
-          title={"NOTRE VISION"}
-          body={
-            "Contribuer à numériser et à améliorer l'industrie marocaine des pièces détachées automobiles."
-          }
+          title={t("about.visionTitle")}
+          body={t("about.visionBody")}
         />
 
         <AboutSection
           iconName="star-outline"
-          title={"NOS VALEURS"}
+          title={t("about.valuesTitle")}
           body={""}
         />
         <View flexDirection="row" style={styles.valuesRow} gap={16}>
-          {(["VITESSE", "DISCIPLINE", "AUDACE"] as const).map((v) => (
-            <Text key={v} type="label" semiBold color={Colors.brand}>
-              {v}
+          {(["speed", "discipline", "boldness"] as const).map((value) => (
+            <Text key={value} type="label" semiBold color={Colors.brand} translate={false}>
+              {t(`about.value.${value}`)}
             </Text>
           ))}
         </View>
@@ -105,7 +105,7 @@ const AboutScreen: React.FC = () => {
         {/* Contact */}
         <View style={styles.contactBlock} gap={12}>
           <Text type="label" semiBold color={Colors.brand}>
-            {"Contactes nos:"}
+            {t("about.contact")}
           </Text>
 
           <View flexDirection="row" gap={10} style={styles.contactRow}>
@@ -125,21 +125,13 @@ const AboutScreen: React.FC = () => {
           <View flexDirection="row" gap={10} style={styles.contactRow}>
             <Icon name="location-outline" type="Ionicons" size={18} iconColor={Colors.gray} />
             <Text type="default" color={Colors.grayMidDark} translate={false}>
-              9 Rue AL BORJ appt 8 Rabat, Maroc
+              {t("about.address")}
             </Text>
           </View>
         </View>
       </View>
 
-      {/* Footer */}
-      <View style={styles.footer} flexDirection="row">
-        <Text type="small" color={Colors.gray} style={styles.footerLeft}>
-          {"EBEN Solutions SARL © 2022"}
-        </Text>
-        <Text type="small" color={Colors.gray} style={styles.footerRight}>
-          {"v 1.0.0"}
-        </Text>
-      </View>
+      <Footer />
     </Screen>
   );
 };
@@ -191,17 +183,6 @@ const styles = StyleSheet.create({
   contactRow: {
     alignItems: "center",
   },
-  footer: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderTopWidth: 1,
-    borderTopColor: Colors.backgroundGray,
-    justifyContent: "space-between",
-  },
-  footerLeft: {
-    flex: 1,
-  },
-  footerRight: {},
 });
 
 export default AboutScreen;

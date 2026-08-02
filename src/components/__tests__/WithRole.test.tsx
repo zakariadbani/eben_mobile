@@ -24,6 +24,7 @@ describe("WithRole Component", () => {
     // Mock session as loading
     mockUseSession.mockReturnValue({
       session: null,
+      role: "guest",
       isLoading: true,
     });
 
@@ -40,7 +41,8 @@ describe("WithRole Component", () => {
   it("renders children if role matches", () => {
     // Mock session as loaded with the correct role
     mockUseSession.mockReturnValue({
-      session: { role: Role.CLIENT },
+      session: { user: { role: "client" } },
+      role: Role.CLIENT,
       isLoading: false,
     });
 
@@ -57,7 +59,8 @@ describe("WithRole Component", () => {
   it("does not render children if role does not match", () => {
     // Mock session as loaded with a different role
     mockUseSession.mockReturnValue({
-      session: { role: Role.PRESTATAIRE },
+      session: { user: { role: "ferrailleur" } },
+      role: Role.PRESTATAIRE,
       isLoading: false,
     });
 

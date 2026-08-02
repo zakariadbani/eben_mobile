@@ -24,7 +24,7 @@
  *   - priceFerrailleur only — never expose priceClient / priceBc to the partner screen
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -57,8 +57,10 @@ import {
   getPrestataireOffer,
   type SubmitOfferLinePayload,
 } from '@/api/resources/prestataire';
+import { uploadLocalImages } from '@/api/resources/uploads';
+import { ApiClientError } from '@/api/types';
 import type { Request, RequestItem } from '@/interfaces/Request';
-import type { Offer } from '@/interfaces/Offer';
+import type { PrestataireOffer } from '@/interfaces/Offer';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -72,14 +74,32 @@ interface OfferLine {
   images: string[];
 }
 
+type OfferLineField = 'priceFerrailleur' | 'condition' | 'description' | 'images';
+type OfferLineErrors = Record<number, Partial<Record<OfferLineField, string>>>;
+
+const isLocalImage = (uri: string): boolean => /^(file|content):\/\//i.test(uri);
+
+function mapOfferLineErrors(errors: Record<string, string[]>): OfferLineErrors {
+  const mapped: OfferLineErrors = {};
+  for (const [field, messages] of Object.entries(errors)) {
+    const match = field.match(/^lines\.(\d+)\.(priceFerrailleur|condition|description|images)(?:\.\d+)?$/);
+    const message = messages[0];
+    if (!match || !message) continue;
+    const index = Number(match[1]);
+    const key = match[2] as OfferLineField;
+    mapped[index] = { ...mapped[index], [key]: message };
+  }
+  return mapped;
+}
+
 // ── Condition picker items ─────────────────────────────────────────────────────
 
 // ── Countdown helper ──────────────────────────────────────────────────────────
 
-function formatCountdown(expiresAt: string | null): string {
+function formatCountdown(expiresAt: string | null, expiredLabel: string): string {
   if (!expiresAt) return '—';
   const diff = new Date(expiresAt).getTime() - Date.now();
-  if (diff <= 0) return 'Expiré';
+  if (diff <= 0) return expiredLabel;
   const totalSeconds = Math.floor(diff / 1000);
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
@@ -102,6 +122,10 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   const requestId = Number(offerId);
   const isResendMode = mode === 'resend';
   const existingOfferIdNum = existingOfferId ? Number(existingOfferId) : null;
+  const hasValidRequestId = Number.isSafeInteger(requestId) && requestId > 0;
+  const hasValidExistingOfferId = existingOfferIdNum !== null
+    && Number.isSafeInteger(existingOfferIdNum)
+    && existingOfferIdNum > 0;
   const conditionItems: { id: number; title: string; value: ConditionOption }[] = [
     { id: 1, title: t('partner.fill.conditionOccasion'), value: 'occasion' },
     { id: 2, title: t('partner.fill.conditionEnStock'), value: 'en_stock' },
@@ -114,13 +138,18 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   // ── State ──────────────────────────────────────────────────────────────────
 
   const [request, setRequest] = useState<Request | null>(null);
-  const [existingOffer, setExistingOffer] = useState<Offer | null>(null);
+  const [existingOffer, setExistingOffer] = useState<PrestataireOffer | null>(null);
   const [loadingRequest, setLoadingRequest] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [offerLines, setOfferLines] = useState<OfferLine[]>([]);
+  const [lineErrors, setLineErrors] = useState<OfferLineErrors>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [uploadedPaths, setUploadedPaths] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitDone, setSubmitDone] = useState(false);
+  const [completedOfferId, setCompletedOfferId] = useState<number | null>(null);
+  const mutationLock = useRef(false);
 
   // Decline modal state
   const [declineVisible, setDeclineVisible] = useState(false);
@@ -146,10 +175,30 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
     setLoadingRequest(true);
     setLoadError(null);
     try {
-      // Fetch the incoming request by id (reuse GET /prestataire/incoming-requests mock)
-      // The mock data is keyed by request id; we re-use the mock setup from registry
-      // by calling the prestataire incoming requests mock through a simple find approach.
-      // In real mode this would be: GET /prestataire/requests/:id
+      if (isResendMode) {
+        setRequest(null);
+        if (!hasValidExistingOfferId) {
+          setExistingOffer(null);
+          return;
+        }
+        const offerRes = await getPrestataireOffer(existingOfferIdNum);
+        const ownedOffer = offerRes.data;
+        setExistingOffer(ownedOffer);
+        setOfferLines([{
+          requestItemId: ownedOffer.requestItemId,
+          priceFerrailleur: String(ownedOffer.priceFerrailleur),
+          condition: ownedOffer.condition,
+          description: ownedOffer.description ?? '',
+          images: ownedOffer.images,
+        }]);
+        return;
+      }
+
+      setExistingOffer(null);
+      if (!hasValidRequestId) {
+        setRequest(null);
+        return;
+      }
       const res = await getPrestataireIncomingRequests();
       const found = res.data.find((r) => r.id === requestId) ?? null;
       setRequest(found);
@@ -165,18 +214,19 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
           })),
         );
       }
-
-      // If resend mode, load the existing offer to pre-fill
-      if (isResendMode && existingOfferIdNum) {
-        const offerRes = await getPrestataireOffer(existingOfferIdNum);
-        setExistingOffer(offerRes.data);
-      }
     } catch {
-      setLoadError('Impossible de charger la demande');
+      setLoadError(t('partner.fill.loadError'));
     } finally {
       setLoadingRequest(false);
     }
-  }, [requestId, isResendMode, existingOfferIdNum]);
+  }, [
+    existingOfferIdNum,
+    hasValidExistingOfferId,
+    hasValidRequestId,
+    isResendMode,
+    requestId,
+    t,
+  ]);
 
   useEffect(() => {
     loadData();
@@ -185,32 +235,11 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   // Countdown ticker — refresh every second
   useEffect(() => {
     if (!request?.expiresAt) return;
-    const tick = () => setCountdownLabel(formatCountdown(request.expiresAt));
+    const tick = () => setCountdownLabel(formatCountdown(request.expiresAt, t('partner.offer.statusExpired')));
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [request?.expiresAt]);
-
-  // Pre-fill lines from existing offer when resend data arrives
-  useEffect(() => {
-    if (!existingOffer || !request?.items) return;
-    setOfferLines((prev) =>
-      prev.map((line, index) => {
-        if (index === 0) {
-          return {
-            ...line,
-            priceFerrailleur: String(existingOffer.priceFerrailleur),
-            condition: existingOffer.availability === 'available'
-              ? line.condition
-              : line.condition,
-            description: existingOffer.description ?? '',
-            images: existingOffer.images ?? [],
-          };
-        }
-        return line;
-      }),
-    );
-  }, [existingOffer, request]);
+  }, [request?.expiresAt, t]);
 
   // ── Line helpers ───────────────────────────────────────────────────────────
 
@@ -228,37 +257,63 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   // ── Submit ─────────────────────────────────────────────────────────────────
 
   const handleSubmit = async () => {
-    if (submitting) return;
-    // Validate: every line must have a price
-    const invalid = offerLines.some((l) => {
-      const price = parseFloat(l.priceFerrailleur);
-      return isNaN(price) || price <= 0;
+    if (!hasValidRequestId || mutationLock.current) return;
+    const validationErrors: OfferLineErrors = {};
+    offerLines.forEach((line, index) => {
+      const errors: Partial<Record<OfferLineField, string>> = {};
+      const price = Number(line.priceFerrailleur);
+      if (!Number.isFinite(price) || price <= 0) {
+        errors.priceFerrailleur = t('partner.fill.errorMissingPriceBody');
+      }
+      if (line.images.length === 0 || line.images.some((uri) => !isLocalImage(uri))) {
+        errors.images = t('requestFlow.noPhoto');
+      }
+      if (Object.keys(errors).length > 0) validationErrors[index] = errors;
     });
-    if (invalid) {
-      Alert.alert(
-        t('partner.fill.errorMissingPrice'),
-        t('partner.fill.errorMissingPriceBody'),
-      );
+    if (Object.keys(validationErrors).length > 0) {
+      setLineErrors(validationErrors);
       return;
     }
 
+    mutationLock.current = true;
+    setLineErrors({});
+    setSubmitError(null);
     setSubmitting(true);
     try {
-      const lines: SubmitOfferLinePayload[] = offerLines.map((l) => ({
-        requestItemId: l.requestItemId,
-        priceFerrailleur: parseFloat(l.priceFerrailleur),
-        condition: l.condition,
-        description: l.description.trim() || null,
-        images: l.images,
+      const localUris = offerLines.flatMap((line) => line.images);
+      const pendingUris = localUris.filter((uri) => uploadedPaths[uri] === undefined);
+      const newPaths = pendingUris.length > 0 ? await uploadLocalImages(pendingUris) : [];
+      const nextUploadedPaths = { ...uploadedPaths };
+      pendingUris.forEach((uri, index) => {
+        const path = newPaths[index];
+        if (path) nextUploadedPaths[uri] = path;
+      });
+      if (localUris.some((uri) => !nextUploadedPaths[uri])) throw new Error('Incomplete image upload');
+      setUploadedPaths(nextUploadedPaths);
+
+      const lines: SubmitOfferLinePayload[] = offerLines.map((line) => ({
+        requestItemId: line.requestItemId,
+        priceFerrailleur: Number(line.priceFerrailleur),
+        condition: line.condition,
+        description: line.description.trim() || null,
+        images: line.images.map((uri) => nextUploadedPaths[uri]!),
       }));
-      await submitOffer(requestId, { lines });
+      const result = await submitOffer(requestId, { lines });
+      if (!result.data.success || !Number.isSafeInteger(result.data.offerId) || result.data.offerId <= 0) {
+        throw new Error('Invalid offer response');
+      }
+      setCompletedOfferId(result.data.offerId);
       setSubmitDone(true);
-    } catch {
-      Alert.alert(
-        t('partner.fill.errorTitle'),
-        t('partner.fill.errorSubmit'),
-      );
+    } catch (error) {
+      if (error instanceof ApiClientError && error.status === 422) {
+        const mapped = mapOfferLineErrors(error.errors);
+        setLineErrors(mapped);
+        if (Object.keys(mapped).length === 0) setSubmitError(error.message);
+      } else {
+        setSubmitError(t('partner.fill.errorSubmit'));
+      }
     } finally {
+      mutationLock.current = false;
       setSubmitting(false);
     }
   };
@@ -266,17 +321,21 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   // ── Decline ────────────────────────────────────────────────────────────────
 
   const handleDeclineConfirm = async () => {
+    if (!hasValidRequestId || mutationLock.current) return;
+    mutationLock.current = true;
     setDeclining(true);
     try {
-      await declineRequest(requestId, {
+      const result = await declineRequest(requestId, {
         reason: declineReason?.title,
         comment: declineComment.trim() || undefined,
       });
+      if (!result.data.success || result.data.requestId !== requestId) throw new Error('Invalid decline response');
       setDeclineVisible(false);
       router.back();
     } catch {
       Alert.alert(t('partner.fill.errorTitle'), t('partner.fill.errorDecline'));
     } finally {
+      mutationLock.current = false;
       setDeclining(false);
     }
   };
@@ -284,14 +343,20 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   // ── Resend ─────────────────────────────────────────────────────────────────
 
   const handleResend = async () => {
-    if (!existingOfferIdNum) return;
+    if (!hasValidExistingOfferId || mutationLock.current) return;
+    mutationLock.current = true;
     setResendingOffer(true);
     try {
-      await resendOffer(existingOfferIdNum);
+      const result = await resendOffer(existingOfferIdNum);
+      if (!result.data.success || !Number.isSafeInteger(result.data.offerId) || result.data.offerId <= 0) {
+        throw new Error('Invalid resend response');
+      }
+      setCompletedOfferId(result.data.offerId);
       setSubmitDone(true);
     } catch {
       Alert.alert(t('partner.fill.errorTitle'), t('partner.fill.errorResend'));
     } finally {
+      mutationLock.current = false;
       setResendingOffer(false);
     }
   };
@@ -314,7 +379,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
           <Button
             title="partner.fill.successCta"
             variant="primary"
-            onPress={() => router.replace('/(prestataire)/offers')}
+            onPress={() => completedOfferId && router.replace(`/(prestataire)/offers/${completedOfferId}` as never)}
           />
         </View>
       </Screen>
@@ -334,13 +399,13 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
     );
   }
 
-  if (loadError || !request) {
+  if (loadError || (isResendMode ? !existingOffer : !request)) {
     return (
       <Screen whatsapp={false} scrollable={false}>
         <CustomHeader title="partner.fill.openDetailTitle" />
         <View flex justifyContent="center" alignItems="center" p={24} gap={16}>
           <Text type="default" color={Colors.red} center>
-            {loadError ?? 'Demande introuvable'}
+            {loadError ?? t('partner.fill.notFound')}
           </Text>
           <Button title="partner.fill.retry" variant="primary" onPress={loadData} />
         </View>
@@ -348,7 +413,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
     );
   }
 
-  const items: RequestItem[] = request.items ?? [];
+  const items: RequestItem[] = request?.items ?? [];
 
   // ── Main render ────────────────────────────────────────────────────────────
 
@@ -370,9 +435,9 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
           showsVerticalScrollIndicator={false}
         >
           {/* ── Request images ── */}
-          {!isResendMode && (request.images?.length ?? 0) > 0 && (
+          {!isResendMode && (request?.images?.length ?? 0) > 0 && (
             <View style={styles.heroImageRow} flexDirection="row">
-              {request.images!.slice(0, 3).map((uri, i) => (
+              {request?.images?.slice(0, 3).map((uri, i) => (
                 <Image key={`img-${i}`} source={{ uri }} style={styles.heroImageWrapper} resizeMode="cover" />
               ))}
             </View>
@@ -381,7 +446,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
           {/* ── Vehicle / request info block ── */}
           {!isResendMode && <View style={styles.infoBlock} gap={6}>
             <Text type="small" semiBold color={Colors.brand}>
-              {isArabic ? `المرجع: ${request.reference}` : `Réf: ${request.reference}`}
+              {`${t('partner.offerDetail.ref')} ${request?.reference}`}
             </Text>
             {items[0] ? (
               <>
@@ -396,7 +461,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                 </View>
               </>
             ) : null}
-            {request.notes ? (
+            {request?.notes ? (
               <View style={styles.noteBox}>
                 <Text type="small" color={Colors.grayMidDark} translate={false}>
                   {request.notes}
@@ -415,21 +480,21 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
             {!isResendMode && (
               <View style={[
                 styles.timerBadge,
-                countdownLabel === 'Expiré'
+                countdownLabel === t('partner.offer.statusExpired')
                   ? styles.timerBadgeExpired
                   : styles.timerBadgeActive,
               ]}>
                 <Text
                   type="small"
                   semiBold
-                  color={countdownLabel === 'Expiré' ? Colors.grayMidDark : Colors.noticeUnread}
+                  color={countdownLabel === t('partner.offer.statusExpired') ? Colors.grayMidDark : Colors.noticeUnread}
                   translate={false}
                 >
                   {countdownLabel}
                 </Text>
                 <Text
                   type="small"
-                  color={countdownLabel === 'Expiré' ? Colors.grayMidDark : Colors.noticeUnread}
+                  color={countdownLabel === t('partner.offer.statusExpired') ? Colors.grayMidDark : Colors.noticeUnread}
                 >
                   partner.fill.timerRestante
                 </Text>
@@ -496,7 +561,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                         </View>
                       ) : null}
                       <Text type="textTwo" semiBold color={Colors.brand} numberOfLines={1}>
-                        {`${t("partner.fill.conditionLabel")}: ${t("partner.fill.conditionOccasion")}`}
+                        {`${t("partner.fill.conditionLabel")}: ${t(existingOffer.condition === "occasion" ? "partner.fill.conditionOccasion" : "partner.fill.conditionEnStock")} · ${t("partner.offerDetail.qty")} ${existingOffer.quantity}`}
                       </Text>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.resendImages}>
                         {(existingOffer.images ?? []).map((uri, imageIndex) => (
@@ -526,13 +591,16 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                     <View gap={4}>
                       <Text type="small" color={Colors.grayMidDark}>partner.fill.addPhotos</Text>
                       <ImageInputList
-                        defaultimageUris={line.images}
+                        imageUris={line.images}
                         onAddImage={(uri) => updateLine(index, { images: [...line.images, uri] })}
                         onRemoveImage={(uri) => updateLine(index, { images: line.images.filter((u) => u !== uri) })}
                         canAdd
                         canRemove
                         upload={false}
                       />
+                      {lineErrors[index]?.images ? (
+                        <Text type="small" color={Colors.red} translate={false}>{lineErrors[index].images}</Text>
+                      ) : null}
                     </View>
                     <View gap={4}>
                       <Text type="small" color={Colors.grayMidDark}>partner.fill.conditionLabel</Text>
@@ -545,6 +613,9 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                           if (match) updateLine(index, { condition: match.value });
                         }}
                       />
+                      {lineErrors[index]?.condition ? (
+                        <Text type="small" color={Colors.red} translate={false}>{lineErrors[index].condition}</Text>
+                      ) : null}
                     </View>
                     <View gap={4}>
                       <Text type="small" color={Colors.grayMidDark}>partner.fill.priceLabel</Text>
@@ -568,6 +639,9 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                           {`${parseFloat(line.priceFerrailleur).toFixed(2)} Dhs TTC`}
                         </Text>
                       ) : null}
+                      {lineErrors[index]?.priceFerrailleur ? (
+                        <Text type="small" color={Colors.red} translate={false}>{lineErrors[index].priceFerrailleur}</Text>
+                      ) : null}
                     </View>
                     <View gap={4}>
                       <Text type="small" color={Colors.grayMidDark}>partner.fill.commentLabel</Text>
@@ -580,6 +654,9 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                         numberOfLines={3}
                         style={[styles.commentInput, { textAlign: isArabic ? "right" : "left" }]}
                       />
+                      {lineErrors[index]?.description ? (
+                        <Text type="small" color={Colors.red} translate={false}>{lineErrors[index].description}</Text>
+                      ) : null}
                     </View>
                   </>
                 )}
@@ -587,6 +664,10 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
 
             );
           })}
+
+          {submitError ? (
+            <Text type="small" color={Colors.red} center translate={false}>{submitError}</Text>
+          ) : null}
 
           {/* Spacer at bottom so content clears fixed action bar */}
           <View style={styles.bottomSpacer} />
@@ -621,6 +702,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                 title={resendingOffer ? 'partner.fill.ctaResending' : 'partner.fill.ctaResend'}
                 variant="primary"
                 onPress={handleResend}
+                disabled={resendingOffer}
               />
             ) : (
               <Button

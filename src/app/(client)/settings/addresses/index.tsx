@@ -5,9 +5,9 @@
  * Figma: "Profile / My addresses / Empty" + "Filled".
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import Screen from '@/components/common/Screen';
 import View from '@/components/common/View';
 import { Text } from '@/components/common/Text';
@@ -17,17 +17,17 @@ import Colors from '@/constants/Colors';
 import { getAddresses, deleteAddress, setDefaultAddress } from '@/api';
 import ItemAddressComponent from '@/components/screens/client/addresses/ItemAddressComponent';
 import type { Address } from '@/interfaces/Address';
-import type { Paginated } from '@/api/types';
 import { useTranslation } from 'react-i18next';
 
 export default function MyAddressesScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { state } = useLocalSearchParams<{ state?: string }>();
-  const didOpenRequestedModal = useRef(false);
   const [defaultAddress, setDefaultAddressState] = useState<Address | null>(null);
   const [otherAddresses, setOtherAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const defaultingRef = useRef(false);
 
   // Delete confirmation
   const [pendingDelete, setPendingDelete] = useState<Address | null>(null);
@@ -35,59 +35,57 @@ export default function MyAddressesScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await getAddresses() as Paginated<Address>;
+      const res = await getAddresses();
       const defaultAddr = res.data.find((a) => a.isDefault) ?? null;
       const others = res.data.filter((a) => !a.isDefault);
       setDefaultAddressState(defaultAddr);
       setOtherAddresses(others);
+    } catch {
+      setError(t('settings.address.loadError'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  useEffect(() => {
-    if (state === 'remove' && !loading && !didOpenRequestedModal.current) {
-      const address = otherAddresses[0] ?? defaultAddress;
-      if (address) {
-        didOpenRequestedModal.current = true;
-        setPendingDelete(address);
-      }
-    }
-  }, [defaultAddress, loading, otherAddresses, state]);
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const handleDeleteConfirm = async () => {
-    if (!pendingDelete) return;
+    if (!pendingDelete || deleting) return;
     setDeleting(true);
+    setMutationError(null);
     try {
-      await deleteAddress(pendingDelete.id);
-      if (pendingDelete.isDefault) {
-        setDefaultAddressState(null);
-      } else {
-        setOtherAddresses((prev) => prev.filter((a) => a.id !== pendingDelete.id));
+      const response = await deleteAddress(pendingDelete.id);
+      if (response.data.deleted) {
+        if (pendingDelete.isDefault) setDefaultAddressState(null);
+        else setOtherAddresses((prev) => prev.filter((a) => a.id !== pendingDelete.id));
+        setPendingDelete(null);
       }
+    } catch {
+      setMutationError(t('settings.address.deleteError'));
     } finally {
       setDeleting(false);
-      setPendingDelete(null);
     }
   };
 
   const handleSetDefault = async (address: Address) => {
-    await setDefaultAddress(address.id);
-    // Update local state optimistically
-    if (defaultAddress) {
-      setOtherAddresses((prev) => [
-        ...prev.filter((a) => a.id !== address.id),
-        { ...defaultAddress, isDefault: false },
-      ]);
-    } else {
-      setOtherAddresses((prev) => prev.filter((a) => a.id !== address.id));
+    if (defaultingRef.current) return;
+    defaultingRef.current = true;
+    setMutationError(null);
+    try {
+      const response = await setDefaultAddress(address.id);
+      const returned = response.data;
+      setOtherAddresses((prev) => {
+        const withoutReturned = prev.filter((item) => item.id !== returned.id);
+        return defaultAddress ? [...withoutReturned, { ...defaultAddress, isDefault: false }] : withoutReturned;
+      });
+      setDefaultAddressState(returned);
+    } catch {
+      setMutationError(t('settings.address.defaultError'));
+    } finally {
+      defaultingRef.current = false;
     }
-    setDefaultAddressState({ ...address, isDefault: true });
   };
 
   const navigateToEdit = (address: Address) => {
@@ -101,8 +99,8 @@ export default function MyAddressesScreen() {
     router.push('/(client)/settings/addresses/add');
   };
 
-  const visibleDefaultAddress = state === 'empty' ? null : defaultAddress;
-  const visibleOtherAddresses = state === 'empty' ? [] : otherAddresses;
+  const visibleDefaultAddress = defaultAddress;
+  const visibleOtherAddresses = otherAddresses;
   const isEmpty = !loading && !visibleDefaultAddress && visibleOtherAddresses.length === 0;
 
   const pendingDeleteLabel = pendingDelete
@@ -113,14 +111,19 @@ export default function MyAddressesScreen() {
     <>
       <Screen scrollable whatsapp={false}>
         <View style={styles.container}>
-          {isEmpty ? (
+          {error ? <View style={styles.emptySection} alignItems="center" gap={12}>
+            <Text accessibilityRole="alert" color={Colors.error}>{error}</Text>
+            <Button title={t('settings.retry')} onPress={() => { void load(); }} variant="primary" />
+          </View> : null}
+          {mutationError ? <Text accessibilityRole="alert" color={Colors.error} center>{mutationError}</Text> : null}
+          {!error && isEmpty ? (
             /* ── Empty state ── */
             <View style={styles.emptySection} alignItems="center">
               <Text type="default" color={Colors.gray} center style={styles.emptyText}>
                 {t('addresses.empty')}
               </Text>
             </View>
-          ) : (
+          ) : !error ? (
             /* ── Default address section ── */
             visibleDefaultAddress && (
               <View style={styles.section}>
@@ -131,10 +134,10 @@ export default function MyAddressesScreen() {
                 />
               </View>
             )
-          )}
+          ) : null}
 
           {/* Add CTA */}
-          <View style={styles.addButtonContainer}>
+          {!error ? <View style={styles.addButtonContainer}>
             <Button
               title={t(isEmpty ? 'addresses.addNew' : 'addresses.addAnother')}
               rightIcon="plus"
@@ -143,7 +146,7 @@ export default function MyAddressesScreen() {
               sizeIcon={16}
               onPress={navigateToAdd}
             />
-          </View>
+          </View> : null}
 
           {/* ── Other addresses section ── */}
           {visibleOtherAddresses.length > 0 && (
@@ -164,7 +167,7 @@ export default function MyAddressesScreen() {
           )}
 
           {/* Empty "autres adresses" placeholder */}
-          {isEmpty && (
+          {!error && isEmpty && (
             <View style={styles.othersSection}>
               <Text type="headerTitle" bold style={styles.othersTitle}>
                 {t('addresses.otherTitle')}

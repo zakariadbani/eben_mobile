@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
 import Screen from '@/components/common/Screen';
 import View from '@/components/common/View';
 import { Text } from '@/components/common/Text';
@@ -16,19 +16,18 @@ import Colors from '@/constants/Colors';
 import { getAddresses } from '@/api';
 import type { PaymentMethod } from '@/interfaces/Payment';
 import type { Address } from '@/interfaces/Address';
-import type { Paginated, ApiResponse } from '@/api/types';
-import { apiClient } from '@/api';
+import { getPaymentMethods } from '@/api/resources/orders';
 import { useTranslation } from 'react-i18next';
 
 // ── Payment method label helpers ────────────────────────────────────────────
 
-function paymentTypeLabel(type: string): string {
+function paymentTypeKey(type: string): string {
   const labels: Record<string, string> = {
-    visa: 'Visa',
-    cod: 'Paiement à la livraison',
-    cache_plus: 'Cash Plus',
-    virement: 'Virement bancaire',
-    balance: 'Solde portefeuille',
+    visa: 'settings.payment.type.visa',
+    cod: 'settings.payment.type.cod',
+    cache_plus: 'settings.payment.type.cachePlus',
+    virement: 'settings.payment.type.transfer',
+    balance: 'settings.payment.type.balance',
   };
   return labels[type] ?? type;
 }
@@ -41,11 +40,12 @@ interface PaymentMethodCardProps {
 }
 
 function PaymentMethodCard({ method, onEdit }: PaymentMethodCardProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.card}>
       <View flexDirection="row" alignItems="center" style={styles.cardHeader}>
         <Text type="text" bold style={styles.cardLabel}>
-          {method.label ?? paymentTypeLabel(method.type)}
+          {method.label ?? t(paymentTypeKey(method.type))}
         </Text>
         {onEdit && (
           <TouchableOpacity
@@ -53,28 +53,23 @@ function PaymentMethodCard({ method, onEdit }: PaymentMethodCardProps) {
             activeOpacity={0.7}
             style={styles.editBtn}
           >
-            <Text type="small" color={Colors.grayMidDark}>{'Modifier'}</Text>
+            <Text type="small" color={Colors.grayMidDark}>{t('settings.modify')}</Text>
             <CustomIcon name="pen" size={14} tintColor={Colors.grayMidDark} />
           </TouchableOpacity>
         )}
       </View>
 
       <Text type="small" color={Colors.grayMidDark}>
-        {'Nom: '}
-        {paymentTypeLabel(method.type)}
+        {t('settings.payment.name', { value: t(paymentTypeKey(method.type)) })}
       </Text>
       {method.lastFour && (
         <Text type="small" color={Colors.grayMidDark}>
-          {'Numero: **** **** **** '}
-          {method.lastFour}
+          {t('settings.payment.number', { value: method.lastFour })}
         </Text>
       )}
       {method.expiryMonth !== null && method.expiryYear !== null && (
         <Text type="small" color={Colors.grayMidDark}>
-          {'Date d\'exp.: '}
-          {String(method.expiryMonth).padStart(2, '0')}
-          {'/'}
-          {String(method.expiryYear).slice(-2)}
+          {t('settings.payment.expiry', { value: `${String(method.expiryMonth).padStart(2, '0')}/${String(method.expiryYear).slice(-2)}` })}
         </Text>
       )}
     </View>
@@ -89,6 +84,7 @@ interface AddressCardProps {
 }
 
 function AddressCardSmall({ address, onEdit }: AddressCardProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.card}>
       <View flexDirection="row" alignItems="center" style={styles.cardHeader}>
@@ -101,25 +97,22 @@ function AddressCardSmall({ address, onEdit }: AddressCardProps) {
             activeOpacity={0.7}
             style={styles.editBtn}
           >
-            <Text type="small" color={Colors.grayMidDark}>{'Modifier'}</Text>
+            <Text type="small" color={Colors.grayMidDark}>{t('settings.modify')}</Text>
             <CustomIcon name="pen" size={14} tintColor={Colors.grayMidDark} />
           </TouchableOpacity>
         )}
       </View>
       <Text type="small" color={Colors.grayMidDark}>
-        {'Rue : '}
-        {address.addressLine1.replace(/^Rue\s*:\s*/i, '')}
+        {t('settings.payment.street', { value: address.addressLine1.replace(/^Rue\s*:\s*/i, '') })}
       </Text>
       {address.city ? (
         <Text type="small" color={Colors.grayMidDark}>
-          {'Ville : '}
-          {address.city}
+          {t('settings.payment.city', { value: address.city })}
         </Text>
       ) : null}
       {address.region ? (
         <Text type="small" color={Colors.grayMidDark}>
-          {'État/province/région : '}
-          {address.region}
+          {t('settings.payment.region', { value: address.region })}
         </Text>
       ) : null}
     </View>
@@ -133,20 +126,24 @@ export default function PaymentDetailsScreen() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [defaultAddress, setDefaultAddress] = useState<Address | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const [pmRes, addrRes] = await Promise.all([
-        apiClient.get<PaymentMethod[]>('/payment-methods') as Promise<ApiResponse<PaymentMethod[]>>,
-        getAddresses() as Promise<Paginated<Address>>,
+        getPaymentMethods(),
+        getAddresses(),
       ]);
       setPaymentMethods(pmRes.data);
       setDefaultAddress(addrRes.data.find((a) => a.isDefault) ?? null);
+    } catch {
+      setError(t('settings.payment.loadError'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -159,27 +156,20 @@ export default function PaymentDetailsScreen() {
     <>
       <Screen scrollable whatsapp={false}>
         <View style={styles.container}>
+          {loading ? <ActivityIndicator size="large" color={Colors.primary} /> : null}
+          {error ? <View style={styles.emptySection} alignItems="center" gap={12}>
+            <Text accessibilityRole="alert" color={Colors.error}>{error}</Text>
+            <Button title={t('settings.retry')} onPress={() => { void load(); }} variant="primary" />
+          </View> : null}
           {/* ── Cart principal ── */}
-          {primaryMethod && (
+          {!error && primaryMethod && (
             <View style={styles.section}>
               <PaymentMethodCard method={primaryMethod} />
             </View>
           )}
 
-          {/* ── Add new card CTA ── */}
-          <View style={styles.addButtonContainer}>
-            <Button
-              title={t('payment.addCard')}
-              rightIcon="plus"
-              iconTypeName="FontAwesome5"
-              iconType="standard"
-              sizeIcon={16}
-              disabled
-            />
-          </View>
-
           {/* ── Billing address ── */}
-          {defaultAddress && (
+          {!error && defaultAddress && (
             <View style={styles.section}>
               <Text type="headerTitle" bold style={styles.sectionTitle}>
                 {t('payment.billingAddress')}
@@ -189,7 +179,7 @@ export default function PaymentDetailsScreen() {
           )}
 
           {/* ── Autres cartes ── */}
-          {otherMethods.length > 0 && (
+          {!error && otherMethods.length > 0 && (
             <View style={styles.section}>
               <Text type="headerTitle" bold style={styles.sectionTitle}>
                 {t('payment.otherCards')}
@@ -201,7 +191,7 @@ export default function PaymentDetailsScreen() {
           )}
 
           {/* Empty state */}
-          {!loading && paymentMethods.length === 0 && (
+          {!loading && !error && paymentMethods.length === 0 && (
             <View style={styles.emptySection} alignItems="center">
               <Text type="default" color={Colors.gray} center>
                 {t('payment.empty')}
@@ -244,9 +234,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-  },
-  addButtonContainer: {
-    marginBottom: 24,
   },
   emptySection: {
     paddingVertical: 40,

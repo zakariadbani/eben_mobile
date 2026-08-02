@@ -15,9 +15,10 @@
  * Condition and the breadcrumb path (parentTitle) are carried via router params.
  */
 
-import React, { useEffect, useState } from "react";
-import { FlatList, StyleSheet } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, View as RNView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import type { Href } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import Screen from "@/components/common/Screen";
@@ -29,7 +30,8 @@ import SliderBlockComponent from "@/components/screens/shared/app/SliderBlockCom
 import PubPlacerDemandeBlockComponent from "@/components/screens/shared/app/PubPlacerDemandeBlockComponent";
 import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
 import Colors from "@/constants/Colors";
-import { mockCategories } from "@/api/mock/mockCategories";
+import { getCategoryTree } from "@/api";
+import { Role, useSession } from "@/context/AuthContext";
 import type { Category } from "@/interfaces/Category";
 import type { CategoryProps } from "@/interfaces/Category";
 import type { SubCategoryItem } from "@/components/screens/shared/app/ItemSubCategoryComponent";
@@ -59,32 +61,60 @@ function toSubCategoryItem(cat: Category): SubCategoryItem {
   };
 }
 
+function flattenCategories(categories: Category[]): Category[] {
+  return categories.flatMap((category) => [
+    category,
+    ...flattenCategories(category.children ?? []),
+  ]);
+}
+
 const CategoryDrillScreen: React.FC = () => {
   const router = useRouter();
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
+  const { role } = useSession();
   const isArabic = i18n.language === "ar";
 
   // expo-router useLocalSearchParams returns Record<string, string | string[]>.
   // We cast to our known param shape after extraction.
   const rawParams = useLocalSearchParams();
+  const rawCategoryId =
+    typeof rawParams.categoryId === "string" ? rawParams.categoryId : "";
   const params: DrillParams = {
-    categoryId: String(rawParams.categoryId ?? ""),
+    categoryId: rawCategoryId,
     condition: rawParams.condition === "en_stock" ? "en_stock" : "occasion",
   };
-  const categoryId = Number(params.categoryId);
+  const categoryId = /^\d+$/.test(params.categoryId)
+    ? Number(params.categoryId)
+    : Number.NaN;
   const condition: BrowseCondition = params.condition;
 
   const [current, setCurrent] = useState<Category | undefined>(undefined);
   const [children, setChildren] = useState<Category[]>([]);
   const [levelOneCategories, setLevelOneCategories] = useState<Category[]>([]);
+  const [state, setState] = useState<"loading" | "error" | "ready">("loading");
 
-  useEffect(() => {
-    const found = mockCategories.find((c) => c.id === categoryId);
+  const validCategoryId = Number.isSafeInteger(categoryId) && categoryId > 0;
+  const validCondition =
+    rawParams.condition === undefined ||
+    rawParams.condition === "occasion" ||
+    rawParams.condition === "en_stock";
+
+  const load = useCallback(async () => {
+    if (!validCategoryId || !validCondition) {
+      setState("error");
+      return;
+    }
+    setState("loading");
+    try {
+    const response = await getCategoryTree();
+    const flat = flattenCategories(response.data);
+    const found = flat.find((c) => c.id === categoryId);
     setCurrent(found);
 
     if (found) {
       // If this is a level-3 leaf, redirect straight to results.
       if (found.level === 3) {
+        setState("ready");
         router.replace({
           pathname: "/(client)/categories/results",
           params: { categoryId: String(categoryId), condition },
@@ -92,14 +122,20 @@ const CategoryDrillScreen: React.FC = () => {
         return;
       }
 
-      const kids = mockCategories.filter((c) => c.parentId === found.id);
+      const kids = found.children ?? flat.filter((c) => c.parentId === found.id);
       setChildren(kids);
     }
 
     // Always fetch level-1 categories for the "Vous cherchez d'autres catégories ?" block.
-    const l1 = mockCategories.filter((c) => c.level === 1);
+    const l1 = response.data.filter((c) => c.level === 1);
     setLevelOneCategories(l1);
-  }, [categoryId, condition, router]);
+    setState(found ? "ready" : "error");
+    } catch {
+      setState("error");
+    }
+  }, [categoryId, condition, router, validCategoryId, validCondition]);
+
+  useEffect(() => { void load(); }, [load]);
 
   // Display title: French or Arabic depending on language.
   const screenTitle = current
@@ -131,6 +167,14 @@ const CategoryDrillScreen: React.FC = () => {
     } as never);
   };
 
+  const handleRequestBanner = () => {
+    router.push((
+      role === Role.CLIENT
+        ? "/(client)/requests/CreateRequestScreen"
+        : "/(auth)/ClientLoginScreen"
+    ) as Href);
+  };
+
   // ── Render level-2 children as 2-column grid ──────────────────────────────
   const renderGridItem = ({ item }: { item: Category }) => (
     <View style={styles.gridCell}>
@@ -158,6 +202,21 @@ const CategoryDrillScreen: React.FC = () => {
 
   const isLevelTwoDrill = current?.level === 1 && children.length > 0;
   const isLevelThreeDrill = current?.level === 2 && children.length > 0;
+
+  if (state === "loading") {
+    return <Screen><View flex alignItems="center"><ActivityIndicator color={Colors.primary} size="large" /></View></Screen>;
+  }
+
+  if (state === "error") {
+    return (
+      <Screen padding>
+        <EmptyListComponent
+          title={t("auth.error.generic")}
+          actionButton={{ title: t("reviews.retry"), onPress: load }}
+        />
+      </Screen>
+    );
+  }
 
   return (
     <Screen scrollable padding>
@@ -219,7 +278,21 @@ const CategoryDrillScreen: React.FC = () => {
 
         {/* ── Bottom CTA banner ─────────────────────────────── */}
         <View style={styles.pubBlock}>
-          <PubPlacerDemandeBlockComponent />
+          <TouchableOpacity
+            onPress={handleRequestBanner}
+            accessibilityRole="button"
+            accessibilityLabel={t("Placer une demande")}
+            activeOpacity={0.9}
+          >
+            <RNView
+              pointerEvents="none"
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              <PubPlacerDemandeBlockComponent />
+            </RNView>
+          </TouchableOpacity>
         </View>
       </View>
     </Screen>

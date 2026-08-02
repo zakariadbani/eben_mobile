@@ -1,6 +1,7 @@
 import React from "react";
 import { StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
 import Button from "@/components/common/Button";
@@ -9,8 +10,9 @@ import CarSelectionScreen from "./car-selection";
 
 export default function RegistrationSuccessScreen() {
   const router = useRouter();
-  const { carLabel = "BMW X5 2022 I6" } =
-    useLocalSearchParams<{ carLabel?: string }>();
+  const { t } = useTranslation();
+  const { carLabel } = useLocalSearchParams<{ carLabel?: string }>();
+  const savedCarLabel = typeof carLabel === "string" ? carLabel.trim() : "";
 
   return (
     <View style={styles.root}>
@@ -18,13 +20,15 @@ export default function RegistrationSuccessScreen() {
       <View style={styles.overlay}>
         <View style={styles.modal}>
           <Text type="headerTitle" center style={styles.title}>
-            Voiture ajoutée à votre garage
+            {savedCarLabel ? t("auth.register.vehicleAddedTitle") : t("auth.register.completeTitle")}
           </Text>
           <Text translate={false} center style={styles.body}>
-            {`${carLabel} a été ajouté à votre garage`}
+            {savedCarLabel
+              ? t("auth.register.vehicleAddedBody", { car: savedCarLabel })
+              : t("auth.register.completeBody")}
           </Text>
           <Button
-            title="Aller à la page d'accueil"
+            title={t("auth.register.goHome")}
             onPress={() => router.replace("/(client)")}
           />
         </View>

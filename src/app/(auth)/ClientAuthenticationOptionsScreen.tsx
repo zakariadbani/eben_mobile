@@ -72,23 +72,6 @@ const ClientAuthenticationOptionsScreen = () => {
               title={"Continuer en tant qu'invité"}
             />
           </View>
-          <View style={styles.conditionContainer}>
-            <Text style={styles.info}>
-              Si vous continuez en tant qu'invité, vous acceptez nos
-            </Text>
-            <Button
-              style={styles.conditions}
-              styleTitle={{
-                textDecorationLine: "underline",
-                fontSize: 12,
-                padding: 0,
-              }}
-              outline
-              color="white"
-              title={"conditions et nos accords."}
-              navigateTo="/(auth)/legal"
-            />
-          </View>
         </View>
       </ImageBackground>
     </Screen>
@@ -129,17 +112,6 @@ const styles = StyleSheet.create({
   asGuest: {
     borderWidth: 0,
     marginTop: 56,
-  },
-  conditions: {
-    borderWidth: 0,
-    fontSize: 11,
-    color: Colors.light,
-    paddingVertical: 0,
-    paddingBottom: 20,
-  },
-  conditionContainer: {
-    alignItems: "center",
-    marginTop: 42,
   },
 });
 

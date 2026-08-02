@@ -1,12 +1,9 @@
 import React from "react";
 import { StyleSheet } from "react-native";
-import {
-  Form,
-  FormField,
-  FormSubmit,
-} from "@/components/common/forms";
-import { useGlobalValidation } from "@/helpers/validationHelper";
+import { Form, FormField, FormSubmit } from "@/components/common/forms";
 import { Text } from "@/components/common/Text";
+import Colors from "@/constants/Colors";
+import { useGlobalValidation } from "@/helpers/validationHelper";
 
 interface FormValues {
   phone: string;
@@ -14,52 +11,53 @@ interface FormValues {
 
 interface ForgotPasswordFormProps {
   onSubmit: (values: FormValues) => Promise<void>;
+  error?: string | null;
 }
 
 const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
   onSubmit,
+  error,
 }) => {
   const { createValidationSchema } = useGlobalValidation();
-
-  const initialValues: FormValues = {
-    phone: "",
-  };
-
   const validationSchema = createValidationSchema([
     {
       name: "phone",
       rules: ["required", "numeric"],
-      label: "Phone",
+      label: "auth.fields.phone",
     },
   ]);
+
   return (
     <Form
-      initialValues={initialValues}
+      initialValues={{ phone: "" }}
       onSubmit={onSubmit}
       validationSchema={validationSchema}
     >
       <Text style={styles.subTitle} type="loginDefault" center>
-        Saisissez votre numéro de téléphone que vous avez utilisée pour vous inscrire sur EBEN.
+        auth.recovery.instructions
       </Text>
-
       <FormField
-        label="Phone"
-        placeholder="06 77 77 77 77"
+        label="auth.fields.phone"
+        placeholder="auth.fields.phonePlaceholder"
         name="phone"
-        variant={"secondary"}
+        variant="secondary"
         keyboardType="numeric"
         inputStyle={styles.inputField}
       />
-      <FormSubmit title="Réinitialiser le mot de passe" />
+      {error ? (
+        <Text style={styles.error} accessibilityRole="alert">
+          {error}
+        </Text>
+      ) : null}
+      <FormSubmit
+        title="auth.recovery.start"
+        submittingTitle="auth.recovery.starting"
+      />
     </Form>
   );
 };
 
 const styles = StyleSheet.create({
-  splitView: {
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
   subTitle: {
     marginBottom: 18,
     fontSize: 15,
@@ -67,6 +65,11 @@ const styles = StyleSheet.create({
   },
   inputField: {
     paddingVertical: 8,
+  },
+  error: {
+    color: Colors.errorInbackgroundBrand,
+    marginBottom: 12,
+    textAlign: "center",
   },
 });
 

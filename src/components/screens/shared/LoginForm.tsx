@@ -1,5 +1,7 @@
 import React from "react";
 import { StyleSheet } from "react-native";
+import type { FormikHelpers } from "formik";
+import { useTranslation } from "react-i18next";
 import View from "@/components/common/View";
 import {
   Form,
@@ -17,7 +19,7 @@ interface FormValues {
 }
 
 interface LoginFormProps {
-  onSubmit: (values: FormValues) => Promise<void>;
+  onSubmit: (values: FormValues, helpers: FormikHelpers<FormValues>) => Promise<void>;
   forgotPasswordRoute?: string;
 }
 
@@ -26,28 +28,13 @@ const LoginForm: React.FC<LoginFormProps> = ({
   forgotPasswordRoute = "/(auth)/ForgotPasswordScreen",
 }) => {
   const { createValidationSchema } = useGlobalValidation();
-
-  const initialValues: FormValues = {
-    password: "",
-    phone: "",
-    rememberMe: false,
-  };
-
+  const { t } = useTranslation();
+  const initialValues: FormValues = { password: "", phone: "", rememberMe: false };
   const validationSchema = createValidationSchema([
-    {
-      name: "password",
-      rules: ["required"],
-      label: "Mot de passe",
-      errorMessages: {
-        min: "Le mot de passe doit au moins contenir 6 caractères",
-      },
-    },
-    {
-      name: "phone",
-      rules: ["required"],
-      label: "Numéro de téléphone",
-    },
+    { name: "password", rules: ["required"], label: "auth.fields.password" },
+    { name: "phone", rules: ["required"], label: "auth.fields.phone" },
   ]);
+
   return (
     <Form
       initialValues={initialValues}
@@ -55,42 +42,43 @@ const LoginForm: React.FC<LoginFormProps> = ({
       validationSchema={validationSchema}
     >
       <FormField
-        label="Numéro de téléphone"
-        placeholder="06 77 77 77 77"
+        label="auth.fields.phone"
+        placeholder="auth.fields.phonePlaceholder"
         name="phone"
-        variant={"secondary"}
-        keyboardType="default"
+        variant="secondary"
+        keyboardType="numeric"
       />
       <FormField
-        label="Mot de passe"
+        label="auth.fields.password"
         autoCapitalize="none"
         name="password"
         placeholder="......"
         secureTextEntry
         textContentType="password"
-        variant={"secondary"}
+        variant="secondary"
         leftIcon="lock"
         iconType="standard"
       />
       <View style={styles.splitView} flexDirection="row" alignItems="center">
-        <View>
-          <FormCheckbox
-            name="rememberMe"
-            text="Rappelle-toi de moi"
-            variant={"secondary"}
-          />
-        </View>
-        <View>
-          <Button
-            outline
-            variant="pink"
-            title="Mot de passe oublié ?"
-            style={styles.link}
-            navigateTo={forgotPasswordRoute}
-          />
-        </View>
+        <FormCheckbox
+          name="rememberMe"
+          text={t("auth.login.remember")}
+          variant="secondary"
+          width="auto"
+        />
+        <Button
+          outline
+          fit
+          variant="pink"
+          title={t("auth.login.forgotPassword")}
+          style={styles.link}
+          navigateTo={forgotPasswordRoute}
+        />
       </View>
-      <FormSubmit title="Se connecter" />
+      <FormSubmit
+        title={t("auth.login.submit")}
+        submittingTitle={t("auth.login.submitting")}
+      />
     </Form>
   );
 };

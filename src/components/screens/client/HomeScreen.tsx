@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   ImageBackground,
   ImageSourcePropType,
@@ -12,66 +13,85 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Href, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 
-import { getCategories } from "@/api";
-import { mockRequestSummaries } from "@/api/mock/mockRequests";
+import { getCategories, getCategoryTree, getProducts, getRequests } from "@/api";
 import CustomIcon from "@/components/common/CustomIcon";
 import Screen from "@/components/common/Screen";
 import { Text } from "@/components/common/Text";
+import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
 import Colors from "@/constants/Colors";
+import { Role, useSession } from "@/context/AuthContext";
 import type { Category } from "@/interfaces/Category";
+import type { Product } from "@/interfaces/Product";
 import type { RequestSummary } from "@/interfaces/Request";
 
-interface HomeProduct {
-  id: number;
-  title: string;
-  titleAr: string;
-  category: string;
-  categoryAr: string;
-  priceClient?: number;
-  image: ImageSourcePropType;
-}
-
-const stockProducts: HomeProduct[] = [
-  { id: 1001, title: "Jeu de plaquettes de frein avant Brembo", titleAr: "طقم بطانات الفرامل الأمامية بريمبو", category: "Plaquettes de frein avant", categoryAr: "بطانات الفرامل الأمامية", priceClient: 2676.5, image: require("@/assets/img/freins.png") },
-  { id: 1003, title: "Flexible de frein avant Bosch", titleAr: "خرطوم الفرامل الأمامي بوش", category: "Flexible de frein avant", categoryAr: "خرطوم الفرامل الأمامي", priceClient: 159.9, image: require("@/assets/img/freins.png") },
-  { id: 1005, title: "Kit de distribution complet", titleAr: "طقم التوزيع الكامل", category: "Kit de distribution", categoryAr: "طقم التوزيع", priceClient: 1272, image: require("@/assets/img/moteur.png") },
-];
-
-const recentProducts: HomeProduct[] = [
-  { id: 1002, title: "Jeu de plaquettes de frein avant — occasion", titleAr: "طقم بطانات الفرامل الأمامية — مستعمل", category: "Plaquettes de frein avant", categoryAr: "بطانات الفرامل الأمامية", image: require("@/assets/img/freins.png") },
-  { id: 1004, title: "Disque de frein arrière — occasion", titleAr: "قرص الفرامل الخلفي — مستعمل", category: "Disque de frein arrière", categoryAr: "قرص الفرامل الخلفي", image: require("@/assets/img/freins.png") },
-  { id: 1006, title: "Pare-chocs avant — occasion", titleAr: "المصد الأمامي — مستعمل", category: "Pare-chocs avant", categoryAr: "المصد الأمامي", image: require("@/assets/img/carrosserie.png") },
-];
-
 const promoImage = require("@/assets/img/imagePub.jpeg");
+const fallbackProductImage = require("@/assets/img/freins.png");
+
+function firstLeaf(categories: Category[]): Category | null {
+  for (const category of categories) {
+    if (category.level === 3) return category;
+    const leaf = firstLeaf(category.children ?? []);
+    if (leaf) return leaf;
+  }
+  return null;
+}
 
 const HomeScreen: React.FC = () => {
   const router = useRouter();
   const { t, i18n } = useTranslation();
+  const { role } = useSession();
   const isArabic = i18n.language === "ar";
   const [categories, setCategories] = useState<Category[]>([]);
-  const requests = mockRequestSummaries.slice(0, 2);
+  const [stockProducts, setStockProducts] = useState<Product[]>([]);
+  const [recentProducts, setRecentProducts] = useState<Product[]>([]);
+  const [requests, setRequests] = useState<RequestSummary[]>([]);
+  const [state, setState] = useState<"loading" | "error" | "ready">("loading");
   const push = (href: Href) => router.push(href);
 
-  useEffect(() => {
-    let mounted = true;
-    getCategories().then((response) => {
-      if (!mounted || !("pagination" in response)) return;
-      const order: Record<string, number> = { freins: 1, moteur: 2, mecanique: 2, carrosserie: 3 };
-      setCategories(
-        (response.data as Category[])
-          .filter((category) => category.level === 1)
-          .sort((a, b) => (order[a.slug] ?? 99) - (order[b.slug] ?? 99) || a.sortOrder - b.sortOrder),
-      );
-    });
-    return () => { mounted = false; };
-  }, []);
+  const requireClient = (href: Href) => {
+    push(role === Role.CLIENT ? href : "/(auth)/ClientLoginScreen");
+  };
+
+  const load = useCallback(async () => {
+    setState("loading");
+    try {
+      const [categoryResponse, treeResponse] = await Promise.all([
+        getCategories(),
+        getCategoryTree(),
+      ]);
+      const roots = categoryResponse.data.filter((category) => category.level === 1);
+      const leaf = firstLeaf(treeResponse.data);
+      const [stockResponse, recentResponse, requestResponse] = await Promise.all([
+        leaf
+          ? getProducts({ categoryId: leaf.id, condition: "en_stock", featured: true, perPage: 6 })
+          : Promise.resolve(null),
+        leaf
+          ? getProducts({ categoryId: leaf.id, condition: "occasion", sort: "recent", perPage: 6 })
+          : Promise.resolve(null),
+        role === Role.CLIENT ? getRequests() : Promise.resolve(null),
+      ]);
+      setCategories(roots);
+      setStockProducts(stockResponse?.data ?? []);
+      setRecentProducts(recentResponse?.data ?? []);
+      setRequests(requestResponse?.data.slice(0, 2) ?? []);
+      setState("ready");
+    } catch {
+      setState("error");
+    }
+  }, [role]);
+
+  useEffect(() => { void load(); }, [load]);
 
   const sectionTitle = (title: string, seeAll?: Href) => (
     <View style={[styles.sectionTitleRow, isArabic && styles.rowReverse]}>
       <Text type="titleSection" style={styles.sectionTitle}>{t(title)}</Text>
       {seeAll ? (
-        <TouchableOpacity onPress={() => push(seeAll)} style={[styles.seeAll, isArabic && styles.rowReverse]} accessibilityRole="button" accessibilityLabel={t("home.seeAll")}>
+        <TouchableOpacity
+          onPress={() => push(seeAll)}
+          style={[styles.seeAll, isArabic && styles.rowReverse]}
+          accessibilityRole="button"
+          accessibilityLabel={t("home.seeAll")}
+        >
           <Text type="defaultTwo" style={styles.seeAllText}>{t("home.seeAll")}</Text>
           <CustomIcon name={isArabic ? "arrow_left" : "arrow_right"} size={20} tintColor={Colors.grayMidDark} />
         </TouchableOpacity>
@@ -80,31 +100,64 @@ const HomeScreen: React.FC = () => {
   );
 
   const categoryCard = (category: Category, index: number) => {
-    const source: ImageSourcePropType | undefined = typeof category.image === "string" ? { uri: category.image } : category.image ?? undefined;
+    const source: ImageSourcePropType | undefined =
+      typeof category.image === "string"
+        ? { uri: category.image }
+        : category.image ?? undefined;
     return (
-      <TouchableOpacity key={category.id} onPress={() => push(`/(client)/categories/${category.id}` as Href)} style={styles.categoryCard} accessibilityRole="button" accessibilityLabel={isArabic ? category.titleAr : category.title}>
+      <TouchableOpacity
+        key={category.id}
+        onPress={() => push(`/(client)/categories/${category.id}` as Href)}
+        style={styles.categoryCard}
+        accessibilityRole="button"
+        accessibilityLabel={isArabic ? category.titleAr : category.title}
+      >
         {source ? <Image source={source} style={styles.categoryImage} resizeMode="contain" /> : null}
-        <Text type="defaultTwo" semiBold center numberOfLines={1} style={[styles.categoryTitle, index === 0 && styles.uppercase]}>{isArabic ? category.titleAr : category.title}</Text>
+        <Text
+          type="defaultTwo"
+          semiBold
+          center
+          numberOfLines={1}
+          style={[styles.categoryTitle, index === 0 && styles.uppercase]}
+          translate={false}
+        >
+          {isArabic ? category.titleAr : category.title}
+        </Text>
       </TouchableOpacity>
     );
   };
 
   const requestCard = (request: RequestSummary) => {
-    const ready = request.status === "offers_received";
+    const ready = request.status === "validated";
     return (
-      <TouchableOpacity key={request.id} onPress={() => push(`/(client)/requests/${request.id}` as Href)} style={[styles.requestCard, isArabic && styles.rowReverse]} accessibilityRole="button">
+      <TouchableOpacity
+        key={request.id}
+        onPress={() => push(`/(client)/requests/${request.id}` as Href)}
+        style={[styles.requestCard, isArabic && styles.rowReverse]}
+        accessibilityRole="button"
+      >
         <CustomIcon name={ready ? "orders" : "clock"} size={50} />
         <View style={styles.requestInfo}>
           <View style={[styles.referenceRow, isArabic && styles.rowReverse]}>
-            <Text type="label" style={styles.reference}>{t("home.reference", { value: request.reference })}</Text>
-            {ready ? <Text type="defaultTwo" semiBold style={styles.ready}>{t("home.ready")}</Text> : null}
+            <Text type="label" style={styles.reference}>
+              {t("home.reference", { value: request.reference })}
+            </Text>
+            {ready ? <Text type="defaultTwo" semiBold style={styles.ready}>home.ready</Text> : null}
           </View>
-          <Text type="defaultTwo" semiBold style={styles.requestStatus}>{t(ready ? "home.offersReceived" : "home.priceCountdown")}</Text>
-          <Text type="defaultTwo" semiBold style={styles.requestExpiry}>{ready ? t("home.expiresIn", { value: request.expiresDisplay ?? "" }) : request.expiresDisplay}</Text>
+          <Text type="defaultTwo" semiBold style={styles.requestStatus}>
+            {ready ? "home.offersReceived" : "home.priceCountdown"}
+          </Text>
+          <Text type="defaultTwo" semiBold style={styles.requestExpiry} translate={false}>
+            {ready
+              ? t("home.expiresIn", { value: request.expiresDisplay ?? "" })
+              : request.expiresDisplay ?? ""}
+          </Text>
         </View>
         <View style={styles.requestActionWrap}>
           <View style={[styles.requestAction, ready ? styles.readyAction : styles.detailAction, isArabic && styles.rowReverse]}>
-            <Text type="defaultTwo" semiBold style={styles.actionText}>{t(ready ? "home.checkPrices" : "home.details")}</Text>
+            <Text type="defaultTwo" semiBold style={styles.actionText}>
+              {ready ? "home.checkPrices" : "home.details"}
+            </Text>
             <CustomIcon name={isArabic ? "arrow_left" : "arrow_right"} size={18} />
           </View>
         </View>
@@ -112,71 +165,141 @@ const HomeScreen: React.FC = () => {
     );
   };
 
-  const productCard = (product: HomeProduct, recent = false) => (
-    <TouchableOpacity key={product.id} onPress={() => push({ pathname: "/(client)/products/[productId]", params: { productId: String(product.id) } })} style={[styles.productCard, recent && styles.recentCard]} accessibilityRole="button" accessibilityLabel={isArabic ? product.titleAr : product.title}>
+  const productCard = (product: Product, recent = false) => (
+    <TouchableOpacity
+      key={product.id}
+      onPress={() => push({ pathname: "/(client)/products/[productId]", params: { productId: String(product.id) } })}
+      style={[styles.productCard, recent && styles.recentCard]}
+      accessibilityRole="button"
+      accessibilityLabel={isArabic ? product.titleAr : product.title}
+    >
       {!recent ? <Text translate={false} style={styles.heart}>♡</Text> : null}
-      <Image source={product.image} style={styles.productImage} resizeMode="contain" />
+      <Image
+        source={product.images[0] ? { uri: product.images[0] } : fallbackProductImage}
+        style={styles.productImage}
+        resizeMode="contain"
+      />
       <View style={styles.productInfo}>
-        <Text type="label" style={styles.article} numberOfLines={1}>{t("home.articleNumber", { value: product.id })}</Text>
-        <Text type="label" style={styles.productCategory} numberOfLines={1}>{t("home.category", { value: isArabic ? product.categoryAr : product.category })}</Text>
-        <Text type="defaultTwo" semiBold center style={styles.productTitle} numberOfLines={3}>{isArabic ? product.titleAr : product.title}</Text>
+        <Text type="label" style={styles.article} numberOfLines={1}>
+          {t("home.articleNumber", { value: product.articleNumber })}
+        </Text>
+        <Text type="label" style={styles.productCategory} numberOfLines={1}>
+          {t("home.category", { value: isArabic ? product.categoryNameAr : product.categoryName })}
+        </Text>
+        <Text type="defaultTwo" semiBold center style={styles.productTitle} numberOfLines={3} translate={false}>
+          {isArabic ? product.titleAr : product.title}
+        </Text>
       </View>
       {recent ? (
         <View style={[styles.listButton, isArabic && styles.rowReverse]}>
-          <Text type="defaultTwo" semiBold>{t("home.list")}</Text><CustomIcon name="liste" size={17} />
+          <Text type="defaultTwo" semiBold>home.list</Text>
+          <CustomIcon name="liste" size={17} />
         </View>
-      ) : product.priceClient !== undefined ? (
+      ) : (
         <View style={styles.priceBlock}>
-          <Text type="defaultTwo" semiBold center style={styles.price}>{t("home.price", { value: product.priceClient.toLocaleString("fr-MA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })}</Text>
-          <Text type="small" center style={styles.shipping}>{t("home.shippingExcluded")}</Text>
+          <Text type="defaultTwo" semiBold center style={styles.price}>
+            {t("home.price", {
+              value: (product.promoPrice ?? product.price).toLocaleString("fr-MA", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }),
+            })}
+          </Text>
+          <Text type="small" center style={styles.shipping}>home.shippingExcluded</Text>
         </View>
-      ) : null}
+      )}
     </TouchableOpacity>
   );
 
-  const productSlider = (products: HomeProduct[], recent = false) => (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.horizontalContent, isArabic && styles.rowReverse]}>
-      {products.map((product) => productCard(product, recent))}
-    </ScrollView>
+  const productSlider = (products: Product[], recent = false) => (
+    products.length === 0 ? <EmptyListComponent title={t("wishlist.empty")} /> : (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.horizontalContent, isArabic && styles.rowReverse]}>
+        {products.map((product) => productCard(product, recent))}
+      </ScrollView>
+    )
   );
 
   const promo = (limited = false) => (
     <View style={styles.promoSection}>
-      <Text type="titleSection" style={styles.promoHeading}>{t(limited ? "home.limitedOffers" : "home.learnMore")}</Text>
+      <Text type="titleSection" style={styles.promoHeading}>
+        {limited ? "home.limitedOffers" : "home.learnMore"}
+      </Text>
       <ImageBackground source={promoImage} style={styles.promoCard} imageStyle={styles.promoImage}>
-        <LinearGradient colors={isArabic ? ["rgba(0,0,0,0.1)", "rgba(0,0,0,0.95)"] : ["rgba(0,0,0,0.95)", "rgba(0,0,0,0.1)"]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
+        <LinearGradient
+          colors={isArabic ? ["rgba(0,0,0,0.1)", "rgba(0,0,0,0.95)"] : ["rgba(0,0,0,0.95)", "rgba(0,0,0,0.1)"]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
         <View style={[styles.promoCopy, isArabic && styles.promoCopyArabic]}>
-          <Text type="defaultTwo" semiBold style={styles.promoTitle}>{t("home.promoTitle")}</Text>
+          <Text type="defaultTwo" semiBold style={styles.promoTitle}>home.promoTitle</Text>
           <View style={styles.promoUnderline} />
-          <Text type="label" style={styles.promoBody}>{t("home.promoBody")}</Text>
-          <Text type="label" style={styles.promoHighlight}>{t("home.promoHighlight")}</Text>
-          <TouchableOpacity onPress={() => push("/(client)/categories")} style={[styles.demoButton, isArabic && styles.rowReverse]} accessibilityRole="button">
-            <Text type="defaultTwo" semiBold>{t("home.viewDemo")}</Text><CustomIcon name="eye" size={18} />
+          <Text type="label" style={styles.promoBody}>home.promoBody</Text>
+          <Text type="label" style={styles.promoHighlight}>home.promoHighlight</Text>
+          <TouchableOpacity
+            onPress={() => push("/(client)/categories")}
+            style={[styles.demoButton, isArabic && styles.rowReverse]}
+            accessibilityRole="button"
+          >
+            <Text type="defaultTwo" semiBold>home.viewDemo</Text>
+            <CustomIcon name="eye" size={18} />
           </TouchableOpacity>
         </View>
       </ImageBackground>
     </View>
   );
 
+  if (state === "loading") {
+    return <Screen><View style={styles.center}><ActivityIndicator size="large" color={Colors.primary} /></View></Screen>;
+  }
+
+  if (state === "error") {
+    return (
+      <Screen padding>
+        <EmptyListComponent
+          title={t("auth.error.generic")}
+          actionButton={{ title: t("reviews.retry"), onPress: load }}
+        />
+      </Screen>
+    );
+  }
+
+  if (categories.length === 0 && stockProducts.length === 0 && recentProducts.length === 0) {
+    return <Screen padding><EmptyListComponent title={t("wishlist.empty")} /></Screen>;
+  }
+
   return (
     <Screen scrollable whatsapp={false} padding={false}>
       <View style={styles.container}>
         <View style={styles.categoriesSection}>
           {sectionTitle("home.searchQuestion", "/(client)/categories")}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.horizontalContent, isArabic && styles.rowReverse]}>{categories.map(categoryCard)}</ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.horizontalContent, isArabic && styles.rowReverse]}>
+            {categories.map(categoryCard)}
+          </ScrollView>
         </View>
+
         <View style={styles.requestsSection}>
           {sectionTitle("home.activeRequests", "/(client)/requests/OrdersListScreen")}
           {requests.map(requestCard)}
-          <View style={[styles.notice, isArabic && styles.rowReverse]}><CustomIcon name="info" size={28} tintColor={Colors.grayMidDark} /><Text type="label" style={styles.noticeText}>{t("home.orderNotice")}</Text></View>
+          <View style={[styles.notice, isArabic && styles.rowReverse]}>
+            <CustomIcon name="info" size={28} tintColor={Colors.grayMidDark} />
+            <Text type="label" style={styles.noticeText}>home.orderNotice</Text>
+          </View>
         </View>
+
         <View style={styles.stockSection}>{sectionTitle("home.stockProducts", "/(client)/categories")}{productSlider(stockProducts)}</View>
         {promo()}
         <View style={styles.recentSection}>{sectionTitle("home.recentProducts")}{productSlider(recentProducts, true)}</View>
         {promo(true)}
         <View style={styles.ctaSection}>
-          <Text type="titleSection" style={styles.ctaHeading}>{t("home.startExperience")}</Text>
-          <TouchableOpacity onPress={() => push("/(client)/requests/CreateRequestScreen")} style={styles.cta} accessibilityRole="button"><Text type="defaultTwo" semiBold center style={styles.ctaText}>{t("home.requestNow")}</Text></TouchableOpacity>
+          <Text type="titleSection" style={styles.ctaHeading}>home.startExperience</Text>
+          <TouchableOpacity
+            onPress={() => requireClient("/(client)/requests/CreateRequestScreen")}
+            style={styles.cta}
+            accessibilityRole="button"
+          >
+            <Text type="defaultTwo" semiBold center style={styles.ctaText}>home.requestNow</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Screen>
@@ -184,6 +307,7 @@ const HomeScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { paddingHorizontal: 16, paddingTop: 28, paddingBottom: 34, backgroundColor: Colors.white },
   rowReverse: { flexDirection: "row-reverse" },
   sectionTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },

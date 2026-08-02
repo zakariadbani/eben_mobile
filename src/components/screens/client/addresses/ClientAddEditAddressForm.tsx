@@ -6,7 +6,7 @@
  * and /(client)/settings/addresses/[addressId]/index.tsx.
  */
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import * as Yup from 'yup';
 import View from '@/components/common/View';
@@ -16,6 +16,8 @@ import Colors from '@/constants/Colors';
 import { addAddress, updateAddress } from '@/api';
 import type { Address } from '@/interfaces/Address';
 import type { AddAddressPayload } from '@/api/resources/addresses';
+import { ApiClientError } from '@/api/types';
+import { useTranslation } from 'react-i18next';
 
 interface AddressFormValues {
   label: string;
@@ -25,11 +27,6 @@ interface AddressFormValues {
   postalCode: string;
   region: string;
 }
-
-const validationSchema = Yup.object({
-  addressLine1: Yup.string().required('Ce champ est obligatoire'),
-  city: Yup.string().required('Ce champ est obligatoire'),
-});
 
 interface ClientAddEditAddressFormProps {
   /** If provided, the form is in edit mode. */
@@ -43,7 +40,14 @@ export default function ClientAddEditAddressForm({
   onSuccess,
 }: ClientAddEditAddressFormProps) {
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const submittingRef = useRef(false);
+  const { t } = useTranslation();
   const isEdit = address !== undefined;
+  const validationSchema = Yup.object({
+    addressLine1: Yup.string().trim().required(t('settings.address.required')),
+    city: Yup.string().trim().required(t('settings.address.required')),
+  });
 
   const initialValues: AddressFormValues = {
     label: address?.label ?? '',
@@ -55,7 +59,10 @@ export default function ClientAddEditAddressForm({
   };
 
   const handleSubmit = async (values: AddressFormValues) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const payload: AddAddressPayload = {
         label: values.label.trim() || null,
@@ -74,7 +81,11 @@ export default function ClientAddEditAddressForm({
         res = await addAddress(payload);
       }
       onSuccess(res.data);
+    } catch (error) {
+      const fieldMessage = error instanceof ApiClientError ? Object.values(error.errors)[0]?.[0] : undefined;
+      setSubmitError(fieldMessage ?? t('settings.address.saveError'));
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -82,7 +93,7 @@ export default function ClientAddEditAddressForm({
   return (
     <View style={styles.container}>
       <Text type="text" bold style={styles.title}>
-        {isEdit ? 'Modifier l\'adresse' : 'Ajouter une adresse'}
+        {t(isEdit ? 'settings.address.editTitle' : 'settings.address.addTitle')}
       </Text>
 
       <Form
@@ -93,52 +104,53 @@ export default function ClientAddEditAddressForm({
       >
         <FormField
           name="label"
-          label="Nom de l'adresse (ex: Ma maison)"
-          placeholder="Ma maison, Mon bureau..."
+          label={t('settings.address.label')}
+          placeholder={t('settings.address.labelPlaceholder')}
         />
 
         <FormField
           name="addressLine1"
-          label="Adresse"
-          placeholder="Rue, numéro..."
+          label={t('settings.address.line1')}
+          placeholder={t('settings.address.line1Placeholder')}
         />
 
         <FormField
           name="addressLine2"
-          label="Complément d'adresse (optionnel)"
-          placeholder="Appartement, étage..."
+          label={t('settings.address.line2')}
+          placeholder={t('settings.address.line2Placeholder')}
         />
 
         <FormField
           name="city"
-          label="Ville"
-          placeholder="Casablanca, Rabat..."
+          label={t('settings.address.city')}
+          placeholder={t('settings.address.cityPlaceholder')}
         />
 
         <FormField
           name="postalCode"
-          label="Code postal (optionnel)"
+          label={t('settings.address.postalCode')}
           placeholder="20000"
           keyboardType="numeric"
         />
 
         <FormField
           name="region"
-          label="État/province/région (optionnel)"
-          placeholder="Casablanca-Settat"
+          label={t('settings.address.region')}
+          placeholder={t('settings.address.regionPlaceholder')}
         />
 
         <FormSubmit
           title={
             submitting
-              ? 'Enregistrement...'
+              ? t('settings.saving')
               : isEdit
-              ? 'Modifier l\'adresse'
-              : 'Ajouter l\'adresse'
+              ? t('settings.address.editAction')
+              : t('settings.address.addAction')
           }
           disabled={submitting}
           style={styles.submitButton}
         />
+        {submitError ? <Text accessibilityRole="alert" type="small" color={Colors.error} center style={styles.submitError}>{submitError}</Text> : null}
       </Form>
     </View>
   );
@@ -155,4 +167,5 @@ const styles = StyleSheet.create({
   submitButton: {
     marginTop: 4,
   },
+  submitError: { marginTop: 10 },
 });

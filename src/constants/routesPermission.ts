@@ -71,6 +71,7 @@ const allowedRoutes: Record<AllowedRole, string[]> = {
     // Profile / Settings tab
     "(client)/settings/index",
     "(client)/settings/profile/index",
+    "(client)/settings/profile/verify-phone",
     "(client)/settings/orders/index",
     "(client)/settings/orders/[orderId]/index",
     "(client)/settings/archived-offers/index",
@@ -82,7 +83,6 @@ const allowedRoutes: Record<AllowedRole, string[]> = {
     "(client)/settings/notifications/index",
     "(client)/settings/wishlist/index",
     "(client)/settings/pages/About",
-    "(client)/settings/pages/Legal",
     "(client)/settings/language/index",
   ],
 
@@ -126,7 +126,6 @@ const allowedRoutes: Record<AllowedRole, string[]> = {
     "(prestataire)/profile/notifications",
     "(prestataire)/profile/language",
     "(prestataire)/profile/about",
-    "(prestataire)/profile/legal",
 
     // Legacy stub screen kept from original scaffold
     "(prestataire)/settings",
@@ -181,9 +180,7 @@ const allowedRoutes: Record<AllowedRole, string[]> = {
     "(client)/categories/results",
     "(client)/search",
     "(client)/search/index",
-    "(client)/requests/index",
     "(client)/requests/login-to-send",
-    "(client)/cart/index",
     // Product browsing is guest-accessible
     "(client)/products/[productId]",
     "(client)/products/[productId]/reviews",

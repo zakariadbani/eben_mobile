@@ -97,7 +97,7 @@ export default function ClientCheckoutForm({
       {/* ── Section 2 : Delivery address ────────────────────────────────── */}
       <View style={styles.section}>
         <Text type="text" bold style={styles.sectionTitle}>
-          {'2- Détails d\'expédition'}
+          {t('checkout.shippingDetails')}
         </Text>
 
         {addresses.slice(0, 2).map((address, index) => (
@@ -105,6 +105,9 @@ export default function ClientCheckoutForm({
             key={address.id}
             onPress={() => onSelectAddress(address.id)}
             activeOpacity={0.7}
+            accessibilityRole="radio"
+            accessibilityLabel={index === 0 ? t('Utiliser mon adresse principale') : t("Utiliser l'adresse de mon mécanicien")}
+            accessibilityState={{ checked: selectedAddressId === address.id }}
           >
             <View flexDirection="row" alignItems="center" style={styles.addressRow} gap={10}>
               <RadioButton
@@ -120,7 +123,7 @@ export default function ClientCheckoutForm({
           </TouchableOpacity>
         ))}
 
-        <TouchableOpacity onPress={onAddAddress} activeOpacity={0.7}>
+        <TouchableOpacity onPress={onAddAddress} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('Utiliser une nouvelle adresse')}>
           <View flexDirection="row" alignItems="center" style={styles.addressRow} gap={10}>
             <RadioButton isSelected={false} onValueChange={onAddAddress} />
             <Text type="label" style={styles.addressTextBlock}>
@@ -133,16 +136,21 @@ export default function ClientCheckoutForm({
       {/* ── Section 3 : Payment method ──────────────────────────────────── */}
       <View style={styles.section}>
         <Text type="text" bold style={styles.sectionTitle}>
-          {'3- Mode de Paiement'}
+          {t('checkout.paymentMethod')}
         </Text>
 
         {PAYMENT_OPTIONS.map((opt) => {
           const isSelected = selectedPaymentMethod === opt.type;
+          const isDisabled = opt.type !== 'cod';
           return (
             <TouchableOpacity
               key={opt.type}
               onPress={() => onSelectPaymentMethod(opt.type)}
               activeOpacity={0.7}
+              disabled={isDisabled}
+              accessibilityRole="radio"
+              accessibilityLabel={t(opt.labelKey)}
+              accessibilityState={{ checked: isSelected, disabled: isDisabled }}
             >
               <View style={styles.paymentRow} gap={8}>
                 {/* Row: square checkbox + label + optional card icon */}
@@ -183,19 +191,22 @@ export default function ClientCheckoutForm({
 
       <View style={styles.section}>
         <Text type="text" bold style={styles.sectionTitle}>
-          {t('4- Détails du paiement')}
+          {t('checkout.paymentDetails')}
         </Text>
 
         <TouchableOpacity
           onPress={() => setBillingSame((value) => !value)}
           activeOpacity={0.7}
+          accessibilityRole="checkbox"
+          accessibilityLabel={t('checkout.billingSame')}
+          accessibilityState={{ checked: billingSame }}
         >
           <View flexDirection="row" alignItems="flex-start" gap={8} style={styles.billingToggle}>
             <RNView style={[styles.squareBox, billingSame && styles.squareBoxSelected]}>
               {billingSame ? <Text style={styles.squareCheck}>{'✓'}</Text> : null}
             </RNView>
             <Text type="label" flex>
-              {t('Les détails de facturation sont les mêmes que ceux de l’expédition')}
+              {t('checkout.billingSame')}
             </Text>
           </View>
         </TouchableOpacity>

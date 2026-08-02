@@ -7,10 +7,6 @@
  * Bilingual convention (CONFIRMED A-16):
  *   French is the primary field (`title`), Arabic is the `Ar` suffix (`titleAr`)
  *   matching the DB in-row `_ar` column convention.
- *
- * Margin rule (read-only — stored at creation time, never recomputed on the fly):
- *   priceFerrailleur × 1.06 = price (client price shown on the listing)
- *   priceFerrailleur × 0.94 = priceBc (purchase-order price sent to ferrailleur)
  */
 
 export type ProductCondition = 'en_stock' | 'occasion';
@@ -41,25 +37,15 @@ export interface Product {
   /** Manufacturer article / part number shown below the title. */
   articleNumber: string;
 
-  // ── Pricing (MARGIN-CRITICAL) ───────────────────────────────────────────────
-  /**
-   * Client price — the price shown to the buyer.
-   * = priceFerrailleur × 1.06
-   * Stored immutably at listing creation time.
-   */
+  // ── Pricing ─────────────────────────────────────────────────────────────────
+  /** Client price returned by the public API and shown to the buyer. */
   price: number;
-  /**
-   * BC (bon de commande) price — the purchase-order amount sent to the ferrailleur.
-   * = priceFerrailleur × 0.94
-   * Optional here (hidden from buyer UI, visible to BC / admin).
-   */
-  priceBc?: number;
   /**
    * Promotional/discounted client price.
    * When set, `price` is the original crossed-out price and `promoPrice` is the
    * green sale price shown with the Promo badge.
    */
-  promoPrice?: number;
+  promoPrice?: number | null;
 
   // ── Media ───────────────────────────────────────────────────────────────────
   /**
@@ -84,25 +70,25 @@ export interface Product {
 
   // ── Seller / brand info ─────────────────────────────────────────────────────
   /** Part / manufacturer brand name (e.g. "Bosch", "Brembo"). */
-  brand?: string;
+  brand?: string | null;
   /** Display name of the seller / ferrailleur who listed the part. */
-  sellerName?: string;
+  sellerName?: string | null;
   /** Seller's user id — used for navigation to seller profile. */
-  sellerId?: number;
+  sellerId?: number | null;
 
   // ── Ratings ─────────────────────────────────────────────────────────────────
   /** Aggregate star rating (0–5, float). Absent until at least 1 review. */
   rating?: number;
   /** Total number of reviews. */
-  reviewsCount?: number;
+  reviewsCount: number;
 
   // ── Inventory / logistics ───────────────────────────────────────────────────
-  /** Available stock quantity. `undefined` = unknown / not displayed. */
-  stock?: number;
+  /** Available stock quantity. */
+  stock: number;
   /** Warranty period as a localised human-readable string (e.g. "6 mois"). */
-  warranty?: string;
+  warranty?: string | null;
   /** Arabic warranty text. */
-  warrantyAr?: string;
+  warrantyAr?: string | null;
 
   // ── Timestamps ──────────────────────────────────────────────────────────────
   createdAt: string;

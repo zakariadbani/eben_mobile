@@ -16,7 +16,7 @@
  *   • RTL-aware. All strings i18n except amounts.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -35,6 +35,7 @@ import Icon from '@/components/common/Icon';
 import Colors from '@/constants/Colors';
 
 import { getPrestataireWallet, requestWithdrawal } from '@/api/resources/prestataire';
+import { ApiClientError } from '@/api/types';
 import type { PrestataireWallet } from '@/interfaces/Wallet';
 import type { Withdrawal } from '@/interfaces/Wallet';
 import CustomHeader from '@/components/common/CustomHeader';
@@ -56,8 +57,8 @@ const METHODS: MethodItem[] = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatBalance(amount: number): string {
-  return amount.toLocaleString('fr-MA', {
+function formatBalance(amount: number, locale: string): string {
+  return amount.toLocaleString(locale, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });
@@ -68,7 +69,9 @@ function formatBalance(amount: number): string {
 export default function PrestataireWithdrawScreen(): React.ReactElement {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
+  const locale = isArabic ? 'ar-MA' : 'fr-MA';
   const router = useRouter();
+  const submittingRef = useRef(false);
 
   // Wallet balance
   const [wallet, setWallet] = useState<PrestataireWallet | null>(null);
@@ -138,10 +141,11 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
   // ── Submit ────────────────────────────────────────────────────────────────────
 
   const handleSubmit = async () => {
-    if (!validate()) return;
+    if (submittingRef.current || !validate()) return;
 
     const parsed = parseFloat(amount.replace(/\s/g, '').replace(',', '.'));
 
+    submittingRef.current = true;
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -153,7 +157,6 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
             pathname: '/(prestataire)/profile/wallet/verification',
             params: {
               amount: String(parsed),
-              method: method ?? 'virement',
               withdrawalId: String(result.withdrawal.id),
             },
           } as never);
@@ -161,17 +164,20 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
           router.push({
             pathname: '/(prestataire)/profile/wallet/success',
             params: {
-              amount: String(parsed),
-              method: method ?? 'virement',
+              withdrawalId: String(result.withdrawal.id),
             },
           } as never);
         }
       } else {
         setSubmitError(t('partner.withdraw.submitError'));
       }
-    } catch {
-      setSubmitError(t('partner.withdraw.submitError'));
+    } catch (caught) {
+      const fieldMessage = caught instanceof ApiClientError
+        ? Object.values(caught.errors)[0]?.[0]
+        : undefined;
+      setSubmitError(fieldMessage ?? (caught instanceof ApiClientError ? caught.message : t('partner.withdraw.submitError')));
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -209,7 +215,7 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
             <Text type="text" semiBold color={Colors.brand} style={styles.balanceLine} translate={false}>
               {walletLoading
                 ? '...'
-                : `${t('partner.withdraw.balanceLabel')} ${formatBalance(wallet?.balance ?? 0)} Dhs`}
+                : `${t('partner.withdraw.balanceLabel')} ${formatBalance(wallet?.balance ?? 0, locale)} Dhs`}
             </Text>
 
             {/* Amount input */}
@@ -330,6 +336,8 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
             }
             variant="primary"
             onPress={handleSubmit}
+            disabled={submitting}
+            accessibilityState={{ busy: submitting }}
           />
         </View>
       </KeyboardAvoidingView>

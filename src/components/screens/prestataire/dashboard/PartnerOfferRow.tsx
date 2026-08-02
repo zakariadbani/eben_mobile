@@ -18,11 +18,11 @@ interface PartnerOfferRowProps {
 }
 
 const statusAppearance: Record<string, { key: string; icon: string; type: string; color: string }> = {
-  validated: { key: "partner.sent.enAttente", icon: "clock", type: "Feather", color: Colors.blue },
-  pending: { key: "partner.sent.offerManquee", icon: "file-remove-outline", type: "MaterialCommunityIcons", color: Colors.grayDark },
-  selected: { key: "partner.sent.shipped", icon: "truck-fast-outline", type: "MaterialCommunityIcons", color: Colors.greenDark },
-  rejected: { key: "partner.sent.refusee", icon: "file-cancel-outline", type: "MaterialCommunityIcons", color: Colors.redLight },
-  expired: { key: "partner.sent.offerManquee", icon: "file-remove-outline", type: "MaterialCommunityIcons", color: Colors.grayDark },
+  validated: { key: "partner.offer.statusActive", icon: "clock", type: "Feather", color: Colors.blue },
+  pending: { key: "partner.offer.statusPending", icon: "file-send-outline", type: "MaterialCommunityIcons", color: Colors.grayDark },
+  selected: { key: "partner.offer.statusAccepted", icon: "file-check-outline", type: "MaterialCommunityIcons", color: Colors.greenDark },
+  rejected: { key: "partner.offer.statusRejected", icon: "file-cancel-outline", type: "MaterialCommunityIcons", color: Colors.redLight },
+  expired: { key: "partner.offer.statusExpired", icon: "file-remove-outline", type: "MaterialCommunityIcons", color: Colors.grayDark },
 };
 
 const remainingLabel = (expiresAt: string, isArabic: boolean): string => {
@@ -86,7 +86,7 @@ const PartnerOfferRow: React.FC<PartnerOfferRowProps> = ({ item, variant = "open
         {variant !== "open" ? (
           <>
             <Text type="labelTwo" semiBold translate={false}>{`${item.priceFerrailleur.toLocaleString("fr-MA")} Dhs`}</Text>
-            <Text type="labelTwo">{"partner.dashboard.quantityOne"}</Text>
+            <Text type="labelTwo" translate={false}>{t("partner.dashboard.quantity", { count: item.quantity })}</Text>
           </>
         ) : null}
         <TouchableOpacity onPress={onPress} style={styles.details} accessibilityRole="button" accessibilityLabel={t("partner.offer.details")}>

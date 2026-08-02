@@ -9,12 +9,13 @@
 import { apiClient } from '../client';
 import type { Paginated, ApiResponse } from '../types';
 import type { WishlistItem } from '@/interfaces/Wishlist';
+import { getAllPages } from './paginate';
 
 /**
  * Fetch the current user's wishlist.
  */
 export async function getWishlist(): Promise<Paginated<WishlistItem>> {
-  return apiClient.get<WishlistItem>('/wishlist') as Promise<Paginated<WishlistItem>>;
+  return getAllPages<WishlistItem>('/wishlist');
 }
 
 /**
@@ -25,6 +26,9 @@ export async function getWishlist(): Promise<Paginated<WishlistItem>> {
  *                    The backend resolves the leaf categoryId from the product.
  */
 export async function addToWishlist(productId: number): Promise<ApiResponse<WishlistItem>> {
+  if (!Number.isSafeInteger(productId) || productId < 1) {
+    throw new TypeError('productId must be a positive integer');
+  }
   return apiClient.post<WishlistItem>('/wishlist/items', { productId });
 }
 
@@ -35,5 +39,8 @@ export async function addToWishlist(productId: number): Promise<ApiResponse<Wish
  * @param wishlistItemId - The WishlistItem.id to remove.
  */
 export async function removeWishlistItem(wishlistItemId: number): Promise<ApiResponse<{ id: number }>> {
+  if (!Number.isSafeInteger(wishlistItemId) || wishlistItemId < 1) {
+    throw new TypeError('wishlistItemId must be a positive integer');
+  }
   return apiClient.del<{ id: number }>(`/wishlist/items/${wishlistItemId}`);
 }

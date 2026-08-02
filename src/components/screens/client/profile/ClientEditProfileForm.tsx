@@ -6,15 +6,17 @@
  * Avatar with camera overlay.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
+  Image,
   ViewStyle,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import View from '@/components/common/View';
 import { Text } from '@/components/common/Text';
 import TextInput from '@/components/common/TextInput';
@@ -22,6 +24,8 @@ import Icon from '@/components/common/Icon';
 import Colors from '@/constants/Colors';
 import type { ClientProfile } from '@/interfaces/User';
 import type { UpdateProfilePayload } from '@/api/resources/users';
+import { ApiClientError } from '@/api/types';
+import { uploadLocalImages } from '@/api/resources/uploads';
 
 interface ClientEditProfileFormProps {
   profile: ClientProfile;
@@ -37,35 +41,101 @@ const ClientEditProfileForm: React.FC<ClientEditProfileFormProps> = ({
   styleContainer,
 }) => {
   const { t } = useTranslation();
+  const router = useRouter();
   const [name, setName] = useState(profile.name);
   const [nameEditing, setNameEditing] = useState(false);
   const [nameDirty, setNameDirty] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [editingIdentifier, setEditingIdentifier] = useState<'email' | 'phone' | null>(null);
+  const [email, setEmail] = useState(profile.email ?? '');
+  const [phone, setPhone] = useState(profile.phone);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [avatarSaving, setAvatarSaving] = useState(false);
+  const savingRef = useRef(false);
+
+  useEffect(() => { setName(profile.name); }, [profile.name]);
+  useEffect(() => { setEmail(profile.email ?? ''); }, [profile.email]);
+  useEffect(() => { setPhone(profile.phone); }, [profile.phone]);
+
+  const errorMessage = (error: unknown): string => {
+    const fieldMessage = error instanceof ApiClientError ? Object.values(error.errors)[0]?.[0] : undefined;
+    return fieldMessage ?? t('settings.profile.saveError');
+  };
 
   const handleNameConfirm = async () => {
     if (!nameDirty) {
       setNameEditing(false);
       return;
     }
-    await onSave({ name });
-    setNameEditing(false);
-    setNameDirty(false);
+    if (savingRef.current || !name.trim()) return;
+    savingRef.current = true;
+    setSaveError(null);
+    try {
+      await onSave({ name: name.trim() });
+      setNameEditing(false);
+      setNameDirty(false);
+    } catch (error) {
+      setSaveError(errorMessage(error));
+    } finally {
+      savingRef.current = false;
+    }
   };
 
-  const handleCameraPress = () => {
-    Alert.alert(
-      t('Modifier'),
-      t('partner.editProfile.changeAvatarBody'),
-      [{ text: t('Fermer'), style: 'cancel' }],
-    );
+  const handleCameraPress = async () => {
+    if (savingRef.current || isSaving) return;
+    setSaveError(null);
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setSaveError(t('settings.profile.photoPermission'));
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (result.canceled || result.assets.length === 0) return;
+      savingRef.current = true;
+      setAvatarSaving(true);
+      const [path] = await uploadLocalImages([result.assets[0].uri]);
+      if (!path) throw new Error('Missing uploaded image path');
+      await onSave({ avatar: path });
+    } catch (error) {
+      setSaveError(errorMessage(error));
+    } finally {
+      savingRef.current = false;
+      setAvatarSaving(false);
+    }
   };
 
-  const handleModifierPress = (field: 'email' | 'phone' | 'password') => {
-    Alert.alert(
-      t('Modifier'),
-      t(`Modifier ${field}`),
-      [{ text: t('Fermer'), style: 'cancel' }],
-    );
+  const startIdentifierEdit = (field: 'email' | 'phone') => {
+    setEditingIdentifier(field);
+    setCurrentPassword('');
+    setSaveError(null);
   };
+
+  const handleIdentifierConfirm = async () => {
+    if (!editingIdentifier || savingRef.current || isSaving) return;
+    const value = editingIdentifier === 'email' ? email.trim() : phone.trim();
+    if (!value || !currentPassword.trim()) {
+      setSaveError(t('settings.profile.identifierRequired'));
+      return;
+    }
+    savingRef.current = true;
+    setSaveError(null);
+    try {
+      await onSave({ [editingIdentifier]: value, currentPassword });
+      setEditingIdentifier(null);
+      setCurrentPassword('');
+    } catch (error) {
+      setSaveError(errorMessage(error));
+    } finally {
+      savingRef.current = false;
+    }
+  };
+
+  const busy = isSaving || avatarSaving;
 
   return (
     <View style={[styles.container, styleContainer]}>
@@ -73,17 +143,19 @@ const ClientEditProfileForm: React.FC<ClientEditProfileFormProps> = ({
       <View alignItems="center" style={styles.avatarSection}>
         <View style={styles.avatarWrapper}>
           <View style={styles.avatarPlaceholder}>
-            <Icon name="user" size={52} iconColor={Colors.gray} type="FontAwesome5" />
+            {profile.avatar ? <Image source={{ uri: profile.avatar }} style={styles.avatarImage} /> : (
+              <Icon name="user" size={52} iconColor={Colors.gray} type="FontAwesome5" />
+            )}
           </View>
-          <TouchableOpacity style={styles.cameraButton} activeOpacity={0.8} onPress={handleCameraPress}>
-            <Icon name="camera" size={16} iconColor={Colors.brand} type="Feather" />
+          <TouchableOpacity style={styles.cameraButton} activeOpacity={0.8} onPress={() => { void handleCameraPress(); }} disabled={busy} accessibilityRole="button" accessibilityLabel={t('settings.profile.changeAvatar')} accessibilityState={{ disabled: busy, busy: avatarSaving }}>
+            {avatarSaving ? <ActivityIndicator size="small" color={Colors.brand} /> : <Icon name="camera" size={16} iconColor={Colors.brand} type="Feather" />}
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Section title */}
       <Text type="subTitle" semiBold style={styles.sectionTitle}>
-        Mes informations de profil
+        {t('settings.profile.sectionTitle')}
       </Text>
 
       {/* Profile card */}
@@ -100,6 +172,7 @@ const ClientEditProfileForm: React.FC<ClientEditProfileFormProps> = ({
                 style={styles.nameInputWrapper}
                 textStyle={styles.nameInputText}
                 inputStyle={styles.nameInputBox}
+                accessibilityLabel={t('settings.profile.name')}
                 translate={false}
               />
             ) : (
@@ -109,22 +182,22 @@ const ClientEditProfileForm: React.FC<ClientEditProfileFormProps> = ({
             )}
           </View>
           {nameEditing ? (
-            <TouchableOpacity onPress={handleNameConfirm} disabled={isSaving} style={styles.confirmBtn}>
+            <TouchableOpacity onPress={() => { void handleNameConfirm(); }} disabled={busy} style={styles.confirmBtn} accessibilityRole="button" accessibilityLabel={t('settings.profile.confirmName')} accessibilityState={{ disabled: busy, busy: isSaving }}>
               {isSaving ? (
                 <ActivityIndicator size="small" color={Colors.greenDark} />
               ) : (
                 <View flexDirection="row" alignItems="center" gap={4}>
                   <Text type="small" color={Colors.greenDark}>
-                    Confirm
+                    {t('settings.confirm')}
                   </Text>
                   <Icon name="check-circle" size={16} iconColor={Colors.greenDark} type="Feather" />
                 </View>
               )}
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity onPress={() => setNameEditing(true)} style={styles.modifierBtn}>
+            <TouchableOpacity onPress={() => setNameEditing(true)} style={styles.modifierBtn} accessibilityRole="button" accessibilityLabel={t('settings.profile.modifyName')}>
               <Text type="small" color={Colors.gray}>
-                Modifier
+                {t('settings.modify')}
               </Text>
               <Icon name="edit-2" size={14} iconColor={Colors.gray} type="Feather" />
             </TouchableOpacity>
@@ -137,17 +210,23 @@ const ClientEditProfileForm: React.FC<ClientEditProfileFormProps> = ({
         <View style={styles.row}>
           <View flexDirection="row" alignItems="center" gap={8} flex>
             <Icon name="mail" size={18} iconColor={Colors.gray} type="Feather" />
-            <Text type="label" style={styles.fieldValue} translate={false}>
-              {profile.email ?? '—'}
-            </Text>
+            {editingIdentifier === 'email' ? <TextInput value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" accessibilityLabel={t('settings.profile.email')} translate={false} /> : <Text type="label" style={styles.fieldValue} translate={false}>{profile.email ?? '—'}</Text>}
           </View>
-          <TouchableOpacity onPress={() => handleModifierPress('email')} style={styles.modifierBtn}>
+          <TouchableOpacity onPress={() => startIdentifierEdit('email')} style={styles.modifierBtn} disabled={busy} accessibilityRole="button" accessibilityLabel={t('settings.profile.modifyEmail')} accessibilityState={{ disabled: busy }}>
             <Text type="small" color={Colors.gray}>
-              Modifier
+              {t('settings.modify')}
             </Text>
             <Icon name="edit-2" size={14} iconColor={Colors.gray} type="Feather" />
           </TouchableOpacity>
         </View>
+        {editingIdentifier === 'email' ? (
+          <View style={styles.identifierActions}>
+            <TextInput value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry accessibilityLabel={t('settings.profile.currentPassword')} placeholder={t('settings.profile.currentPassword')} translate={false} />
+            <TouchableOpacity onPress={() => { void handleIdentifierConfirm(); }} disabled={busy} accessibilityRole="button" accessibilityLabel={t('settings.profile.confirmEmail')} accessibilityState={{ disabled: busy, busy: isSaving }} style={styles.identifierConfirm}>
+              {busy ? <ActivityIndicator size="small" color={Colors.greenDark} /> : <Text type="small" color={Colors.greenDark}>{t('settings.confirm')}</Text>}
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <View style={styles.divider} />
 
@@ -155,17 +234,23 @@ const ClientEditProfileForm: React.FC<ClientEditProfileFormProps> = ({
         <View style={styles.row}>
           <View flexDirection="row" alignItems="center" gap={8} flex>
             <Icon name="phone" size={18} iconColor={Colors.gray} type="Feather" />
-            <Text type="label" style={styles.fieldValue} translate={false}>
-              {profile.phone}
-            </Text>
+            {editingIdentifier === 'phone' ? <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" accessibilityLabel={t('settings.profile.phone')} translate={false} /> : <Text type="label" style={styles.fieldValue} translate={false}>{profile.phone}</Text>}
           </View>
-          <TouchableOpacity onPress={() => handleModifierPress('phone')} style={styles.modifierBtn}>
+          <TouchableOpacity onPress={() => startIdentifierEdit('phone')} style={styles.modifierBtn} disabled={busy} accessibilityRole="button" accessibilityLabel={t('settings.profile.modifyPhone')} accessibilityState={{ disabled: busy }}>
             <Text type="small" color={Colors.gray}>
-              Modifier
+              {t('settings.modify')}
             </Text>
             <Icon name="edit-2" size={14} iconColor={Colors.gray} type="Feather" />
           </TouchableOpacity>
         </View>
+        {editingIdentifier === 'phone' ? (
+          <View style={styles.identifierActions}>
+            <TextInput value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry accessibilityLabel={t('settings.profile.currentPassword')} placeholder={t('settings.profile.currentPassword')} translate={false} />
+            <TouchableOpacity onPress={() => { void handleIdentifierConfirm(); }} disabled={busy} accessibilityRole="button" accessibilityLabel={t('settings.profile.confirmPhone')} accessibilityState={{ disabled: busy, busy: isSaving }} style={styles.identifierConfirm}>
+              {busy ? <ActivityIndicator size="small" color={Colors.greenDark} /> : <Text type="small" color={Colors.greenDark}>{t('settings.confirm')}</Text>}
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <View style={styles.divider} />
 
@@ -177,14 +262,15 @@ const ClientEditProfileForm: React.FC<ClientEditProfileFormProps> = ({
               {'*'.repeat(14)}
             </Text>
           </View>
-          <TouchableOpacity onPress={() => handleModifierPress('password')} style={styles.modifierBtn}>
+          <TouchableOpacity onPress={() => router.push('/(auth)/ForgotPasswordScreen')} style={styles.modifierBtn} disabled={busy} accessibilityRole="button" accessibilityLabel={t('settings.profile.changePassword')} accessibilityState={{ disabled: busy }}>
             <Text type="small" color={Colors.gray}>
-              Modifier
+              {t('settings.modify')}
             </Text>
             <Icon name="edit-2" size={14} iconColor={Colors.gray} type="Feather" />
           </TouchableOpacity>
         </View>
       </View>
+      {saveError ? <Text accessibilityRole="alert" type="small" color={Colors.error} center style={styles.saveError}>{saveError}</Text> : null}
     </View>
   );
 };
@@ -209,6 +295,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   cameraButton: {
     position: 'absolute',
@@ -272,6 +362,15 @@ const styles = StyleSheet.create({
     color: Colors.brand,
     paddingLeft: 5,
     paddingRight: 5,
+  },
+  saveError: { marginHorizontal: 16, marginTop: 12 },
+  identifierActions: {
+    paddingBottom: 12,
+    gap: 8,
+  },
+  identifierConfirm: {
+    alignSelf: 'flex-end',
+    padding: 8,
   },
 });
 

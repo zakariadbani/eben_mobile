@@ -1,4 +1,94 @@
 {
+  "auth.fields.firstName": "Prénom",
+  "auth.fields.lastName": "Nom",
+  "auth.fields.email": "Email",
+  "auth.fields.phone": "Numéro de téléphone",
+  "auth.fields.phonePlaceholder": "06 77 77 77 77",
+  "auth.fields.password": "Mot de passe",
+  "auth.fields.passwordConfirmation": "Répéter le mot de passe",
+  "auth.login.title": "Commençons",
+  "auth.login.subtitle": "Connectez-vous pour continuer",
+  "auth.login.remember": "Rappelez-vous de moi",
+  "auth.login.forgotPassword": "Mot de passe oublié ?",
+  "auth.login.submit": "Se connecter",
+  "auth.login.submitting": "Connexion...",
+  "auth.login.noAccount": "Je n'ai pas de compte.",
+  "auth.login.signUp": "S'inscrire !",
+  "auth.login.error": "Connexion impossible. Vérifiez vos informations et réessayez.",
+  "auth.login.roleMismatch": "Ce compte n'est pas un compte Client.",
+  "auth.register.submit": "S'inscrire",
+  "auth.register.submitting": "Inscription...",
+  "auth.register.passwordLength": "Le mot de passe doit contenir au moins 8 caractères",
+  "auth.register.passwordConfirmationRequired": "Vous devez confirmer votre mot de passe",
+  "auth.register.passwordMismatch": "Les mots de passe doivent correspondre",
+  "auth.register.terms": "Conditions",
+  "auth.register.acceptTerms": "J'ai lu et accepté les conditions d'utilisation",
+  "auth.register.termsRequired": "Vous devez accepter les conditions",
+  "auth.register.phoneInvalid": "Saisissez un numéro mobile marocain valide",
+  "auth.register.confirmPhone": "C'est votre numéro ?",
+  "auth.register.confirmBack": "Non, retournez",
+  "auth.register.confirmContinue": "Oui, continuez",
+  "auth.register.error": "Inscription impossible. Vérifiez les champs et réessayez.",
+  "auth.register.fieldError.name": "Vérifiez votre nom",
+  "auth.register.fieldError.email": "Cette adresse e-mail n'est pas disponible",
+  "auth.register.fieldError.phone": "Ce numéro de téléphone n'est pas disponible",
+  "auth.register.fieldError.password": "Vérifiez votre mot de passe",
+  "auth.otp.title": "Vérification SMS",
+  "auth.otp.sent": "Un code d'identification a été envoyé au {{phone}}",
+  "auth.otp.notReceived": "Vous n'avez pas reçu le code ?",
+  "auth.otp.seconds": "{{count}} sec",
+  "auth.otp.resend": "Renvoyez-le maintenant",
+  "auth.otp.resending": "Envoi...",
+  "auth.otp.verify": "Vérifier",
+  "auth.otp.verifying": "Vérification...",
+  "auth.otp.incomplete": "Saisissez les 6 chiffres du code",
+  "auth.otp.invalid": "Le code est invalide ou expiré",
+  "auth.otp.resendError": "Impossible de renvoyer le code. Réessayez.",
+  "auth.otp.initialSendError": "Le code n'a pas pu être envoyé. Renvoyez-le pour continuer.",
+  "auth.otp.noPendingRegistration": "Recommencez l'inscription pour recevoir un nouveau code.",
+  "auth.error.generic": "Une erreur est survenue. Réessayez.",
+  "auth.prestataire.login.roleMismatch": "Ce compte n'est pas un compte Prestataire.",
+  "auth.prestataire.login.joinWaitlist": "Rejoindre la liste d'attente",
+  "auth.recovery.header": "Réinitialiser le mot de passe",
+  "auth.recovery.instructions": "Saisissez le numéro de téléphone utilisé pour vous inscrire sur EBEN.",
+  "auth.recovery.start": "Réinitialiser le mot de passe",
+  "auth.recovery.starting": "Envoi du code...",
+  "auth.recovery.newPasswordInstructions": "Saisissez votre nouveau mot de passe",
+  "auth.recovery.passwordLength": "Le mot de passe doit contenir au moins 8 caractères",
+  "auth.recovery.passwordConfirmationRequired": "Vous devez confirmer votre mot de passe",
+  "auth.recovery.passwordMismatch": "Les mots de passe doivent correspondre",
+  "auth.recovery.confirm": "Confirmer",
+  "auth.recovery.confirming": "Confirmation...",
+  "auth.recovery.noPending": "Recommencez la réinitialisation pour recevoir un nouveau code.",
+  "auth.recovery.startError": "Impossible d'envoyer le code. Vérifiez le numéro et réessayez.",
+  "auth.recovery.resetError": "Impossible de réinitialiser le mot de passe. Réessayez.",
+  "partner.waitlist.title": "Formulaire de demande",
+  "partner.waitlist.fields.city": "Ville",
+  "partner.waitlist.fields.firstName": "Prénom",
+  "partner.waitlist.fields.lastName": "Nom",
+  "partner.waitlist.fields.email": "Email",
+  "partner.waitlist.fields.phone": "Numéro de téléphone",
+  "partner.waitlist.fields.businessType": "Type de commerce",
+  "partner.waitlist.fields.companyName": "Nom de l'entreprise ou du magasin",
+  "partner.waitlist.placeholders.city": "Casablanca, Oujda, Rabat ...",
+  "partner.waitlist.placeholders.firstName": "Ahmed",
+  "partner.waitlist.placeholders.lastName": "Mehdaoui",
+  "partner.waitlist.placeholders.email": "ahmed@example.com",
+  "partner.waitlist.placeholders.businessType": "Ferraille ou SARL",
+  "partner.waitlist.placeholders.companyName": "Xyz",
+  "partner.waitlist.terms": "J'ai lu et accepté les conditions d'utilisation",
+  "partner.waitlist.submit": "S'inscrire",
+  "partner.waitlist.submitting": "Envoi...",
+  "partner.waitlist.success": "Demande envoyée",
+  "partner.waitlist.error.city": "Saisissez une ville valide",
+  "partner.waitlist.error.firstName": "Saisissez un prénom valide",
+  "partner.waitlist.error.lastName": "Saisissez un nom valide",
+  "partner.waitlist.error.email": "Saisissez une adresse e-mail valide",
+  "partner.waitlist.error.phone": "Saisissez un numéro mobile marocain valide",
+  "partner.waitlist.error.businessType": "Saisissez un type de commerce valide",
+  "partner.waitlist.error.companyName": "Vérifiez le nom de l'entreprise",
+  "partner.waitlist.error.acceptedTerms": "Vous devez accepter les conditions",
+  "partner.waitlist.error.general": "Impossible d'envoyer la demande. Vérifiez les champs et réessayez.",
   "cart.voucher.message": "Bon d'achat de 100 dhs sur cette commande!",
   "cart.voucher.claim": "Réclamer",
   "cart.voucher.claimed": "Bon réclamé",
@@ -50,10 +140,12 @@
   "review.ratingRequired": "Veuillez sélectionner une note",
   "review.titleFieldLabel": "Titre *",
   "review.titleFieldPlaceholder": "Décrivez votre avis en quelques mots",
+  "review.titleRequired": "Saisissez un titre.",
   "review.commentLabel": "Commentaire (facultatif)",
   "review.commentLabelRequired": "Commentaire *",
   "review.commentPlaceholder": "Décrivez votre expérience avec ce produit...",
   "review.commentPlaceholderFigma": "Notez vos réflexions et commentaires sur cette pièce de voiture.",
+  "review.commentRequired": "Saisissez un commentaire.",
   "review.submit": "Soumettre l'avis",
   "review.submitFigma": "Envoyer",
   "review.submitting": "Envoi en cours...",
@@ -133,7 +225,12 @@
   "offerDetail.sellerRemarks": "Remarques sur la pièce",
 
   "checkout.loadError": "Impossible de charger la commande",
+  "checkout.yourInformation": "Vos informations",
   "checkout.retry": "Réessayer",
+  "checkout.shippingDetails": "2- Détails d’expédition",
+  "checkout.paymentMethod": "3- Mode de paiement",
+  "checkout.paymentDetails": "4- Détails du paiement",
+  "checkout.billingSame": "Les détails de facturation sont les mêmes que ceux de l’expédition",
   "checkout.placing": "En cours...",
   "Paquet": "Paquet",
   "de": "de",
@@ -313,10 +410,12 @@
   "partner.dashboard.sentCount": "Envois",
   "partner.dashboard.emptyOffers": "Aucune offre active pour le moment",
   "partner.dashboard.loadError": "Impossible de charger le tableau de bord",
+  "partner.dashboard.offersLoadError": "Impossible de charger les offres actives",
   "partner.dashboard.retry": "Réessayer",
   "partner.dashboard.seeAllOffers": "Voir tous",
   "partner.dashboard.paymentDelay": "Il faut compter entre 24 et 48 heures pour traiter le paiement.",
   "partner.dashboard.quantityOne": "Qté 1",
+  "partner.dashboard.quantity": "Qté {{count}}",
   "partner.dashboard.offerWindowNote": "Veuillez placer vos offres dans la fenêtre de 2 heures afin d’éviter qu’elles ne soient retirées de votre liste.",
   "partner.dashboard.missedCount": "Demandes manquées",
   "partner.dashboard.salesMonth": "Ventes en mai 2022",
@@ -324,7 +423,7 @@
   "partner.dashboard.supportTitle": "3ndk chi sou2al??",
   "partner.dashboard.supportBody": "Vous pouvez nous appeler de 8h à 19h du lundi au vendredi au numéro suivant :",
   "partner.dashboard.supportCall": "Appeler le support",
-  "partner.dashboard.supportPhone": "06 66 77 88 99 00",
+  "partner.dashboard.supportPhone": "+212 6 61 39 39 71",
   "partner.sent.shipped": "Expédiée",
   "partner.offer.statusActive": "Active",
   "partner.offer.statusPending": "Envoyée",
@@ -467,6 +566,40 @@
 
   "partner.history.searchPlaceholder": "Rechercher",
   "partner.orders.detailTitle": "Vos expéditions - Détails",
+  "partner.orders.title": "Vos expéditions",
+  "partner.orders.tabs.accepted": "Offres acceptées",
+  "partner.orders.tabs.shipped": "Expédiées",
+  "partner.orders.tabs.delivered": "Historique",
+  "partner.orders.step.accepted": "Acceptée",
+  "partner.orders.step.shipped": "Expédiée",
+  "partner.orders.step.delivered": "Livrée",
+  "partner.orders.empty.accepted": "Aucune offre acceptée en attente",
+  "partner.orders.empty.shipped": "Aucune commande expédiée",
+  "partner.orders.empty.delivered": "Aucun historique de commande",
+  "partner.orders.status.pending": "En attente",
+  "partner.orders.status.confirmed": "Acceptée",
+  "partner.orders.status.processing": "En traitement",
+  "partner.orders.status.shipped": "Expédiée",
+  "partner.orders.status.delivered": "Livrée",
+  "partner.orders.status.cancelled": "Annulée",
+  "partner.orders.status.refunded": "Remboursée",
+  "partner.orders.details": "Détails",
+  "partner.orders.referenceLabel": "Réf :",
+  "partner.orders.detailLoadError": "Impossible de charger la commande",
+  "partner.orders.notFound": "Commande introuvable",
+  "partner.orders.transitionConflict": "Cette commande a changé d’état. Actualisez et réessayez.",
+  "partner.orders.transitionError": "Impossible de mettre à jour la commande. Réessayez.",
+  "partner.orders.parts": "Pièces",
+  "partner.orders.purchaseOrderStatus.sent": "À confirmer",
+  "partner.orders.purchaseOrderStatus.acknowledged": "Confirmée",
+  "partner.orders.purchaseOrderStatus.preparing": "En préparation",
+  "partner.orders.purchaseOrderStatus.ready": "Prête à expédier",
+  "partner.orders.purchaseOrderStatus.shipped": "Expédiée",
+  "partner.orders.purchaseOrderStatus.received": "Reçue",
+  "partner.orders.purchaseOrderStatus.cancelled": "Annulée",
+  "partner.orders.acknowledge": "Accuser réception",
+  "partner.orders.prepare": "Préparer la commande",
+  "partner.orders.ship": "Expédier",
   "partner.ordersHistory.title": "Historique des commandes",
   "partner.ordersHistory.empty": "Vous n'avez pas de commandes",
   "partner.ordersHistory.loadError": "Impossible de charger les commandes",
@@ -481,6 +614,8 @@
   "partner.offersHistory.prixNet": "Votre prix net",
   "partner.offersHistory.ref": "Réf :",
   "partner.offersHistory.status.missed": "Offre manquée",
+  "partner.offersHistory.details": "Détails",
+  "partner.offersHistory.noResults": "Aucune offre ne correspond à votre recherche",
 
   "partner.notifications.title": "Notifications",
   "partner.notifications.empty": "Vous n'avez pas de notifications",
@@ -493,6 +628,11 @@
   "partner.notifications.cta.sendOffer": "Envoyer une offre",
   "partner.notifications.cta.details": "Détails",
   "partner.notifications.cta.ship": "Expédier la pièce",
+  "partner.notifications.noUnread": "Aucune notification non lue",
+  "partner.notifications.unreadCount": "· {{count}} non lue(s)",
+  "partner.notifications.markAllRead": "Tout lire",
+  "partner.notifications.filterUnread": "Afficher uniquement les notifications non lues",
+  "partner.notifications.mutationError": "Impossible de mettre à jour les notifications",
 
   "partner.wallet.title": "Mon portefeuille",
   "partner.wallet.currentBalance": "Solde courant",
@@ -550,6 +690,8 @@
   "partner.profile.logoutBody": "Êtes-vous sûr(e) de vouloir vous déconnecter ?",
   "partner.profile.copyright": "EBEN Solutions SARL © 2022",
   "partner.profile.version": "v 1.0.0",
+  "partner.profile.greeting": "Bonjour {{name}} 👋",
+  "partner.profile.partnerFallback": "Partenaire",
   "Déconnexion": "Déconnexion",
   "Annuler": "Annuler",
   "Fermer": "Fermer",
@@ -570,6 +712,8 @@
   "partner.overview.dateRange": "Demandes envoyées entre (Juin 6, 2022 et Juin 11, 2022)",
   "partner.overview.loadError": "Impossible de charger les aperçus",
   "partner.overview.retry": "Réessayer",
+  "partner.overview.seriesLoadError": "Impossible de charger le graphique",
+  "partner.overview.seriesRetry": "Réessayer le graphique",
 
   "partner.editProfile.title": "Modifier mon profil",
   "partner.editProfile.sectionTitle": "Mes informations de profil",
@@ -581,6 +725,8 @@
   "partner.editProfile.supportCta": "Contactez le support pour modifier",
   "partner.editProfile.loadError": "Impossible de charger le profil",
   "partner.editProfile.retry": "Réessayer",
+  "partner.editProfile.photoPermission": "Autorisez l'accès aux photos pour modifier votre avatar.",
+  "partner.editProfile.avatarSaveError": "Impossible de mettre à jour la photo de profil.",
 
   "partner.company.title": "Informations sur l'entreprise",
   "partner.company.sectionAddress": "Siège social",
@@ -612,6 +758,23 @@
   "partner.company.sheetPiecesLabel": "Pieces",
   "partner.company.sheetCta": "Ajouter",
   "partner.company.sheetSaving": "Enregistrement...",
+  "partner.company.addressExtra": "Complément d'adresse",
+  "partner.company.taxId": "Identifiant fiscal",
+  "partner.company.bankSupportOnly": "La configuration des coordonnées bancaires est disponible uniquement via le support EBEN.",
+  "partner.company.noBrandResults": "Aucune marque ne correspond à votre recherche",
+  "partner.company.removeBrandAccessibility": "Retirer la marque {{brand}}",
+  "partner.about.title": "À propos d'EBEN",
+  "partner.about.madeInMorocco": "Fabriqué au Maroc",
+  "partner.about.missionTitle": "NOTRE MISSION",
+  "partner.about.missionBody": "Faciliter la commande et l'achat de pièces automobiles partout au Maroc en supprimant les obstacles liés à l'achat et à la vente.",
+  "partner.about.visionTitle": "NOTRE VISION",
+  "partner.about.visionBody": "Contribuer à numériser et à améliorer l'industrie marocaine des pièces automobiles.",
+  "partner.about.valuesTitle": "NOS VALEURS",
+  "partner.about.values.speed": "VITESSE",
+  "partner.about.values.discipline": "DISCIPLINE",
+  "partner.about.values.boldness": "AUDACE",
+  "partner.about.contactTitle": "CONTACTEZ-NOUS :",
+  "partner.about.address": "9 Rue Al Borj, appartement 8, Rabat, Maroc",
 
   "Phone": "Phone",
   "06 77 77 77 77": "06 77 77 77 77",
@@ -669,6 +832,8 @@
   "partner.offers.month": "Décembre 2022",
   "partner.offers.history": "Historique des offres",
   "partner.offers.filter.title": "Filtres",
+  "partner.offers.sortAscending": "Trier par ordre croissant",
+  "partner.offers.sortDescending": "Trier par ordre décroissant",
   "partner.offers.filter.all": "Tout",
   "partner.offers.filter.progress": "En cours",
   "partner.offers.filter.payment": "En attente de paiement",
@@ -708,5 +873,315 @@
   "guestAuth.title": "Connectez-vous",
   "guestAuth.body": "Vous devez vous connecter ou cr\u00e9er un compte pour acc\u00e9der \u00e0 votre profil.",
   "guestAuth.createAccount": "Cr\u00e9er un compte",
-  "guestAuth.signIn": "Se connecter"
+  "guestAuth.signIn": "Se connecter",
+  "requestFlow.title": "Créer une demande",
+  "requestFlow.vehicle": "Véhicule : {{value}}",
+  "requestFlow.chooseCategory": "Choisissez une catégorie",
+  "requestFlow.chooseSubcategory": "Choisissez une sous-catégorie",
+  "requestFlow.choosePart": "Choisissez une pièce",
+  "requestFlow.addPart": "Ajouter {{name}}",
+  "requestFlow.addedParts": "Pièces ajoutées",
+  "requestFlow.removePart": "Retirer",
+  "requestFlow.used": "Occasion",
+  "requestFlow.new": "Neuf",
+  "requestFlow.note": "Ajouter une note",
+  "requestFlow.notePlaceholder": "Décrivez les détails utiles...",
+  "requestFlow.addImage": "Ajouter une image",
+  "requestFlow.removeImage": "Supprimer l'image",
+  "requestFlow.removeImageTitle": "Supprimer",
+  "requestFlow.removeImageConfirm": "Voulez-vous supprimer cette image ?",
+  "requestFlow.yes": "Oui",
+  "requestFlow.no": "Non",
+  "requestFlow.verify": "Vérifier la demande",
+  "requestFlow.submitting": "Création...",
+  "requestFlow.send": "Oui, envoyer",
+  "requestFlow.sending": "Envoi...",
+  "requestFlow.edit": "Modifier",
+  "requestFlow.retry": "Réessayer",
+  "requestFlow.back": "Retour",
+  "requestFlow.loadError": "Impossible de charger les demandes",
+  "requestFlow.submitError": "Impossible de créer la demande",
+  "requestFlow.sendError": "Impossible d'envoyer la demande",
+  "requestFlow.invalidCategory": "La catégorie sélectionnée n'est pas valide",
+  "requestFlow.invalidRoute": "Lien de demande invalide",
+  "requestFlow.emptyGarage": "Ajoutez un véhicule avant de créer une demande.",
+  "requestFlow.addVehicle": "Ajouter une voiture",
+  "requestFlow.openGarage": "Ouvrir mon garage",
+  "requestFlow.requestsTitle": "Vos demandes",
+  "requestFlow.requestsEmpty": "Aucune demande pour le moment",
+  "requestFlow.create": "Créer une demande",
+  "requestFlow.requestReference": "Demande {{reference}}",
+  "requestFlow.verificationTitle": "Vérifiez votre demande",
+  "requestFlow.comment": "Commentaire",
+  "requestFlow.noComment": "Aucun commentaire",
+  "requestFlow.requestNotFound": "Demande introuvable",
+  "requestFlow.parts": "Pièces demandées",
+  "requestFlow.noParts": "Aucune pièce",
+  "requestFlow.quantity": "Qté : {{count}}",
+  "requestFlow.condition.occasion": "Occasion",
+  "requestFlow.condition.en_stock": "Neuf",
+  "requestFlow.details": "Détails ajoutés",
+  "requestFlow.images": "Images jointes",
+  "requestFlow.expires": "Expire le {{value}}",
+  "requestFlow.offersReady": "Vous avez reçu {{count}} offre(s)",
+  "requestFlow.viewOffers": "Voir les offres",
+  "requestFlow.waitingOffers": "En attente des offres",
+  "requestFlow.offersTitle": "Offres reçues",
+  "requestFlow.offersEmpty": "Aucune offre reçue",
+  "requestFlow.offerNotFound": "Offre introuvable",
+  "requestFlow.noPhoto": "Aucune photo disponible",
+  "requestFlow.reference": "Réf. : {{value}}",
+  "requestFlow.available": "Disponible",
+  "requestFlow.unavailable": "Non disponible",
+  "requestFlow.clientPrice": "Prix client TTC",
+  "requestFlow.sellerComment": "Commentaire du vendeur",
+  "requestFlow.audio": "Note vocale",
+  "requestFlow.total": "Total",
+  "requestFlow.acceptOffer": "Accepter cette offre",
+  "requestFlow.accepting": "Acceptation...",
+  "requestFlow.acceptError": "Impossible d'accepter cette offre",
+  "requestFlow.status.pending": "En attente",
+  "requestFlow.status.validated": "Validée",
+  "requestFlow.status.selected": "Sélectionnée",
+  "requestFlow.status.rejected": "Rejetée",
+  "requestFlow.status.expired": "Expirée"
+  ,"requestFlow.requestStatus.draft": "Brouillon"
+  ,"requestFlow.requestStatus.pending": "En attente"
+  ,"requestFlow.requestStatus.offers_received": "Offres reçues"
+  ,"requestFlow.requestStatus.validated": "Validée"
+  ,"requestFlow.requestStatus.ordered": "Commandée"
+  ,"requestFlow.requestStatus.expired": "Expirée"
+  ,"requestFlow.requestStatus.cancelled": "Annulée"
+  ,"commerce.success.viewOrders": "Afficher mes commandes"
+  ,"commerce.success.confirmation": "Félicitations ! Votre commande a été passée."
+  ,"commerce.success.orderNumber": "Nº Commande : {{reference}}"
+  ,"commerce.success.date": "Date : {{date}}"
+  ,"commerce.success.total": "Total : {{value}} Dhs"
+  ,"commerce.success.paymentLabel": "Mode de paiement :"
+  ,"commerce.success.payment.cod": "Paiement à la livraison"
+  ,"commerce.success.invoice": "Télécharger la facture"
+  ,"commerce.success.summary": "Résumé"
+  ,"commerce.success.item": "x{{count}} — {{title}}"
+  ,"commerce.success.taxIncluded": "TTC"
+  ,"commerce.success.paymentMode": "Mode de paiement"
+  ,"commerce.success.shipping": "Frais de livraison"
+  ,"commerce.success.deliveryDate": "Date prévue de la livraison"
+  ,"commerce.success.subtotal": "Sous-total des articles TTC"
+  ,"commerce.success.discount": "Réduction"
+  ,"commerce.success.tax": "TVA"
+  ,"commerce.success.home": "Accueil"
+  ,"commerce.success.loadError": "Impossible de charger la commande"
+  ,"commerce.success.retry": "Réessayer"
+  ,"settings.orders": "Mes commandes"
+  ,"settings.archivedOffers": "Archive de mes offres"
+  ,"settings.wishlist": "Ma liste de souhaits"
+  ,"settings.profileSection": "Mon profil"
+  ,"settings.garage": "Mon garage"
+  ,"settings.editProfile": "Modifier mon profil"
+  ,"settings.payment": "Mes détails de paiement"
+  ,"settings.addresses": "Mes adresses"
+  ,"settings.preferences": "Préférences"
+  ,"settings.preferencesLoadError": "Impossible de charger les préférences de notification"
+  ,"settings.preferencesSaveError": "Impossible d’enregistrer les préférences de notification"
+  ,"settings.pushNotifications": "Notifications push"
+  ,"settings.doNotTrack": "Demander à l’application de ne pas faire de suivi"
+  ,"settings.language": "Langue"
+  ,"settings.aboutSection": "À propos"
+  ,"settings.contact": "Contactez-nous"
+  ,"settings.about": "Qui nous sommes"
+  ,"settings.legalSection": "Mentions légales"
+  ,"settings.terms": "Termes et conditions"
+  ,"settings.privacy": "Politique de confidentialité"
+  ,"settings.returns": "Politique de retour"
+  ,"settings.greeting": "Bonjour {{name}} 👋"
+  ,"settings.client": "Client"
+  ,"settings.retry": "Réessayer"
+  ,"settings.notifications": "Notifications"
+  ,"settings.logout": "Se déconnecter"
+  ,"settings.confirm": "Confirmer"
+  ,"settings.modify": "Modifier"
+  ,"settings.saving": "Enregistrement..."
+  ,"settings.cancelling": "Annulation..."
+  ,"settings.profile.loadError": "Impossible de charger le profil"
+  ,"settings.profile.notFound": "Profil introuvable"
+  ,"settings.profile.saveError": "Impossible d’enregistrer le profil"
+  ,"settings.profile.changeAvatar": "Modifier la photo de profil"
+  ,"settings.profile.photoPermission": "Autorisez l’accès aux photos pour modifier votre profil"
+  ,"settings.profile.identifierRequired": "Renseignez la nouvelle valeur et votre mot de passe actuel"
+  ,"settings.profile.email": "Adresse e-mail"
+  ,"settings.profile.name": "Nom complet"
+  ,"settings.profile.phone": "Numéro de téléphone"
+  ,"settings.profile.currentPassword": "Mot de passe actuel"
+  ,"settings.profile.modifyName": "Modifier le nom"
+  ,"settings.profile.confirmName": "Confirmer le nom"
+  ,"settings.profile.modifyEmail": "Modifier l’adresse e-mail"
+  ,"settings.profile.confirmEmail": "Confirmer l’adresse e-mail"
+  ,"settings.profile.modifyPhone": "Modifier le numéro de téléphone"
+  ,"settings.profile.confirmPhone": "Confirmer le numéro de téléphone"
+  ,"settings.profile.changePassword": "Modifier le mot de passe"
+  ,"settings.profile.sectionTitle": "Mes informations de profil"
+  ,"settings.address.required": "Ce champ est obligatoire"
+  ,"settings.address.saveError": "Impossible d’enregistrer l’adresse"
+  ,"settings.address.loadError": "Impossible de charger l’adresse"
+  ,"settings.address.deleteError": "Impossible de supprimer l’adresse"
+  ,"settings.address.defaultError": "Impossible de définir l’adresse par défaut"
+  ,"settings.address.addTitle": "Ajouter une adresse"
+  ,"settings.address.editTitle": "Modifier l’adresse"
+  ,"settings.address.editAction": "Modifier l’adresse"
+  ,"settings.address.addAction": "Ajouter l’adresse"
+  ,"settings.address.label": "Nom de l’adresse (ex. : Ma maison)"
+  ,"settings.address.labelPlaceholder": "Ma maison, Mon bureau..."
+  ,"settings.address.line1": "Adresse"
+  ,"settings.address.line1Placeholder": "Rue, numéro..."
+  ,"settings.address.line2": "Complément d’adresse (optionnel)"
+  ,"settings.address.line2Placeholder": "Appartement, étage..."
+  ,"settings.address.city": "Ville"
+  ,"settings.address.cityPlaceholder": "Casablanca, Rabat..."
+  ,"settings.address.postalCode": "Code postal (optionnel)"
+  ,"settings.address.region": "État/province/région (optionnel)"
+  ,"settings.address.regionPlaceholder": "Casablanca-Settat"
+  ,"settings.address.card.edit": "Modifier"
+  ,"settings.address.card.street": "Rue : "
+  ,"settings.address.card.city": "Ville : "
+  ,"settings.address.card.region": "État/province/région : "
+  ,"settings.address.card.default": "Adresse par défaut"
+  ,"settings.address.card.setDefault": "Définir par défaut"
+  ,"settings.address.card.delete": "Supprimer"
+  ,"settings.payment.loadError": "Impossible de charger les moyens de paiement"
+  ,"settings.payment.type.visa": "Visa"
+  ,"settings.payment.type.cod": "Paiement à la livraison"
+  ,"settings.payment.type.cachePlus": "Cash Plus"
+  ,"settings.payment.type.transfer": "Virement bancaire"
+  ,"settings.payment.type.balance": "Solde portefeuille"
+  ,"settings.payment.name": "Nom : {{value}}"
+  ,"settings.payment.number": "Numéro : **** **** **** {{value}}"
+  ,"settings.payment.expiry": "Date d’expiration : {{value}}"
+  ,"settings.payment.street": "Rue : {{value}}"
+  ,"settings.payment.city": "Ville : {{value}}"
+  ,"settings.payment.region": "État/province/région : {{value}}"
+  ,"settings.notifications.title": "Notifications"
+  ,"settings.notifications.details": "Détails"
+  ,"settings.notifications.unread": "{{count}} non lu(s)"
+  ,"settings.notifications.empty": "Vous n’avez pas de notifications"
+  ,"settings.notifications.loadError": "Impossible de charger les notifications"
+  ,"settings.notifications.mutationError": "Impossible de mettre à jour les notifications"
+  ,"settings.wishlist.title": "Ma liste de souhaits"
+  ,"settings.wishlist.empty": "La liste est vide"
+  ,"settings.wishlist.explore": "Explorer les produits"
+  ,"settings.wishlist.loadError": "Impossible de charger la liste de souhaits"
+  ,"settings.wishlist.removeError": "Impossible de retirer cet article"
+  ,"settings.orders.loadError": "Impossible de charger les commandes"
+  ,"settings.orders.loadDetailError": "Impossible de charger la commande"
+  ,"settings.orders.invalid": "Lien de commande invalide"
+  ,"settings.orders.notFound": "Commande introuvable"
+  ,"settings.orders.cancel": "Annuler la commande"
+  ,"settings.orders.cancelConfirm": "Confirmer l’annulation"
+  ,"settings.orders.cancelBody": "Voulez-vous annuler cette commande ?"
+  ,"settings.orders.cancelError": "Impossible d’annuler cette commande"
+  ,"settings.orders.subtotal": "Sous-total"
+  ,"settings.orders.tax": "TVA"
+  ,"settings.orders.tracking": "Suivi : {{id}}"
+  ,"settings.orders.reference": "Réf. : {{reference}}"
+  ,"settings.orders.summary": "Résumé de la commande"
+  ,"settings.orders.noItems": "Aucun article"
+  ,"settings.orders.shipping": "Frais de livraison"
+  ,"settings.orders.discount": "Bon d’achat"
+  ,"settings.orders.total": "Total"
+  ,"settings.orders.paymentDetails": "Détails du paiement"
+  ,"settings.orders.invoice": "Facture"
+  ,"settings.orders.method": "Méthode : {{method}}"
+  ,"settings.orders.step.paid": "Payé"
+  ,"settings.orders.step.cod": "Paiement à la livraison"
+  ,"settings.orders.step.paymentPending": "Paiement en attente"
+  ,"settings.orders.step.processing": "Traitement"
+  ,"settings.orders.step.shipped": "Expédition"
+  ,"settings.orders.step.delivered": "Livré"
+  ,"settings.archived.loadError": "Impossible de charger les offres archivées"
+  ,"settings.profile.verifyPhoneTitle": "Vérifier le nouveau numéro"
+  ,"settings.profile.noPendingPhoneVerification": "Aucun changement de numéro n’est en attente de vérification."
+  ,"Accueil": "Accueil"
+  ,"Acheter": "Acheter"
+  ,"Acheteur": "Acheteur"
+  ,"Ajouter une adresse": "Ajouter une adresse"
+  ,"Ajouter une voiture": "Ajouter une voiture"
+  ,"Ajouter à la liste": "Ajouter à la liste"
+  ,"Ajouter": "Ajouter"
+  ,"Appliquer": "Appliquer"
+  ,"Bienvenue à EBEN": "Bienvenue à EBEN"
+  ,"Caisse de sortie": "Paiement"
+  ,"Category": "Catégorie"
+  ,"Ce champ est obligatoire": "Ce champ est obligatoire"
+  ,"Changer de voiture": "Changer de voiture"
+  ,"Chercher ...": "Chercher..."
+  ,"Chercher": "Chercher"
+  ,"Choisissez votre langue": "Choisissez votre langue"
+  ,"En stock": "En stock"
+  ,"La liste a été envoyée": "La liste a été envoyée"
+  ,"Langue": "Langue"
+  ,"Le champ doit être un nombre": "Le champ doit être un nombre"
+  ,"Les champs doivent correspondre": "Les champs doivent correspondre"
+  ,"Les offres": "Les offres"
+  ,"Les retours ne sont pas acceptés pour les pièces d'occasion.": "Les retours ne sont pas acceptés pour les pièces d'occasion."
+  ,"Liste": "Liste"
+  ,"Ma liste de souhaits": "Ma liste de souhaits"
+  ,"Mes adresses": "Mes adresses"
+  ,"Mes commandes": "Mes commandes"
+  ,"Mes détails de paiement": "Mes détails de paiement"
+  ,"Mon garage": "Mon garage"
+  ,"Mon panier": "Mon panier"
+  ,"Notifications": "Notifications"
+  ,"N° Article:": "N° Article :"
+  ,"Panier": "Panier"
+  ,"Pièce d'occasion — état conforme à la photo": "Pièce d'occasion — état conforme à la photo"
+  ,"Placer une demande": "Placer une demande"
+  ,"Profil": "Profil"
+  ,"Promo": "Promo"
+  ,"Quantité": "Quantité"
+  ,"Recherche pneumatiques": "Recherche pneumatiques"
+  ,"Recherche": "Recherche"
+  ,"Réessayer": "Réessayer"
+  ,"Si vous avez un compte": "Si vous avez un compte"
+  ,"Suppression...": "Suppression..."
+  ,"Supprimer": "Supprimer"
+  ,"Termes et conditions": "Termes et conditions"
+  ,"Utiliser l'adresse de mon mécanicien": "Utiliser l'adresse de mon mécanicien"
+  ,"Vendeur": "Vendeur"
+  ,"Voir tous": "Voir tous"
+  ,"Vos offres": "Vos offres"
+  ,"Votre boutique en ligne de pièces détachées automobiles au Maroc": "Votre boutique en ligne de pièces détachées automobiles au Maroc"
+  ,"Votre liste a été envoyée à nos partenaires, vous obtiendrez un prix dans 2 heures.": "Votre liste a été envoyée à nos partenaires, vous obtiendrez un prix dans 2 heures."
+  ,"Votre référence de demande :": "Votre référence de demande :"
+  ,"Vous devez accepter les conditions": "Vous devez accepter les conditions"
+  ,"Vous devez cocher ce champ": "Vous devez cocher ce champ"
+  ,"doit être un nombre": "doit être un nombre"
+  ,"est obligatoire": "est obligatoire"
+  ,"À l'instant": "À l'instant"
+  ,"À propos": "À propos"
+  ,"Êtes-vous": "Êtes-vous"
+  ,"about.madeInMorocco": "Fabriqué au Maroc"
+  ,"about.missionTitle": "NOTRE MISSION"
+  ,"about.missionBody": "Faciliter la commande et l'achat de pièces automobiles dans tout le Maroc en supprimant les obstacles à l'achat et à la vente dans le secteur."
+  ,"about.visionTitle": "NOTRE VISION"
+  ,"about.visionBody": "Contribuer à numériser et à améliorer l'industrie marocaine des pièces détachées automobiles."
+  ,"about.valuesTitle": "NOS VALEURS"
+  ,"about.value.speed": "VITESSE"
+  ,"about.value.discipline": "DISCIPLINE"
+  ,"about.value.boldness": "AUDACE"
+  ,"about.contact": "Contactez-nous :"
+  ,"about.address": "9 Rue Al Borj, appartement 8, Rabat, Maroc"
+  ,"auth.register.vehicleAddedTitle": "Voiture ajoutée à votre garage"
+  ,"auth.register.vehicleAddedBody": "{{car}} a été ajoutée à votre garage"
+  ,"auth.register.completeTitle": "Inscription terminée"
+  ,"auth.register.completeBody": "Votre compte est prêt."
+  ,"auth.register.goHome": "Aller à la page d'accueil"
+  ,"auth.register.skipVehicle": "Passer cette étape"
+  ,"legal.unavailableTitle": "Documents juridiques indisponibles"
+  ,"legal.unavailableBody": "Les documents juridiques officiels d'EBEN ne sont pas encore approuvés. Aucune acceptation ne sera enregistrée tant qu'ils ne seront pas disponibles."
+  ,"legal.back": "Retour"
+  ,"settings.profile.title": "Vérification du téléphone"
+  ,"partner.offers.quantity": "Qté {{count}}"
+  ,"Page introuvable": "Page introuvable"
+  ,"Cette page n'existe pas.": "Cette page n'existe pas."
+  ,"Aller à la connexion": "Aller à la connexion"
+  ,"Aller à l'accueil": "Aller à l'accueil"
 }

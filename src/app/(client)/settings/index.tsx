@@ -7,18 +7,22 @@
  * Bottom: Logout button (round).
  */
 
-import React from 'react';
-import { StyleSheet, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import View from '@/components/common/View';
 import Screen from '@/components/common/Screen';
 import { Text } from '@/components/common/Text';
 import ItemMenuComponent from '@/components/screens/shared/app/ItemMenuComponent';
 import Button from '@/components/common/Button';
+import Footer from '@/components/common/Footer';
 import Icon from '@/components/common/Icon';
 import Colors from '@/constants/Colors';
 import { useSession } from '@/context/AuthContext';
+import { getProfile } from '@/api/resources/users';
+import { getNotificationPreferences, updateNotificationPreferences } from '@/api/resources/notifications';
+import type { UserNotificationPreferences } from '@/interfaces/Notification';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,6 +39,7 @@ interface MenuRow {
   isToggle?: boolean;
   toggleValue?: boolean;
   onToggle?: (value: boolean) => void;
+  toggleDisabled?: boolean;
   onPress?: () => void;
 }
 
@@ -44,124 +49,149 @@ type MenuItem = MenuHeader | MenuRow;
 
 const ClientMenuScreen: React.FC = () => {
   const { t } = useTranslation();
-  const { logOut, username } = useSession();
+  const { logOut } = useSession();
   const router = useRouter();
-  const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
-  const [trackingDisabled, setTrackingDisabled] = React.useState(false);
+  const [preferences, setPreferences] = useState<UserNotificationPreferences | null>(null);
+  const [preferencesLoading, setPreferencesLoading] = useState(true);
+  const [preferencesSaving, setPreferencesSaving] = useState(false);
+  const [preferencesError, setPreferencesError] = useState<string | null>(null);
+  const preferenceMutationRef = useRef(false);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState(false);
+
+  const loadProfile = useCallback(async () => {
+    setProfileLoading(true);
+    setProfileError(false);
+    try {
+      const response = await getProfile();
+      setDisplayName(response.data.name);
+    } catch {
+      setProfileError(true);
+    } finally {
+      setProfileLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => { void loadProfile(); }, [loadProfile]));
+
+  const loadPreferences = useCallback(async () => {
+    setPreferencesLoading(true);
+    setPreferencesError(null);
+    try {
+      const response = await getNotificationPreferences();
+      setPreferences(response.data);
+    } catch {
+      setPreferencesError(t('settings.preferencesLoadError'));
+    } finally {
+      setPreferencesLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => { void loadPreferences(); }, [loadPreferences]);
+
+  const handlePushPreference = useCallback(async (value: boolean) => {
+    if (preferenceMutationRef.current || preferencesLoading) return;
+    preferenceMutationRef.current = true;
+    setPreferencesSaving(true);
+    setPreferencesError(null);
+    try {
+      const response = await updateNotificationPreferences({ channelPreferences: { push: value } });
+      setPreferences(response.data);
+    } catch {
+      setPreferencesError(t('settings.preferencesSaveError'));
+    } finally {
+      preferenceMutationRef.current = false;
+      setPreferencesSaving(false);
+    }
+  }, [preferencesLoading, t]);
 
   const menuItems: MenuItem[] = [
     // ── Orders & Offers ──────────────────────────────────────────────────────
     {
       icon: 'cart',
-      title: 'Mes commandes',
+      title: t('settings.orders'),
       navigateTo: '(client)/settings/orders',
     },
     {
       icon: 'liste',
-      title: 'Archive de mes offres',
+      title: t('settings.archivedOffers'),
       navigateTo: '(client)/settings/archived-offers',
     },
     {
       icon: 'wishlist',
-      title: 'Ma liste de souhaits',
+      title: t('settings.wishlist'),
       navigateTo: '(client)/settings/wishlist',
     },
 
     // ── Mon profil ────────────────────────────────────────────────────────────
     {
       type: 'header' as const,
-      title: 'Mon profil',
+      title: t('settings.profileSection'),
     },
     {
       icon: 'car',
-      title: 'Mon garage',
+      title: t('settings.garage'),
       navigateTo: '(client)/settings/parking',
     },
     {
       icon: 'profile',
-      title: 'Modifier mon profil',
+      title: t('settings.editProfile'),
       navigateTo: '(client)/settings/profile',
     },
     {
       icon: 'visa',
-      title: 'Mes détails de paiement',
+      title: t('settings.payment'),
       navigateTo: '(client)/settings/payment',
     },
     {
       icon: 'geo',
-      title: 'Mes adresses',
+      title: t('settings.addresses'),
       navigateTo: '(client)/settings/addresses',
     },
 
     // ── Préférences ───────────────────────────────────────────────────────────
     {
       type: 'header' as const,
-      title: 'Préférences',
+      title: t('settings.preferences'),
     },
     {
       icon: 'notif',
-      title: 'Notifications push',
+      title: t('settings.pushNotifications'),
       isToggle: true,
-      toggleValue: notificationsEnabled,
-      onToggle: setNotificationsEnabled,
-    },
-    {
-      icon: 'eye',
-      title: 'Demandez à l\'application de ne pas faire de suivi',
-      isToggle: true,
-      toggleValue: trackingDisabled,
-      onToggle: setTrackingDisabled,
+      toggleValue: preferences?.channelPreferences.push ?? false,
+      onToggle: (value) => { void handlePushPreference(value); },
+      toggleDisabled: preferencesLoading || preferencesSaving || preferences === null,
     },
     {
       icon: 'language',
-      title: 'Langue',
+      title: t('settings.language'),
       navigateTo: '(client)/settings/language',
     },
 
     // ── À propos ──────────────────────────────────────────────────────────────
     {
       type: 'header' as const,
-      title: 'À propos',
+      title: t('settings.aboutSection'),
     },
     {
       icon: 'casque',
-      title: 'Contactez-nous',
+      title: t('settings.contact'),
       navigateTo: '(client)/settings/pages/About',
     },
     {
       icon: 'logo',
-      title: 'Qui nous sommes',
+      title: t('settings.about'),
       navigateTo: '(client)/settings/pages/About',
     },
 
     // ── Mentions légales ──────────────────────────────────────────────────────
-    {
-      type: 'header' as const,
-      title: 'Mentions légales',
-    },
-    {
-      icon: 'info2',
-      title: 'Termes et conditions',
-      navigateTo: '(client)/settings/pages/Legal',
-    },
-    {
-      icon: 'protection',
-      title: 'Politique de confidentialité',
-      navigateTo: '(client)/settings/pages/Legal',
-    },
-    {
-      icon: 'retour',
-      title: 'Politique de retour',
-      navigateTo: '(client)/settings/pages/Legal',
-    },
   ];
 
-  const handleLogout = () => {
-    logOut();
+  const handleLogout = async () => {
+    await logOut();
     router.replace('/(auth)' as never);
   };
-
-  const displayName = username ?? 'toi';
 
   return (
     <Screen scrollable>
@@ -172,18 +202,32 @@ const ClientMenuScreen: React.FC = () => {
             <Icon name="user" size={36} iconColor={Colors.gray} type="FontAwesome5" />
           </View>
           <View flex>
-            <Text type="text" semiBold color={Colors.brand} translate={false}>
-              {`Hey ${displayName} 👋`}
-            </Text>
+            {profileLoading ? <ActivityIndicator size="small" color={Colors.brand} /> : (
+              <Text type="text" semiBold color={Colors.brand}>
+                {t('settings.greeting', { name: displayName ?? t('settings.client') })}
+              </Text>
+            )}
+            {profileError ? <TouchableOpacity onPress={() => { void loadProfile(); }} accessibilityRole="button" accessibilityLabel={t('settings.retry')}>
+              <Text type="small" color={Colors.error}>{t('settings.retry')}</Text>
+            </TouchableOpacity> : null}
           </View>
           <TouchableOpacity
             style={styles.bellBtn}
             activeOpacity={0.7}
             onPress={() => router.push('/(client)/settings/notifications' as never)}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.notifications')}
           >
             <Icon name="bell" size={22} iconColor={Colors.brand} type="Feather" />
           </TouchableOpacity>
         </View>
+
+        {preferencesError ? (
+          <View alignItems="center" gap={8} style={styles.preferencesError}>
+            <Text accessibilityRole="alert" type="small" color={Colors.error}>{preferencesError}</Text>
+            <Button title={t('settings.retry')} onPress={() => { void loadPreferences(); }} disabled={preferencesLoading} />
+          </View>
+        ) : null}
 
         {/* Menu rows */}
         {menuItems.map((item, index) => {
@@ -205,6 +249,7 @@ const ClientMenuScreen: React.FC = () => {
                 navigateTo={row.navigateTo}
                 onToggle={row.onToggle}
                 toggleValue={row.toggleValue}
+                toggleDisabled={row.toggleDisabled}
                 isToggle={row.isToggle}
                 trailingIcon={row.isToggle ? 'chevron' : 'arrow'}
                 styleContainer={styles.menuRowCompact}
@@ -220,19 +265,12 @@ const ClientMenuScreen: React.FC = () => {
             iconType="custom"
             variant="pink"
             style={styles.buttonLogout}
-            onPress={handleLogout}
+            onPress={() => { void handleLogout(); }}
+            accessibilityLabel={t('settings.logout')}
           />
         </View>
 
-        {/* Footer */}
-        <View alignItems="center" style={styles.footer}>
-          <Text type="small" color={Colors.gray} translate={false}>
-            EBEN Solutions SARL © 2022
-          </Text>
-          <Text type="small" color={Colors.gray} translate={false}>
-            v 1.0.0
-          </Text>
-        </View>
+        <Footer />
       </View>
     </Screen>
   );
@@ -251,6 +289,10 @@ const styles = StyleSheet.create({
   },
   menuRowCompact: {
     paddingVertical: 5,
+  },
+  preferencesError: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   avatarWrapper: {
     width: 56,
@@ -281,10 +323,6 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     paddingVertical: 0,
-  },
-  footer: {
-    marginTop: 20,
-    gap: 4,
   },
 });
 

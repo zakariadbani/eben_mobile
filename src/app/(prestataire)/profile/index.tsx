@@ -20,7 +20,7 @@
  *   Footer  — power-off icon (logout), copyright line, version
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -31,7 +31,7 @@ import {
   Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs, useFocusEffect, useRouter } from 'expo-router';
 
 import View from '@/components/common/View';
 import { Text } from '@/components/common/Text';
@@ -61,11 +61,9 @@ function SectionLabel({ label }: { readonly label: string }): React.ReactElement
 export default function PrestataireProfileScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
-  const { logOut } = useSession();
+  const { logOut, username } = useSession();
 
   const [profile, setProfile] = useState<PrestataireProfile | null>(null);
-  const [notifEnabled, setNotifEnabled] = useState(true);
-  const [doNotTrack, setDoNotTrack] = useState(false);
 
   const loadProfile = useCallback(async () => {
     try {
@@ -76,9 +74,7 @@ export default function PrestataireProfileScreen(): React.ReactElement {
     }
   }, []);
 
-  useEffect(() => {
-    void loadProfile();
-  }, [loadProfile]);
+  useFocusEffect(useCallback(() => { void loadProfile(); }, [loadProfile]));
 
   const handleLogout = () => {
     Alert.alert(
@@ -103,13 +99,13 @@ export default function PrestataireProfileScreen(): React.ReactElement {
       {/* ── Yellow header ── */}
       <View style={styles.header} flexDirection="row" alignItems="center">
         <Image
-          source={require('@/assets/img/avatar.jpg')}
+          source={profile?.avatar ? { uri: profile.avatar } : require('@/assets/img/avatar.jpg')}
           style={styles.avatar}
           accessibilityLabel={profile?.name ?? t('partner.dashboard.greeting')}
         />
         <View flex style={styles.headerTextBlock}>
           <Text type="headerTitle" semiBold color={Colors.brand}>
-            {'partner.dashboard.greeting'}
+            {t('partner.profile.greeting', { name: profile?.name ?? username ?? t('partner.profile.partnerFallback') })}
           </Text>
         </View>
         <TouchableOpacity
@@ -169,20 +165,6 @@ export default function PrestataireProfileScreen(): React.ReactElement {
         <SectionLabel label={t('partner.profile.sectionPrefs')} />
         <View style={styles.group}>
           <ItemMenuComponent
-            icon="notif"
-            title={t('partner.profile.notifPush')}
-            isToggle
-            toggleValue={notifEnabled}
-            onToggle={setNotifEnabled}
-          />
-          <ItemMenuComponent
-            icon="eye"
-            title={t('partner.profile.doNotTrack')}
-            isToggle
-            toggleValue={doNotTrack}
-            onToggle={setDoNotTrack}
-          />
-          <ItemMenuComponent
             icon="language"
             title={t('partner.profile.language')}
             navigateTo="(prestataire)/profile/language"
@@ -205,24 +187,6 @@ export default function PrestataireProfileScreen(): React.ReactElement {
         </View>
 
         {/* ── Group 5: Mentions légales ── */}
-        <SectionLabel label={t('partner.profile.sectionLegal')} />
-        <View style={styles.group}>
-          <ItemMenuComponent
-            icon="info2"
-            title={t('partner.profile.terms')}
-            navigateTo="(prestataire)/profile/legal"
-          />
-          <ItemMenuComponent
-            icon="protection"
-            title={t('partner.profile.privacy')}
-            navigateTo="(prestataire)/profile/legal"
-          />
-          <ItemMenuComponent
-            icon="info3"
-            title={t('partner.profile.salesPolicy')}
-            navigateTo="(prestataire)/profile/legal"
-          />
-        </View>
 
         {/* ── Logout button ── */}
         <View style={styles.logoutSection} alignItems="center">
@@ -238,11 +202,11 @@ export default function PrestataireProfileScreen(): React.ReactElement {
         {/* ── Footer ── */}
         <View style={styles.footer} flexDirection="row" alignItems="center">
           <Text type="small" color={Colors.gray}>
-            {'partner.profile.copyright'}
+            {t('partner.profile.copyright')}
           </Text>
           <View flex />
           <Text type="small" color={Colors.gray}>
-            {'partner.profile.version'}
+            {t('partner.profile.version')}
           </Text>
         </View>
       </ScrollView>

@@ -1,17 +1,21 @@
 import { Link, Stack, type Href } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { useTranslation } from "react-i18next";
+import { Text } from "@/components/common/Text";
 
 export default function NotFoundScreen() {
+  const { t } = useTranslation();
+
   return (
     <>
-      <Stack.Screen options={{ title: "Oops!" }} />
+      <Stack.Screen options={{ title: t("Page introuvable") }} />
       <View style={styles.container}>
-        <Text>This screen doesn't exist.</Text>
+        <Text>Cette page n'existe pas.</Text>
         <Link href={"/(auth)" as Href} style={styles.link}>
-          <Text>Go to login screen!</Text>
+          <Text>Aller à la connexion</Text>
         </Link>
         <Link href="/" style={styles.link}>
-          <Text>Go to home screen!</Text>
+          <Text>Aller à l'accueil</Text>
         </Link>
       </View>
     </>

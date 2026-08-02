@@ -41,6 +41,7 @@ export interface ItemMenuComponentProps {
   onToggle?: (value: boolean) => void;
   /** Initial switch value. */
   toggleValue?: boolean;
+  toggleDisabled?: boolean;
   styleContainer?: ViewStyle;
   /**
    * Trailing icon for nav rows.
@@ -58,6 +59,7 @@ const ItemMenuComponent: React.FC<ItemMenuComponentProps> = ({
   isToggle = false,
   onToggle,
   toggleValue = false,
+  toggleDisabled = false,
   styleContainer,
   trailingIcon = 'chevron',
 }) => {
@@ -102,8 +104,11 @@ const ItemMenuComponent: React.FC<ItemMenuComponentProps> = ({
         {isToggle ? (
           <Switch
             accessibilityLabel={title}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: toggleValue, disabled: toggleDisabled }}
             value={toggleValue}
             onValueChange={onToggle}
+            disabled={toggleDisabled}
             trackColor={{ false: Colors.borderLight, true: Colors.greenDark }}
             thumbColor={Colors.white}
           />

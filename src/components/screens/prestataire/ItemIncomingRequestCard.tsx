@@ -39,7 +39,11 @@ export default function ItemIncomingRequestCard({ item, onPress, styleContainer 
 
   return (
     <TouchableOpacity style={[styles.card, styleContainer]} activeOpacity={0.78} onPress={handlePress}>
-      <Image source={require("@/assets/img/freins.png")} style={styles.image} resizeMode="contain" />
+      <Image
+        source={firstItem?.categoryImage ? { uri: firstItem.categoryImage } : require("@/assets/img/freins.png")}
+        style={styles.image}
+        resizeMode="contain"
+      />
       <View flex style={styles.content}>
         <Text type="label" color={Colors.gray} translate={false}>{`${t("partner.offers.card.ref")} ${item.reference}`}</Text>
         <Text type="labelTwo" semiBold numberOfLines={2} translate={false}>{title}</Text>
@@ -50,7 +54,7 @@ export default function ItemIncomingRequestCard({ item, onPress, styleContainer 
           </Text>
         </View>
       </View>
-      <TouchableOpacity style={styles.button} onPress={handlePress}>
+      <TouchableOpacity style={styles.button} onPress={handlePress} accessibilityRole="button">
         <Text type="labelTwo" semiBold>{t("partner.offers.card.details")}</Text>
       </TouchableOpacity>
     </TouchableOpacity>
@@ -59,8 +63,8 @@ export default function ItemIncomingRequestCard({ item, onPress, styleContainer 
 
 const styles = StyleSheet.create({
   card: { minHeight: 106, marginBottom: 12, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 7, backgroundColor: Colors.white, flexDirection: "row", alignItems: "center", shadowColor: Colors.gray, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.17, shadowRadius: 7, elevation: 4 },
-  image: { width: 61, height: 61, marginRight: 12 },
+  image: { width: 61, height: 61, marginEnd: 12 },
   content: { minWidth: 0 },
   expiry: { marginTop: 10 },
-  button: { alignSelf: "flex-end", marginLeft: 8, marginBottom: 1, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 4, backgroundColor: Colors.primary },
+  button: { alignSelf: "flex-end", marginStart: 8, marginBottom: 1, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 4, backgroundColor: Colors.primary },
 });

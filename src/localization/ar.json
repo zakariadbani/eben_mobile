@@ -1,4 +1,94 @@
 {
+  "auth.fields.firstName": "الاسم الأول",
+  "auth.fields.lastName": "الاسم العائلي",
+  "auth.fields.email": "البريد الإلكتروني",
+  "auth.fields.phone": "رقم الهاتف",
+  "auth.fields.phonePlaceholder": "06 77 77 77 77",
+  "auth.fields.password": "كلمة المرور",
+  "auth.fields.passwordConfirmation": "تأكيد كلمة المرور",
+  "auth.login.title": "لنبدأ",
+  "auth.login.subtitle": "سجل الدخول للمتابعة",
+  "auth.login.remember": "تذكرني",
+  "auth.login.forgotPassword": "نسيت كلمة المرور؟",
+  "auth.login.submit": "تسجيل الدخول",
+  "auth.login.submitting": "جارٍ تسجيل الدخول...",
+  "auth.login.noAccount": "ليس لدي حساب.",
+  "auth.login.signUp": "سجل الآن!",
+  "auth.login.error": "تعذر تسجيل الدخول. تحقق من معلوماتك وحاول مرة أخرى.",
+  "auth.login.roleMismatch": "هذا الحساب ليس حساب عميل.",
+  "auth.register.submit": "التسجيل",
+  "auth.register.submitting": "جارٍ التسجيل...",
+  "auth.register.passwordLength": "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل",
+  "auth.register.passwordConfirmationRequired": "يجب تأكيد كلمة المرور",
+  "auth.register.passwordMismatch": "يجب أن تتطابق كلمتا المرور",
+  "auth.register.terms": "الشروط",
+  "auth.register.acceptTerms": "قرأت شروط الاستخدام ووافقت عليها",
+  "auth.register.termsRequired": "يجب قبول الشروط",
+  "auth.register.phoneInvalid": "أدخل رقم هاتف مغربي صالحًا",
+  "auth.register.confirmPhone": "هل هذا رقمك؟",
+  "auth.register.confirmBack": "لا، ارجع",
+  "auth.register.confirmContinue": "نعم، تابع",
+  "auth.register.error": "تعذر التسجيل. تحقق من الحقول وحاول مرة أخرى.",
+  "auth.register.fieldError.name": "تحقق من اسمك",
+  "auth.register.fieldError.email": "عنوان البريد الإلكتروني هذا غير متاح",
+  "auth.register.fieldError.phone": "رقم الهاتف هذا غير متاح",
+  "auth.register.fieldError.password": "تحقق من كلمة المرور",
+  "auth.otp.title": "التحقق عبر الرسائل القصيرة",
+  "auth.otp.sent": "تم إرسال رمز التحقق إلى {{phone}}",
+  "auth.otp.notReceived": "لم تستلم الرمز؟",
+  "auth.otp.seconds": "{{count}} ثانية",
+  "auth.otp.resend": "أعد إرساله الآن",
+  "auth.otp.resending": "جارٍ الإرسال...",
+  "auth.otp.verify": "تحقق",
+  "auth.otp.verifying": "جارٍ التحقق...",
+  "auth.otp.incomplete": "أدخل أرقام الرمز الستة",
+  "auth.otp.invalid": "الرمز غير صالح أو منتهي الصلاحية",
+  "auth.otp.resendError": "تعذر إعادة إرسال الرمز. حاول مرة أخرى.",
+  "auth.otp.initialSendError": "تعذر إرسال الرمز. أعد إرساله للمتابعة.",
+  "auth.otp.noPendingRegistration": "أعد التسجيل للحصول على رمز جديد.",
+  "auth.error.generic": "حدث خطأ. حاول مرة أخرى.",
+  "auth.prestataire.login.roleMismatch": "هذا الحساب ليس حساب مقدم خدمة.",
+  "auth.prestataire.login.joinWaitlist": "انضم إلى قائمة الانتظار",
+  "auth.recovery.header": "إعادة تعيين كلمة المرور",
+  "auth.recovery.instructions": "أدخل رقم الهاتف الذي استخدمته للتسجيل في EBEN.",
+  "auth.recovery.start": "إعادة تعيين كلمة المرور",
+  "auth.recovery.starting": "جارٍ إرسال الرمز...",
+  "auth.recovery.newPasswordInstructions": "أدخل كلمة المرور الجديدة",
+  "auth.recovery.passwordLength": "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل",
+  "auth.recovery.passwordConfirmationRequired": "يجب تأكيد كلمة المرور",
+  "auth.recovery.passwordMismatch": "يجب أن تتطابق كلمتا المرور",
+  "auth.recovery.confirm": "تأكيد",
+  "auth.recovery.confirming": "جارٍ التأكيد...",
+  "auth.recovery.noPending": "أعد بدء تعيين كلمة المرور للحصول على رمز جديد.",
+  "auth.recovery.startError": "تعذر إرسال الرمز. تحقق من الرقم وحاول مرة أخرى.",
+  "auth.recovery.resetError": "تعذر إعادة تعيين كلمة المرور. حاول مرة أخرى.",
+  "partner.waitlist.title": "استمارة التقديم",
+  "partner.waitlist.fields.city": "المدينة",
+  "partner.waitlist.fields.firstName": "الاسم الأول",
+  "partner.waitlist.fields.lastName": "الاسم العائلي",
+  "partner.waitlist.fields.email": "البريد الإلكتروني",
+  "partner.waitlist.fields.phone": "رقم الهاتف",
+  "partner.waitlist.fields.businessType": "نوع النشاط التجاري",
+  "partner.waitlist.fields.companyName": "اسم الشركة أو المتجر",
+  "partner.waitlist.placeholders.city": "الدار البيضاء، وجدة، الرباط ...",
+  "partner.waitlist.placeholders.firstName": "أحمد",
+  "partner.waitlist.placeholders.lastName": "المهداوي",
+  "partner.waitlist.placeholders.email": "ahmed@example.com",
+  "partner.waitlist.placeholders.businessType": "خردة أو شركة",
+  "partner.waitlist.placeholders.companyName": "Xyz",
+  "partner.waitlist.terms": "قرأت شروط الاستخدام ووافقت عليها",
+  "partner.waitlist.submit": "التسجيل",
+  "partner.waitlist.submitting": "جارٍ الإرسال...",
+  "partner.waitlist.success": "تم إرسال الطلب",
+  "partner.waitlist.error.city": "أدخل مدينة صالحة",
+  "partner.waitlist.error.firstName": "أدخل اسمًا أول صالحًا",
+  "partner.waitlist.error.lastName": "أدخل اسمًا عائليًا صالحًا",
+  "partner.waitlist.error.email": "أدخل بريدًا إلكترونيًا صالحًا",
+  "partner.waitlist.error.phone": "أدخل رقم هاتف مغربي صالحًا",
+  "partner.waitlist.error.businessType": "أدخل نوع نشاط تجاري صالحًا",
+  "partner.waitlist.error.companyName": "تحقق من اسم الشركة",
+  "partner.waitlist.error.acceptedTerms": "يجب قبول الشروط",
+  "partner.waitlist.error.general": "تعذر إرسال الطلب. تحقق من الحقول وحاول مرة أخرى.",
   "cart.voucher.message": "قسيمة شراء بقيمة 100 درهم لهذا الطلب!",
   "cart.voucher.claim": "استبدال",
   "cart.voucher.claimed": "تم الاستبدال",
@@ -319,10 +409,12 @@
   "review.ratingRequired": "يرجى تحديد تقييم",
   "review.titleFieldLabel": "العنوان *",
   "review.titleFieldPlaceholder": "صف رأيك في بضع كلمات",
+  "review.titleRequired": "أدخل عنوانًا.",
   "review.commentLabel": "تعليق (اختياري)",
   "review.commentLabelRequired": "تعليق *",
   "review.commentPlaceholder": "صف تجربتك مع هذا المنتج...",
   "review.commentPlaceholderFigma": "سجّل أفكارك وتعليقاتك حول هذه القطعة.",
+  "review.commentRequired": "أدخل تعليقًا.",
   "review.submit": "إرسال الرأي",
   "review.submitFigma": "إرسال",
   "review.submitting": "جارٍ الإرسال...",
@@ -408,7 +500,12 @@
   "Sous-catégorie": "الفئة الفرعية",
   "Pièce": "القطعة",
   "checkout.loadError": "تعذر تحميل الطلب",
+  "checkout.yourInformation": "معلوماتك",
   "checkout.retry": "إعادة المحاولة",
+  "checkout.shippingDetails": "2- تفاصيل الشحن",
+  "checkout.paymentMethod": "3- طريقة الدفع",
+  "checkout.paymentDetails": "4- تفاصيل الدفع",
+  "checkout.billingSame": "بيانات الفوترة مطابقة لبيانات الشحن",
   "checkout.placing": "جارٍ الإرسال...",
   "Paquet": "طرد",
   "de": "من",
@@ -548,10 +645,12 @@
   "partner.dashboard.sentCount": "الإرسالات",
   "partner.dashboard.emptyOffers": "لا توجد عروض نشطة حالياً",
   "partner.dashboard.loadError": "تعذّر تحميل لوحة التحكم",
+  "partner.dashboard.offersLoadError": "تعذّر تحميل العروض النشطة",
   "partner.dashboard.retry": "إعادة المحاولة",
   "partner.dashboard.seeAllOffers": "مشاهدة الكل",
   "partner.dashboard.paymentDelay": "تستغرق معالجة الدفع ما بين 24 و48 ساعة.",
   "partner.dashboard.quantityOne": "الكمية 1",
+  "partner.dashboard.quantity": "الكمية {{count}}",
   "partner.dashboard.offerWindowNote": "يرجى وضع عروضك في غضون ساعتين لمنع إزالتها من قائمتك.",
   "partner.dashboard.missedCount": "الطلبات الفائتة",
   "partner.dashboard.salesMonth": "المبيعات في مايو 2022",
@@ -559,7 +658,7 @@
   "partner.dashboard.supportTitle": "3ndk chi sou2al??",
   "partner.dashboard.supportBody": "يمكنك الاتصال بنا من الساعة 8 صباحاً حتى 7 مساءً من الاثنين إلى الجمعة على الرقم التالي:",
   "partner.dashboard.supportCall": "الاتصال بالدعم",
-  "partner.dashboard.supportPhone": "06 66 77 88 99 00",
+  "partner.dashboard.supportPhone": "+212 6 61 39 39 71",
   "partner.sent.shipped": "تم شحنها",
   "partner.offer.statusActive": "نشط",
   "partner.offer.statusPending": "مُرسَل",
@@ -736,6 +835,40 @@
   "Photo pièce": "صورة القطعة",
   "partner.history.searchPlaceholder": "بحث",
   "partner.orders.detailTitle": "طرودك المشحونة - التفاصيل",
+  "partner.orders.title": "شحناتك",
+  "partner.orders.tabs.accepted": "العروض المقبولة",
+  "partner.orders.tabs.shipped": "المشحونة",
+  "partner.orders.tabs.delivered": "السجل",
+  "partner.orders.step.accepted": "مقبولة",
+  "partner.orders.step.shipped": "تم شحنها",
+  "partner.orders.step.delivered": "تم تسليمها",
+  "partner.orders.empty.accepted": "لا توجد عروض مقبولة قيد الانتظار",
+  "partner.orders.empty.shipped": "لا توجد طلبات مشحونة",
+  "partner.orders.empty.delivered": "لا يوجد سجل للطلبات",
+  "partner.orders.status.pending": "قيد الانتظار",
+  "partner.orders.status.confirmed": "مقبولة",
+  "partner.orders.status.processing": "قيد المعالجة",
+  "partner.orders.status.shipped": "تم الشحن",
+  "partner.orders.status.delivered": "تم التوصيل",
+  "partner.orders.status.cancelled": "ملغاة",
+  "partner.orders.status.refunded": "مستردة",
+  "partner.orders.details": "التفاصيل",
+  "partner.orders.referenceLabel": "المرجع:",
+  "partner.orders.detailLoadError": "تعذر تحميل الطلب",
+  "partner.orders.notFound": "تعذر العثور على الطلب",
+  "partner.orders.transitionConflict": "تغيرت حالة هذا الطلب. حدّث الصفحة وحاول مجددًا.",
+  "partner.orders.transitionError": "تعذر تحديث الطلب. حاول مجددًا.",
+  "partner.orders.parts": "القطع",
+  "partner.orders.purchaseOrderStatus.sent": "بانتظار التأكيد",
+  "partner.orders.purchaseOrderStatus.acknowledged": "تم التأكيد",
+  "partner.orders.purchaseOrderStatus.preparing": "قيد التحضير",
+  "partner.orders.purchaseOrderStatus.ready": "جاهزة للشحن",
+  "partner.orders.purchaseOrderStatus.shipped": "تم الشحن",
+  "partner.orders.purchaseOrderStatus.received": "تم الاستلام",
+  "partner.orders.purchaseOrderStatus.cancelled": "ملغاة",
+  "partner.orders.acknowledge": "تأكيد الاستلام",
+  "partner.orders.prepare": "تحضير الطلب",
+  "partner.orders.ship": "شحن",
   "partner.ordersHistory.title": "تاريخ الطلبات",
   "partner.ordersHistory.empty": "ليس لديك طلبات",
   "partner.ordersHistory.loadError": "تعذر تحميل الطلبات",
@@ -749,6 +882,8 @@
   "partner.offersHistory.prixNet": "سعرك الصافي",
   "partner.offersHistory.ref": "المرجع :",
   "partner.offersHistory.status.missed": "عرض فائت",
+  "partner.offersHistory.details": "التفاصيل",
+  "partner.offersHistory.noResults": "لا توجد عروض تطابق بحثك",
   "partner.notifications.title": "الإشعارات",
   "partner.notifications.empty": "ليس لديك إشعارات",
   "partner.notifications.loadError": "تعذر تحميل الإشعارات",
@@ -760,6 +895,11 @@
   "partner.notifications.cta.sendOffer": "أرسل عرضا",
   "partner.notifications.cta.details": "التفاصيل",
   "partner.notifications.cta.ship": "شحن القطعة",
+  "partner.notifications.noUnread": "لا توجد إشعارات غير مقروءة",
+  "partner.notifications.unreadCount": "· {{count}} غير مقروء",
+  "partner.notifications.markAllRead": "قراءة الكل",
+  "partner.notifications.filterUnread": "عرض الإشعارات غير المقروءة فقط",
+  "partner.notifications.mutationError": "تعذر تحديث الإشعارات",
   "partner.profile.hey": "مرحبا",
   "partner.profile.apercu": "المعاينات",
   "partner.profile.wallet": "محفظتي",
@@ -783,6 +923,8 @@
   "partner.profile.logoutBody": "هل أنت متأكد أنك تريد تسجيل الخروج؟",
   "partner.profile.copyright": "EBEN Solutions SARL © 2022",
   "partner.profile.version": "v 1.0.0",
+  "partner.profile.greeting": "مرحبا {{name}} 👋",
+  "partner.profile.partnerFallback": "شريك",
   "Déconnexion": "تسجيل الخروج",
   "Annuler": "إلغاء",
   "Fermer": "إغلاق",
@@ -802,6 +944,8 @@
   "partner.overview.dateRange": "العروض المُرسَلة بين (6 يونيو 2022 و 11 يونيو 2022)",
   "partner.overview.loadError": "تعذر تحميل المعاينات",
   "partner.overview.retry": "إعادة المحاولة",
+  "partner.overview.seriesLoadError": "تعذر تحميل الرسم البياني",
+  "partner.overview.seriesRetry": "إعادة محاولة تحميل الرسم البياني",
   "partner.editProfile.title": "تعديل ملفي الشخصي",
   "partner.editProfile.sectionTitle": "معلومات ملفي الشخصي",
   "partner.editProfile.changeAvatar": "تغيير الصورة",
@@ -812,6 +956,8 @@
   "partner.editProfile.supportCta": "تواصل مع الدعم للتعديل",
   "partner.editProfile.loadError": "تعذر تحميل الملف الشخصي",
   "partner.editProfile.retry": "إعادة المحاولة",
+  "partner.editProfile.photoPermission": "اسمح بالوصول إلى الصور لتعديل صورة ملفك.",
+  "partner.editProfile.avatarSaveError": "تعذر تحديث صورة الملف الشخصي.",
   "partner.company.title": "معلومات الشركة",
   "partner.company.sectionAddress": "المكتب الرئيسي",
   "partner.company.sectionInfo": "معلومات الشركة",
@@ -842,6 +988,23 @@
   "partner.company.sheetPiecesLabel": "Pieces",
   "partner.company.sheetCta": "إرسال طلب",
   "partner.company.sheetSaving": "جارٍ الحفظ...",
+  "partner.company.addressExtra": "تفاصيل إضافية للعنوان",
+  "partner.company.taxId": "المعرف الضريبي",
+  "partner.company.bankSupportOnly": "إعداد البيانات البنكية متاح فقط عبر دعم EBEN.",
+  "partner.company.noBrandResults": "لا توجد علامة تطابق بحثك",
+  "partner.company.removeBrandAccessibility": "إزالة العلامة {{brand}}",
+  "partner.about.title": "عن EBEN",
+  "partner.about.madeInMorocco": "صنع في المغرب",
+  "partner.about.missionTitle": "مهمتنا",
+  "partner.about.missionBody": "تسهيل طلب وشراء قطع السيارات في جميع أنحاء المغرب وإزالة عوائق الشراء والبيع.",
+  "partner.about.visionTitle": "رؤيتنا",
+  "partner.about.visionBody": "المساهمة في رقمنة وتطوير صناعة قطع السيارات في المغرب.",
+  "partner.about.valuesTitle": "قيمنا",
+  "partner.about.values.speed": "السرعة",
+  "partner.about.values.discipline": "الانضباط",
+  "partner.about.values.boldness": "الجرأة",
+  "partner.about.contactTitle": "تواصل معنا:",
+  "partner.about.address": "9 زنقة البرج، الشقة 8، الرباط، المغرب",
 
   "Phone": "Phone",
   "06 77 77 77 77": "06 77 77 77 77",
@@ -899,6 +1062,8 @@
   "partner.offers.month": "ديسمبر 2022",
   "partner.offers.history": "تاريخ العروض",
   "partner.offers.filter.title": "إعدادات",
+  "partner.offers.sortAscending": "الترتيب تصاعدياً",
+  "partner.offers.sortDescending": "الترتيب تنازلياً",
   "partner.offers.filter.all": "الكل",
   "partner.offers.filter.progress": "في تقدم",
   "partner.offers.filter.payment": "في انتظار الدفع",
@@ -937,5 +1102,263 @@
   "guestAuth.title": "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644",
   "guestAuth.body": "\u064a\u062c\u0628 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0623\u0648 \u0625\u0646\u0634\u0627\u0621 \u062d\u0633\u0627\u0628 \u0644\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0645\u0644\u0641\u0643 \u0627\u0644\u0634\u062e\u0635\u064a.",
   "guestAuth.createAccount": "\u0625\u0646\u0634\u0627\u0621 \u062d\u0633\u0627\u0628",
-  "guestAuth.signIn": "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644"
+  "guestAuth.signIn": "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644",
+  "requestFlow.title": "\u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628",
+  "requestFlow.vehicle": "\u0627\u0644\u0633\u064a\u0627\u0631\u0629: {{value}}",
+  "requestFlow.chooseCategory": "\u0627\u062e\u062a\u0631 \u0627\u0644\u0641\u0626\u0629",
+  "requestFlow.chooseSubcategory": "\u0627\u062e\u062a\u0631 \u0627\u0644\u0641\u0626\u0629 \u0627\u0644\u0641\u0631\u0639\u064a\u0629",
+  "requestFlow.choosePart": "\u0627\u062e\u062a\u0631 \u0627\u0644\u0642\u0637\u0639\u0629",
+  "requestFlow.addPart": "\u0625\u0636\u0627\u0641\u0629 {{name}}",
+  "requestFlow.addedParts": "\u0627\u0644\u0642\u0637\u0639 \u0627\u0644\u0645\u0636\u0627\u0641\u0629",
+  "requestFlow.removePart": "\u0625\u0632\u0627\u0644\u0629",
+  "requestFlow.used": "\u0645\u0633\u062a\u0639\u0645\u0644",
+  "requestFlow.new": "\u062c\u062f\u064a\u062f",
+  "requestFlow.note": "\u0625\u0636\u0627\u0641\u0629 \u0645\u0644\u0627\u062d\u0638\u0629",
+  "requestFlow.notePlaceholder": "\u0635\u0641 \u0627\u0644\u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u0645\u0641\u064a\u062f\u0629...",
+  "requestFlow.addImage": "\u0625\u0636\u0627\u0641\u0629 \u0635\u0648\u0631\u0629",
+  "requestFlow.removeImage": "\u062d\u0630\u0641 \u0627\u0644\u0635\u0648\u0631\u0629",
+  "requestFlow.removeImageTitle": "\u062d\u0630\u0641",
+  "requestFlow.removeImageConfirm": "\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0647\u0630\u0647 \u0627\u0644\u0635\u0648\u0631\u0629\u061f",
+  "requestFlow.yes": "\u0646\u0639\u0645",
+  "requestFlow.no": "\u0644\u0627",
+  "requestFlow.verify": "\u0645\u0631\u0627\u062c\u0639\u0629 \u0627\u0644\u0637\u0644\u0628",
+  "requestFlow.submitting": "\u062c\u0627\u0631\u064d \u0627\u0644\u0625\u0646\u0634\u0627\u0621...",
+  "requestFlow.send": "\u0646\u0639\u0645\u060c \u0625\u0631\u0633\u0627\u0644",
+  "requestFlow.sending": "\u062c\u0627\u0631\u064d \u0627\u0644\u0625\u0631\u0633\u0627\u0644...",
+  "requestFlow.edit": "\u062a\u0639\u062f\u064a\u0644",
+  "requestFlow.retry": "\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629",
+  "requestFlow.back": "\u0631\u062c\u0648\u0639",
+  "requestFlow.loadError": "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062a",
+  "requestFlow.submitError": "\u062a\u0639\u0630\u0631 \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0637\u0644\u0628",
+  "requestFlow.sendError": "\u062a\u0639\u0630\u0631 \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0637\u0644\u0628",
+  "requestFlow.invalidCategory": "\u0627\u0644\u0641\u0626\u0629 \u0627\u0644\u0645\u062d\u062f\u062f\u0629 \u063a\u064a\u0631 \u0635\u0627\u0644\u062d\u0629",
+  "requestFlow.invalidRoute": "\u0631\u0627\u0628\u0637 \u0627\u0644\u0637\u0644\u0628 \u063a\u064a\u0631 \u0635\u0627\u0644\u062d",
+  "requestFlow.emptyGarage": "\u0623\u0636\u0641 \u0633\u064a\u0627\u0631\u0629 \u0642\u0628\u0644 \u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628.",
+  "requestFlow.addVehicle": "\u0625\u0636\u0627\u0641\u0629 \u0633\u064a\u0627\u0631\u0629",
+  "requestFlow.openGarage": "\u0641\u062a\u062d \u0645\u0631\u0622\u0628\u064a",
+  "requestFlow.requestsTitle": "\u0637\u0644\u0628\u0627\u062a\u0643",
+  "requestFlow.requestsEmpty": "\u0644\u0627 \u062a\u0648\u062c\u062f \u0637\u0644\u0628\u0627\u062a \u062d\u0627\u0644\u064a\u0627\u064b",
+  "requestFlow.create": "\u0625\u0646\u0634\u0627\u0621 \u0637\u0644\u0628",
+  "requestFlow.requestReference": "\u0627\u0644\u0637\u0644\u0628 {{reference}}",
+  "requestFlow.verificationTitle": "\u0631\u0627\u062c\u0639 \u0637\u0644\u0628\u0643",
+  "requestFlow.comment": "\u0645\u0644\u0627\u062d\u0638\u0629",
+  "requestFlow.noComment": "\u0644\u0627 \u062a\u0648\u062c\u062f \u0645\u0644\u0627\u062d\u0638\u0629",
+  "requestFlow.requestNotFound": "\u0627\u0644\u0637\u0644\u0628 \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f",
+  "requestFlow.parts": "\u0627\u0644\u0642\u0637\u0639 \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u0629",
+  "requestFlow.noParts": "\u0644\u0627 \u062a\u0648\u062c\u062f \u0642\u0637\u0639",
+  "requestFlow.quantity": "\u0627\u0644\u0643\u0645\u064a\u0629: {{count}}",
+  "requestFlow.condition.occasion": "\u0645\u0633\u062a\u0639\u0645\u0644",
+  "requestFlow.condition.en_stock": "\u062c\u062f\u064a\u062f",
+  "requestFlow.details": "\u0627\u0644\u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u0645\u0636\u0627\u0641\u0629",
+  "requestFlow.images": "\u0627\u0644\u0635\u0648\u0631 \u0627\u0644\u0645\u0631\u0641\u0642\u0629",
+  "requestFlow.expires": "\u064a\u0646\u062a\u0647\u064a \u0641\u064a {{value}}",
+  "requestFlow.offersReady": "\u0644\u062f\u064a\u0643 {{count}} \u0639\u0631\u0636",
+  "requestFlow.viewOffers": "\u0639\u0631\u0636 \u0627\u0644\u0639\u0631\u0648\u0636",
+  "requestFlow.waitingOffers": "\u0641\u064a \u0627\u0646\u062a\u0638\u0627\u0631 \u0627\u0644\u0639\u0631\u0648\u0636",
+  "requestFlow.offersTitle": "\u0627\u0644\u0639\u0631\u0648\u0636 \u0627\u0644\u0645\u0633\u062a\u0644\u0645\u0629",
+  "requestFlow.offersEmpty": "\u0644\u0627 \u062a\u0648\u062c\u062f \u0639\u0631\u0648\u0636",
+  "requestFlow.offerNotFound": "\u0627\u0644\u0639\u0631\u0636 \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f",
+  "requestFlow.noPhoto": "\u0644\u0627 \u062a\u0648\u062c\u062f \u0635\u0648\u0631",
+  "requestFlow.reference": "\u0627\u0644\u0645\u0631\u062c\u0639: {{value}}",
+  "requestFlow.available": "\u0645\u062a\u0648\u0641\u0631",
+  "requestFlow.unavailable": "\u063a\u064a\u0631 \u0645\u062a\u0648\u0641\u0631",
+  "requestFlow.clientPrice": "\u0627\u0644\u0633\u0639\u0631 \u0634\u0627\u0645\u0644 \u0627\u0644\u0636\u0631\u064a\u0628\u0629",
+  "requestFlow.sellerComment": "\u0645\u0644\u0627\u062d\u0638\u0629 \u0627\u0644\u0628\u0627\u0626\u0639",
+  "requestFlow.audio": "\u0645\u0644\u0627\u062d\u0638\u0629 \u0635\u0648\u062a\u064a\u0629",
+  "requestFlow.total": "\u0627\u0644\u0645\u062c\u0645\u0648\u0639",
+  "requestFlow.acceptOffer": "\u0642\u0628\u0648\u0644 \u0647\u0630\u0627 \u0627\u0644\u0639\u0631\u0636",
+  "requestFlow.accepting": "\u062c\u0627\u0631\u064d \u0627\u0644\u0642\u0628\u0648\u0644...",
+  "requestFlow.acceptError": "\u062a\u0639\u0630\u0631 \u0642\u0628\u0648\u0644 \u0627\u0644\u0639\u0631\u0636",
+  "requestFlow.status.pending": "\u0642\u064a\u062f \u0627\u0644\u0627\u0646\u062a\u0638\u0627\u0631",
+  "requestFlow.status.validated": "\u0645\u0635\u0627\u062f\u0642 \u0639\u0644\u064a\u0647",
+  "requestFlow.status.selected": "\u0645\u062d\u062f\u062f",
+  "requestFlow.status.rejected": "\u0645\u0631\u0641\u0648\u0636",
+  "requestFlow.status.expired": "\u0645\u0646\u062a\u0647\u064a"
+  ,"requestFlow.requestStatus.draft": "\u0645\u0633\u0648\u062f\u0629"
+  ,"requestFlow.requestStatus.pending": "\u0642\u064a\u062f \u0627\u0644\u0627\u0646\u062a\u0638\u0627\u0631"
+  ,"requestFlow.requestStatus.offers_received": "\u062a\u0645 \u0627\u0633\u062a\u0644\u0627\u0645 \u0627\u0644\u0639\u0631\u0648\u0636"
+  ,"requestFlow.requestStatus.validated": "\u0645\u0635\u0627\u062f\u0642 \u0639\u0644\u064a\u0647"
+  ,"requestFlow.requestStatus.ordered": "\u062a\u0645 \u0627\u0644\u0637\u0644\u0628"
+  ,"requestFlow.requestStatus.expired": "\u0645\u0646\u062a\u0647\u064a"
+  ,"requestFlow.requestStatus.cancelled": "\u0645\u0644\u063a\u0649"
+  ,"commerce.success.viewOrders": "\u0639\u0631\u0636 \u0637\u0644\u0628\u0627\u062a\u064a"
+  ,"commerce.success.confirmation": "\u062a\u0647\u0627\u0646\u064a\u0646\u0627! \u062a\u0645 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628\u0643 \u0628\u0646\u062c\u0627\u062d."
+  ,"commerce.success.orderNumber": "\u0631\u0642\u0645 \u0627\u0644\u0637\u0644\u0628: {{reference}}"
+  ,"commerce.success.date": "\u0627\u0644\u062a\u0627\u0631\u064a\u062e: {{date}}"
+  ,"commerce.success.total": "\u0627\u0644\u0645\u062c\u0645\u0648\u0639: {{value}} \u062f\u0631\u0647\u0645"
+  ,"commerce.success.paymentLabel": "\u0637\u0631\u064a\u0642\u0629 \u0627\u0644\u062f\u0641\u0639:"
+  ,"commerce.success.payment.cod": "\u0627\u0644\u062f\u0641\u0639 \u0639\u0646\u062f \u0627\u0644\u0627\u0633\u062a\u0644\u0627\u0645"
+  ,"commerce.success.invoice": "\u062a\u0646\u0632\u064a\u0644 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629"
+  ,"commerce.success.summary": "\u0627\u0644\u0645\u0644\u062e\u0635"
+  ,"commerce.success.item": "x{{count}} — {{title}}"
+  ,"commerce.success.taxIncluded": "\u0634\u0627\u0645\u0644 \u0627\u0644\u0636\u0631\u064a\u0628\u0629"
+  ,"commerce.success.paymentMode": "\u0637\u0631\u064a\u0642\u0629 \u0627\u0644\u062f\u0641\u0639"
+  ,"commerce.success.shipping": "\u0631\u0633\u0648\u0645 \u0627\u0644\u062a\u0648\u0635\u064a\u0644"
+  ,"commerce.success.deliveryDate": "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u062a\u0633\u0644\u064a\u0645 \u0627\u0644\u0645\u062a\u0648\u0642\u0639"
+  ,"commerce.success.subtotal": "\u0627\u0644\u0645\u062c\u0645\u0648\u0639 \u0627\u0644\u0641\u0631\u0639\u064a \u0644\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u0634\u0627\u0645\u0644 \u0627\u0644\u0636\u0631\u064a\u0628\u0629"
+  ,"commerce.success.discount": "\u0627\u0644\u062e\u0635\u0645"
+  ,"commerce.success.tax": "\u0636\u0631\u064a\u0628\u0629 \u0627\u0644\u0642\u064a\u0645\u0629 \u0627\u0644\u0645\u0636\u0627\u0641\u0629"
+  ,"commerce.success.home": "\u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629"
+  ,"commerce.success.loadError": "\u062a\u0639\u0630\u0651\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0637\u0644\u0628"
+  ,"commerce.success.retry": "\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629"
+  ,"settings.orders": "\u0637\u0644\u0628\u0627\u062a\u064a"
+  ,"settings.archivedOffers": "\u0623\u0631\u0634\u064a\u0641 \u0639\u0631\u0648\u0636\u064a"
+  ,"settings.wishlist": "\u0642\u0627\u0626\u0645\u0629 \u0631\u063a\u0628\u0627\u062a\u064a"
+  ,"settings.profileSection": "\u0645\u0644\u0641\u064a \u0627\u0644\u0634\u062e\u0635\u064a"
+  ,"settings.garage": "\u0645\u0631\u0623\u0628\u064a"
+  ,"settings.editProfile": "\u062a\u0639\u062f\u064a\u0644 \u0645\u0644\u0641\u064a"
+  ,"settings.payment": "\u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u062f\u0641\u0639"
+  ,"settings.addresses": "\u0639\u0646\u0627\u0648\u064a\u0646\u064a"
+  ,"settings.preferences": "\u0627\u0644\u062a\u0641\u0636\u064a\u0644\u0627\u062a"
+  ,"settings.preferencesLoadError": "\u062a\u0639\u0630\u0651\u0631 \u062a\u062d\u0645\u064a\u0644 \u062a\u0641\u0636\u064a\u0644\u0627\u062a \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a"
+  ,"settings.preferencesSaveError": "\u062a\u0639\u0630\u0651\u0631 \u062d\u0641\u0638 \u062a\u0641\u0636\u064a\u0644\u0627\u062a \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a"
+  ,"settings.pushNotifications": "\u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a"
+  ,"settings.doNotTrack": "\u0627\u0637\u0644\u0628 \u0645\u0646 \u0627\u0644\u062a\u0637\u0628\u064a\u0642 \u0639\u062f\u0645 \u0627\u0644\u062a\u062a\u0628\u0639"
+  ,"settings.language": "\u0627\u0644\u0644\u063a\u0629"
+  ,"settings.aboutSection": "\u062d\u0648\u0644"
+  ,"settings.contact": "\u0627\u062a\u0635\u0644 \u0628\u0646\u0627"
+  ,"settings.about": "\u0645\u0646 \u0646\u062d\u0646"
+  ,"settings.legalSection": "\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0642\u0627\u0646\u0648\u0646\u064a\u0629"
+  ,"settings.terms": "\u0627\u0644\u0634\u0631\u0648\u0637 \u0648\u0627\u0644\u0623\u062d\u0643\u0627\u0645"
+  ,"settings.privacy": "\u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629"
+  ,"settings.returns": "\u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u0625\u0631\u062c\u0627\u0639"
+  ,"settings.greeting": "\u0645\u0631\u062d\u0628\u0627\u064b {{name}} \ud83d\udc4b"
+  ,"settings.client": "\u0627\u0644\u0639\u0645\u064a\u0644"
+  ,"settings.retry": "\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629"
+  ,"settings.notifications": "\u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a"
+  ,"settings.logout": "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c"
+  ,"settings.confirm": "\u062a\u0623\u0643\u064a\u062f"
+  ,"settings.modify": "\u062a\u0639\u062f\u064a\u0644"
+  ,"settings.saving": "\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0641\u0638..."
+  ,"settings.cancelling": "\u062c\u0627\u0631\u064d \u0627\u0644\u0625\u0644\u063a\u0627\u0621..."
+  ,"settings.profile.loadError": "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0645\u0644\u0641 \u0627\u0644\u0634\u062e\u0635\u064a"
+  ,"settings.profile.notFound": "\u0627\u0644\u0645\u0644\u0641 \u0627\u0644\u0634\u062e\u0635\u064a \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f"
+  ,"settings.profile.saveError": "\u062a\u0639\u0630\u0631 \u062d\u0641\u0638 \u0627\u0644\u0645\u0644\u0641 \u0627\u0644\u0634\u062e\u0635\u064a"
+  ,"settings.profile.changeAvatar": "\u062a\u063a\u064a\u064a\u0631 \u0635\u0648\u0631\u0629 \u0627\u0644\u0645\u0644\u0641 \u0627\u0644\u0634\u062e\u0635\u064a"
+  ,"settings.profile.photoPermission": "\u0627\u0633\u0645\u062d \u0628\u0627\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u0635\u0648\u0631 \u0644\u062a\u0639\u062f\u064a\u0644 \u0645\u0644\u0641\u0643"
+  ,"settings.profile.identifierRequired": "\u0623\u062f\u062e\u0644 \u0627\u0644\u0642\u064a\u0645\u0629 \u0627\u0644\u062c\u062f\u064a\u062f\u0629 \u0648\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u062d\u0627\u0644\u064a\u0629"
+  ,"settings.profile.email": "\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a"
+  ,"settings.profile.name": "\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0643\u0627\u0645\u0644"
+  ,"settings.profile.phone": "\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062a\u0641"
+  ,"settings.profile.currentPassword": "\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u062d\u0627\u0644\u064a\u0629"
+  ,"settings.profile.modifyName": "\u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0627\u0633\u0645"
+  ,"settings.profile.confirmName": "\u062a\u0623\u0643\u064a\u062f \u0627\u0644\u0627\u0633\u0645"
+  ,"settings.profile.modifyEmail": "\u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a"
+  ,"settings.profile.confirmEmail": "\u062a\u0623\u0643\u064a\u062f \u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a"
+  ,"settings.profile.modifyPhone": "\u062a\u0639\u062f\u064a\u0644 \u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062a\u0641"
+  ,"settings.profile.confirmPhone": "\u062a\u0623\u0643\u064a\u062f \u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062a\u0641"
+  ,"settings.profile.changePassword": "\u062a\u0639\u062f\u064a\u0644 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631"
+  ,"settings.profile.sectionTitle": "\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0645\u0644\u0641\u064a \u0627\u0644\u0634\u062e\u0635\u064a"
+  ,"settings.address.required": "\u0647\u0630\u0627 \u0627\u0644\u062d\u0642\u0644 \u0625\u0644\u0632\u0627\u0645\u064a"
+  ,"settings.address.saveError": "\u062a\u0639\u0630\u0631 \u062d\u0641\u0638 \u0627\u0644\u0639\u0646\u0648\u0627\u0646"
+  ,"settings.address.loadError": "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0639\u0646\u0648\u0627\u0646"
+  ,"settings.address.deleteError": "\u062a\u0639\u0630\u0631 \u062d\u0630\u0641 \u0627\u0644\u0639\u0646\u0648\u0627\u0646"
+  ,"settings.address.defaultError": "\u062a\u0639\u0630\u0631 \u062a\u0639\u064a\u064a\u0646 \u0627\u0644\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0627\u0641\u062a\u0631\u0627\u0636\u064a"
+  ,"settings.address.addTitle": "\u0625\u0636\u0627\u0641\u0629 \u0639\u0646\u0648\u0627\u0646"
+  ,"settings.address.editTitle": "\u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0639\u0646\u0648\u0627\u0646"
+  ,"settings.address.editAction": "\u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0639\u0646\u0648\u0627\u0646"
+  ,"settings.address.addAction": "\u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0639\u0646\u0648\u0627\u0646"
+  ,"settings.address.label": "\u0627\u0633\u0645 \u0627\u0644\u0639\u0646\u0648\u0627\u0646"
+  ,"settings.address.labelPlaceholder": "\u0645\u0646\u0632\u0644\u064a\u060c \u0645\u0643\u062a\u0628\u064a..."
+  ,"settings.address.line1": "\u0627\u0644\u0639\u0646\u0648\u0627\u0646"
+  ,"settings.address.line1Placeholder": "\u0627\u0644\u0634\u0627\u0631\u0639 \u0648\u0627\u0644\u0631\u0642\u0645..."
+  ,"settings.address.line2": "\u062a\u0643\u0645\u0644\u0629 \u0627\u0644\u0639\u0646\u0648\u0627\u0646 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)"
+  ,"settings.address.line2Placeholder": "\u0627\u0644\u0634\u0642\u0629\u060c \u0627\u0644\u0637\u0627\u0628\u0642..."
+  ,"settings.address.city": "\u0627\u0644\u0645\u062f\u064a\u0646\u0629"
+  ,"settings.address.cityPlaceholder": "\u0627\u0644\u062f\u0627\u0631 \u0627\u0644\u0628\u064a\u0636\u0627\u0621\u060c \u0627\u0644\u0631\u0628\u0627\u0637..."
+  ,"settings.address.postalCode": "\u0627\u0644\u0631\u0645\u0632 \u0627\u0644\u0628\u0631\u064a\u062f\u064a (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)"
+  ,"settings.address.region": "\u0627\u0644\u062c\u0647\u0629 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)"
+  ,"settings.address.regionPlaceholder": "\u0627\u0644\u062f\u0627\u0631 \u0627\u0644\u0628\u064a\u0636\u0627\u0621-\u0633\u0637\u0627\u062a"
+  ,"settings.address.card.edit": "\u062a\u0639\u062f\u064a\u0644"
+  ,"settings.address.card.street": "\u0627\u0644\u0634\u0627\u0631\u0639: "
+  ,"settings.address.card.city": "\u0627\u0644\u0645\u062f\u064a\u0646\u0629: "
+  ,"settings.address.card.region": "\u0627\u0644\u062c\u0647\u0629/\u0627\u0644\u0625\u0642\u0644\u064a\u0645: "
+  ,"settings.address.card.default": "\u0627\u0644\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0627\u0641\u062a\u0631\u0627\u0636\u064a"
+  ,"settings.address.card.setDefault": "\u062a\u0639\u064a\u064a\u0646 \u0643\u0627\u0641\u062a\u0631\u0627\u0636\u064a"
+  ,"settings.address.card.delete": "\u062d\u0630\u0641"
+  ,"settings.payment.loadError": "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0637\u0631\u0642 \u0627\u0644\u062f\u0641\u0639"
+  ,"settings.payment.type.visa": "Visa"
+  ,"settings.payment.type.cod": "\u0627\u0644\u062f\u0641\u0639 \u0639\u0646\u062f \u0627\u0644\u0627\u0633\u062a\u0644\u0627\u0645"
+  ,"settings.payment.type.cachePlus": "Cash Plus"
+  ,"settings.payment.type.transfer": "\u062a\u062d\u0648\u064a\u0644 \u0628\u0646\u0643\u064a"
+  ,"settings.payment.type.balance": "\u0631\u0635\u064a\u062f \u0627\u0644\u0645\u062d\u0641\u0638\u0629"
+  ,"settings.payment.name": "\u0627\u0644\u0627\u0633\u0645: {{value}}"
+  ,"settings.payment.number": "\u0627\u0644\u0631\u0642\u0645: **** **** **** {{value}}"
+  ,"settings.payment.expiry": "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0627\u0646\u062a\u0647\u0627\u0621: {{value}}"
+  ,"settings.payment.street": "\u0627\u0644\u0634\u0627\u0631\u0639: {{value}}"
+  ,"settings.payment.city": "\u0627\u0644\u0645\u062f\u064a\u0646\u0629: {{value}}"
+  ,"settings.payment.region": "\u0627\u0644\u062c\u0647\u0629: {{value}}"
+  ,"settings.notifications.title": "\u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a"
+  ,"settings.notifications.details": "\u0627\u0644\u062a\u0641\u0627\u0635\u064a\u0644"
+  ,"settings.notifications.unread": "{{count}} \u063a\u064a\u0631 \u0645\u0642\u0631\u0648\u0621"
+  ,"settings.notifications.empty": "\u0644\u064a\u0633 \u0644\u062f\u064a\u0643 \u0625\u0634\u0639\u0627\u0631\u0627\u062a"
+  ,"settings.notifications.loadError": "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a"
+  ,"settings.notifications.mutationError": "\u062a\u0639\u0630\u0631 \u062a\u062d\u062f\u064a\u062b \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a"
+  ,"settings.wishlist.title": "\u0642\u0627\u0626\u0645\u0629 \u0631\u063a\u0628\u0627\u062a\u064a"
+  ,"settings.wishlist.empty": "\u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0641\u0627\u0631\u063a\u0629"
+  ,"settings.wishlist.explore": "\u0627\u0633\u062a\u0643\u0634\u0641 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a"
+  ,"settings.wishlist.loadError": "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0631\u063a\u0628\u0627\u062a"
+  ,"settings.wishlist.removeError": "\u062a\u0639\u0630\u0631 \u0625\u0632\u0627\u0644\u0629 \u0647\u0630\u0627 \u0627\u0644\u0639\u0646\u0635\u0631"
+  ,"settings.orders.loadError": "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062a"
+  ,"settings.orders.loadDetailError": "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0637\u0644\u0628"
+  ,"settings.orders.invalid": "\u0631\u0627\u0628\u0637 \u0627\u0644\u0637\u0644\u0628 \u063a\u064a\u0631 \u0635\u0627\u0644\u062d"
+  ,"settings.orders.notFound": "\u0627\u0644\u0637\u0644\u0628 \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f"
+  ,"settings.orders.cancel": "\u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u0637\u0644\u0628"
+  ,"settings.orders.cancelConfirm": "\u062a\u0623\u0643\u064a\u062f \u0627\u0644\u0625\u0644\u063a\u0627\u0621"
+  ,"settings.orders.cancelBody": "\u0647\u0644 \u062a\u0631\u064a\u062f \u0625\u0644\u063a\u0627\u0621 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628\u061f"
+  ,"settings.orders.cancelError": "\u062a\u0639\u0630\u0631 \u0625\u0644\u063a\u0627\u0621 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628"
+  ,"settings.orders.subtotal": "\u0627\u0644\u0645\u062c\u0645\u0648\u0639 \u0627\u0644\u0641\u0631\u0639\u064a"
+  ,"settings.orders.tax": "\u0636\u0631\u064a\u0628\u0629 \u0627\u0644\u0642\u064a\u0645\u0629 \u0627\u0644\u0645\u0636\u0627\u0641\u0629"
+  ,"settings.orders.tracking": "\u0627\u0644\u062a\u062a\u0628\u0639: {{id}}"
+  ,"settings.orders.reference": "\u0627\u0644\u0645\u0631\u062c\u0639: {{reference}}"
+  ,"settings.orders.summary": "\u0645\u0644\u062e\u0635 \u0627\u0644\u0637\u0644\u0628"
+  ,"settings.orders.noItems": "\u0644\u0627 \u062a\u0648\u062c\u062f \u0645\u0646\u062a\u062c\u0627\u062a"
+  ,"settings.orders.shipping": "\u0631\u0633\u0648\u0645 \u0627\u0644\u062a\u0648\u0635\u064a\u0644"
+  ,"settings.orders.discount": "\u0627\u0644\u062a\u062e\u0641\u064a\u0636"
+  ,"settings.orders.total": "\u0627\u0644\u0645\u062c\u0645\u0648\u0639"
+  ,"settings.orders.paymentDetails": "\u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u062f\u0641\u0639"
+  ,"settings.orders.invoice": "\u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629"
+  ,"settings.orders.method": "\u0627\u0644\u0637\u0631\u064a\u0642\u0629: {{method}}"
+  ,"settings.orders.step.paid": "\u0645\u062f\u0641\u0648\u0639"
+  ,"settings.orders.step.cod": "\u0627\u0644\u062f\u0641\u0639 \u0639\u0646\u062f \u0627\u0644\u062a\u0633\u0644\u064a\u0645"
+  ,"settings.orders.step.paymentPending": "\u0627\u0644\u062f\u0641\u0639 \u0642\u064a\u062f \u0627\u0644\u0627\u0646\u062a\u0638\u0627\u0631"
+  ,"settings.orders.step.processing": "\u0642\u064a\u062f \u0627\u0644\u0645\u0639\u0627\u0644\u062c\u0629"
+  ,"settings.orders.step.shipped": "\u062a\u0645 \u0627\u0644\u0634\u062d\u0646"
+  ,"settings.orders.step.delivered": "\u062a\u0645 \u0627\u0644\u062a\u0633\u0644\u064a\u0645"
+  ,"settings.archived.loadError": "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0639\u0631\u0648\u0636 \u0627\u0644\u0645\u0624\u0631\u0634\u0641\u0629"
+  ,"settings.profile.verifyPhoneTitle": "\u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u062c\u062f\u064a\u062f"
+  ,"settings.profile.noPendingPhoneVerification": "\u0644\u0627 \u064a\u0648\u062c\u062f \u062a\u063a\u064a\u064a\u0631 \u0644\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062a\u0641 \u0628\u0627\u0646\u062a\u0638\u0627\u0631 \u0627\u0644\u062a\u062d\u0642\u0642."
+  ,"Acheter": "شراء"
+  ,"Quantité": "الكمية"
+  ,"Suppression...": "جارٍ الحذف..."
+  ,"Pièce d'occasion — état conforme à la photo": "قطعة مستعملة — حالتها مطابقة للصورة"
+  ,"Les retours ne sont pas acceptés pour les pièces d'occasion.": "لا تُقبل المرتجعات للقطع المستعملة."
+  ,"Utiliser l'adresse de mon mécanicien": "استخدام عنوان الميكانيكي الخاص بي"
+  ,"À l'instant": "الآن"
+  ,"about.madeInMorocco": "صنع في المغرب"
+  ,"about.missionTitle": "مهمتنا"
+  ,"about.missionBody": "تسهيل طلب وشراء قطع السيارات في جميع أنحاء المغرب عبر إزالة عوائق الشراء والبيع في القطاع."
+  ,"about.visionTitle": "رؤيتنا"
+  ,"about.visionBody": "المساهمة في رقمنة وتطوير صناعة قطع غيار السيارات المغربية."
+  ,"about.valuesTitle": "قيمنا"
+  ,"about.value.speed": "السرعة"
+  ,"about.value.discipline": "الانضباط"
+  ,"about.value.boldness": "الجرأة"
+  ,"about.contact": "اتصل بنا:"
+  ,"about.address": "9 شارع البرج، الشقة 8، الرباط، المغرب"
+  ,"auth.register.vehicleAddedTitle": "تمت إضافة السيارة إلى مرأبك"
+  ,"auth.register.vehicleAddedBody": "تمت إضافة {{car}} إلى مرأبك"
+  ,"auth.register.completeTitle": "اكتمل التسجيل"
+  ,"auth.register.completeBody": "حسابك جاهز."
+  ,"auth.register.goHome": "الذهاب إلى الصفحة الرئيسية"
+  ,"auth.register.skipVehicle": "تخطي هذه الخطوة"
+  ,"legal.unavailableTitle": "الوثائق القانونية غير متاحة"
+  ,"legal.unavailableBody": "لم تُعتمد وثائق EBEN القانونية الرسمية بعد. لن يتم تسجيل أي موافقة حتى تصبح متاحة."
+  ,"legal.back": "رجوع"
+  ,"settings.profile.title": "التحقق من الهاتف"
+  ,"partner.offers.quantity": "الكمية {{count}}"
+  ,"Page introuvable": "الصفحة غير موجودة"
+  ,"Cette page n'existe pas.": "هذه الصفحة غير موجودة."
+  ,"Aller à la connexion": "الذهاب إلى تسجيل الدخول"
+  ,"Aller à l'accueil": "الذهاب إلى الصفحة الرئيسية"
 }

@@ -1,3 +1,9 @@
+/* eslint-disable import/first -- mock mode must be selected before API modules load */
+jest.mock('../../config', () => ({
+  ...jest.requireActual('../../config'),
+  API_MODE: 'mock',
+}));
+
 import {
   acceptOffer,
   createRequest,
@@ -51,9 +57,12 @@ describe('mock golden path', () => {
     expect(clientOffers.data[0]).not.toHaveProperty('priceBc');
     const partnerOffers = (await getPrestataireOffers('active')).data
       .filter(({ requestId }) => requestId === created.data.id);
-    expect(await getPrestataireOffer(partnerOffers[0]!.id)).toEqual(expect.objectContaining({
-      data: expect.objectContaining({ priceFerrailleur: 50.55, priceClient: 53.58, priceBc: 47.52 }),
+    const partnerOffer = await getPrestataireOffer(partnerOffers[0]!.id);
+    expect(partnerOffer).toEqual(expect.objectContaining({
+      data: expect.objectContaining({ priceFerrailleur: 50.55 }),
     }));
+    expect(partnerOffer.data).not.toHaveProperty('priceClient');
+    expect(partnerOffer.data).not.toHaveProperty('priceBc');
 
     for (const offer of partnerOffers) await acceptOffer(offer.id);
     const selectedIds = partnerOffers.map(({ id }) => id).sort((a, b) => a - b);

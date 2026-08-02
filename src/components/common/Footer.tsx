@@ -5,15 +5,15 @@ import * as Application from "expo-application";
 import Colors from "@/constants/Colors";
 
 const Footer = () => {
-  const appVersion = Application.nativeApplicationVersion || "1.0.0"; // Fallback to 1.0.0 if version not available
+  const appVersion = Application.nativeApplicationVersion || "1.0.0";
 
   return (
     <View style={styles.container}>
-      <Text type="smallTwo" color={Colors.grayMidDark}>
-        EBEN solutions SARL © 2024
+      <Text type="smallTwo" color={Colors.grayMidDark} translate={false}>
+        {`EBEN Solutions SARL © ${new Date().getFullYear()}`}
       </Text>
-      <Text type="smallTwo" color={Colors.grayMidDark}>
-        v {appVersion}
+      <Text type="smallTwo" color={Colors.grayMidDark} translate={false}>
+        {`v ${appVersion}`}
       </Text>
     </View>
   );

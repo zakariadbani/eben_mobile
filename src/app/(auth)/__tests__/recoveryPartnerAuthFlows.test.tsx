@@ -1,0 +1,298 @@
+import React from "react";
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
+import {
+  AuthRoleMismatchError,
+  Role,
+  useSession,
+} from "@/context/AuthContext";
+import i18n from "@/localization/i18n";
+import ForgotPasswordScreen from "../ForgotPasswordScreen";
+import ForgotPasswordVerificationScreen from "../forgot-password/verification";
+import ForgotPasswordNewPasswordScreen from "../forgot-password/new-password";
+import PrestataireSignInScreen from "../prestataire/sign-in";
+import PartnerForgotPasswordScreen from "../prestataire/forgot-password";
+import PartnerForgotPasswordVerificationScreen from "../prestataire/forgot-password/verification";
+import PartnerForgotPasswordNewPasswordScreen from "../prestataire/forgot-password/new-password";
+import PartnerWaitlistScreen from "../prestataire/waitlist";
+
+const mockReplace = jest.fn();
+const mockPush = jest.fn();
+const mockBack = jest.fn();
+const mockLogin = jest.fn();
+const mockStartPasswordReset = jest.fn();
+const mockVerifyPasswordReset = jest.fn();
+const mockCompletePasswordReset = jest.fn();
+
+jest.mock("@react-native-async-storage/async-storage", () => ({
+  getItem: jest.fn().mockResolvedValue(null),
+  setItem: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("expo-router", () => {
+  const React = require("react");
+  const Stack = ({ children }: { children?: React.ReactNode }) =>
+    React.createElement(React.Fragment, null, children);
+  Stack.Screen = function MockStackScreen() {
+    return null;
+  };
+  return {
+    Href: {},
+    Stack,
+    useRouter: () => ({
+      back: mockBack,
+      push: mockPush,
+      replace: mockReplace,
+    }),
+    useLocalSearchParams: () => ({}),
+  };
+});
+
+jest.mock("@/context/AuthContext", () => {
+  const actual = jest.requireActual("@/context/AuthContext");
+  return { ...actual, useSession: jest.fn() };
+});
+
+jest.mock("@/components/screens/shared/PhoneVerificationComponent", () => {
+  const React = require("react");
+  const { Button, Text, View } = require("react-native");
+  return function MockPhoneVerification({
+    validate,
+    onResend,
+    phoneNumber,
+    error,
+  }: {
+    validate: (valid: boolean, code: string) => Promise<void>;
+    onResend?: () => Promise<void>;
+    phoneNumber: string;
+    error?: string | null;
+  }) {
+    return React.createElement(
+      View,
+      null,
+      React.createElement(Text, null, phoneNumber),
+      error ? React.createElement(Text, null, error) : null,
+      React.createElement(Button, {
+        title: "verify-reset-code",
+        onPress: () => validate(true, "654321"),
+      }),
+      React.createElement(Button, {
+        title: "resend-reset-code",
+        onPress: () => onResend?.(),
+      }),
+    );
+  };
+});
+
+const mockedUseSession = useSession as jest.MockedFunction<typeof useSession>;
+function sessionValue(phone: string | null = "+212600000101") {
+  return {
+    login: mockLogin,
+    registerClient: jest.fn(),
+    verifyRegistration: jest.fn(),
+    resendRegistrationOtp: jest.fn(),
+    pendingRegistrationPhone: null,
+    pendingRegistrationOtpSent: null,
+    pendingPasswordResetPhone: phone,
+    startPasswordReset: mockStartPasswordReset,
+    verifyPasswordReset: mockVerifyPasswordReset,
+    completePasswordReset: mockCompletePasswordReset,
+    refreshSessionProfile: jest.fn(),
+    startPhoneChangeVerification: jest.fn(),
+    resendPhoneChangeOtp: jest.fn(),
+    verifyPhoneChange: jest.fn(),
+    pendingPhoneChangeVerificationPhone: null,
+    logOut: jest.fn(),
+    session: null,
+    role: "guest" as const,
+    username: null,
+    isLoading: false,
+  };
+}
+
+function submitPhone(screen: ReturnType<typeof render>) {
+  fireEvent.changeText(
+    screen.getByPlaceholderText(i18n.t("auth.fields.phonePlaceholder")),
+    "06 00 00 01 01",
+  );
+  fireEvent.press(
+    screen.getByRole("button", { name: i18n.t("auth.recovery.start") }),
+  );
+}
+
+function submitNewPassword(screen: ReturnType<typeof render>) {
+  fireEvent.changeText(
+    screen.getByLabelText(i18n.t("auth.fields.password")),
+    "new-password",
+  );
+  fireEvent.changeText(
+    screen.getByLabelText(i18n.t("auth.fields.passwordConfirmation")),
+    "new-password",
+  );
+  fireEvent.press(
+    screen.getByRole("button", { name: i18n.t("auth.recovery.confirm") }),
+  );
+}
+
+it("localizes the native recovery submit accessibility label", async () => {
+  await i18n.changeLanguage("ar");
+  const screen = render(<ForgotPasswordScreen />);
+  const submit = screen.getByRole("button", { name: i18n.t("auth.recovery.start") });
+
+  expect(submit.props.accessibilityLabel).toBe(i18n.t("auth.recovery.start"));
+});
+
+beforeEach(async () => {
+  jest.clearAllMocks();
+  await i18n.changeLanguage("fr");
+  mockLogin.mockResolvedValue(Role.PRESTATAIRE);
+  mockStartPasswordReset.mockResolvedValue(undefined);
+  mockVerifyPasswordReset.mockResolvedValue(undefined);
+  mockCompletePasswordReset.mockResolvedValue(undefined);
+  mockedUseSession.mockReturnValue(sessionValue());
+});
+
+it("awaits Prestataire login and navigates only after a successful role match", async () => {
+  let resolveLogin: (role: Role) => void = () => undefined;
+  mockLogin.mockReturnValueOnce(
+    new Promise((resolve) => {
+      resolveLogin = resolve;
+    }),
+  );
+  const screen = render(<PrestataireSignInScreen />);
+
+  fireEvent.changeText(
+    screen.getByPlaceholderText(i18n.t("auth.fields.phonePlaceholder")),
+    "06 00 00 01 01",
+  );
+  fireEvent.changeText(screen.getByPlaceholderText("......"), "password123");
+  fireEvent.press(
+    screen.getByRole("button", { name: i18n.t("auth.login.submit") }),
+  );
+
+  await waitFor(() =>
+    expect(mockLogin).toHaveBeenCalledWith(
+      "0600000101",
+      "password123",
+      Role.PRESTATAIRE,
+    ),
+  );
+  expect(mockReplace).not.toHaveBeenCalled();
+  expect(
+    screen.getByRole("button", {
+      name: i18n.t("auth.login.submitting"),
+    }).props.accessibilityState,
+  ).toMatchObject({ busy: true, disabled: true });
+
+  await act(async () => resolveLogin(Role.PRESTATAIRE));
+  await waitFor(() =>
+    expect(mockReplace).toHaveBeenCalledWith("/(prestataire)/dashboard"),
+  );
+});
+
+it("shows typed Prestataire role mismatch and generic login errors", async () => {
+  mockLogin.mockRejectedValueOnce(
+    new AuthRoleMismatchError(Role.PRESTATAIRE, Role.CLIENT),
+  );
+  const mismatch = render(<PrestataireSignInScreen />);
+  fireEvent.changeText(
+    mismatch.getByPlaceholderText(i18n.t("auth.fields.phonePlaceholder")),
+    "0600000101",
+  );
+  fireEvent.changeText(mismatch.getByPlaceholderText("......"), "password123");
+  fireEvent.press(
+    mismatch.getByRole("button", { name: i18n.t("auth.login.submit") }),
+  );
+  expect(
+    await mismatch.findByText(i18n.t("auth.prestataire.login.roleMismatch")),
+  ).toBeTruthy();
+  mismatch.unmount();
+
+  mockLogin.mockRejectedValueOnce(new Error("storage failed"));
+  const generic = render(<PrestataireSignInScreen />);
+  fireEvent.changeText(
+    generic.getByPlaceholderText(i18n.t("auth.fields.phonePlaceholder")),
+    "0600000101",
+  );
+  fireEvent.changeText(generic.getByPlaceholderText("......"), "password123");
+  fireEvent.press(
+    generic.getByRole("button", { name: i18n.t("auth.login.submit") }),
+  );
+  expect(await generic.findByText(i18n.t("auth.error.generic"))).toBeTruthy();
+  expect(mockReplace).not.toHaveBeenCalled();
+});
+
+it("runs Client password recovery without putting secrets in route params", async () => {
+  mockedUseSession.mockReturnValue(sessionValue());
+  const start = render(<ForgotPasswordScreen />);
+  submitPhone(start);
+  await waitFor(() =>
+    expect(mockStartPasswordReset).toHaveBeenCalledWith("0600000101"),
+  );
+  expect(mockPush).toHaveBeenCalledWith("/(auth)/forgot-password/verification");
+  expect(JSON.stringify(mockPush.mock.calls)).not.toContain("0600000101");
+  start.unmount();
+
+  const verify = render(<ForgotPasswordVerificationScreen />);
+  expect(verify.getByText("06 00 00 01 01")).toBeTruthy();
+  fireEvent.press(verify.getByText("verify-reset-code"));
+  await waitFor(() =>
+    expect(mockVerifyPasswordReset).toHaveBeenCalledWith("654321"),
+  );
+  expect(mockPush).toHaveBeenLastCalledWith(
+    "/(auth)/forgot-password/new-password",
+  );
+  expect(JSON.stringify(mockPush.mock.calls)).not.toContain("654321");
+
+  fireEvent.press(verify.getByText("resend-reset-code"));
+  await waitFor(() =>
+    expect(mockStartPasswordReset).toHaveBeenCalledWith("+212600000101"),
+  );
+  verify.unmount();
+
+  const reset = render(<ForgotPasswordNewPasswordScreen />);
+  submitNewPassword(reset);
+  await waitFor(() =>
+    expect(mockCompletePasswordReset).toHaveBeenCalledWith("new-password"),
+  );
+  expect(mockPush).toHaveBeenLastCalledWith("/(auth)/forgot-password/success");
+  expect(
+    mockPush.mock.calls.every(
+      ([route]) => typeof route === "string" && !route.includes("?"),
+    ),
+  ).toBe(true);
+});
+
+it("preserves the Prestataire recovery route family", async () => {
+  const start = render(<PartnerForgotPasswordScreen />);
+  submitPhone(start);
+  await waitFor(() => expect(mockStartPasswordReset).toHaveBeenCalled());
+  expect(mockPush).toHaveBeenCalledWith(
+    "/(auth)/prestataire/forgot-password/verification",
+  );
+  start.unmount();
+
+  const verify = render(<PartnerForgotPasswordVerificationScreen />);
+  fireEvent.press(verify.getByText("verify-reset-code"));
+  await waitFor(() => expect(mockVerifyPasswordReset).toHaveBeenCalled());
+  expect(mockPush).toHaveBeenLastCalledWith(
+    "/(auth)/prestataire/forgot-password/new-password",
+  );
+  verify.unmount();
+
+  const reset = render(<PartnerForgotPasswordNewPasswordScreen />);
+  submitNewPassword(reset);
+  await waitFor(() => expect(mockCompletePasswordReset).toHaveBeenCalled());
+  expect(mockReplace).toHaveBeenCalledWith(
+    "/(auth)/prestataire/forgot-password/success",
+  );
+});
+
+it.each(["fr", "ar"])("blocks waitlist consent in %s until official EBEN terms exist", async (language) => {
+  await i18n.changeLanguage(language);
+  const screen = render(<PartnerWaitlistScreen />);
+
+  expect(screen.getByText(i18n.t("legal.unavailableTitle"))).toBeTruthy();
+  expect(screen.getByText(i18n.t("legal.unavailableBody"))).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("legal.back") }));
+  expect(mockBack).toHaveBeenCalled();
+});

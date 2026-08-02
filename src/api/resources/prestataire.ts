@@ -3,21 +3,29 @@
  *
  * All functions return the standard typed envelopes (ApiResponse / Paginated).
  * Prices exposed here use priceFerrailleur — the partner's own price.
- * priceClient and priceBc are present on the Offer entity but the dashboard
- * and offers screens should render priceFerrailleur.
+ * Buyer/platform price snapshots are absent from Prestataire responses.
  */
 
 import { apiClient } from '../client';
 import type { Paginated, ApiResponse } from '../types';
-import type { PrestataireDashboardStats } from '@/interfaces/PrestataireDashboard';
+import type {
+  DashboardPeriod,
+  PrestataireDashboardSeries,
+  PrestataireDashboardStats,
+} from '@/interfaces/PrestataireDashboard';
 import type { Request } from '@/interfaces/Request';
-import type { Offer, OfferStatus } from '@/interfaces/Offer';
+import type {
+  OfferStatus,
+  PrestataireOffer,
+  PrestataireShipment,
+} from '@/interfaces/Offer';
 import type { PrestataireProfile } from '@/interfaces/User';
 import type { PrestataireCompany } from '@/interfaces/PrestataireCompany';
 import type { PrestataireWallet, Withdrawal } from '@/interfaces/Wallet';
 import type { Notification } from '@/interfaces/Notification';
-import type { Order } from '@/interfaces/Order';
-import type { MockShipment } from '../mock/goldenStore';
+import type { PrestataireOrder, PrestatairePurchaseOrder } from '@/interfaces/Order';
+import { getAllPages } from './paginate';
+import { assertPositiveId } from './validate';
 
 /**
  * GET /prestataire/dashboard
@@ -29,15 +37,22 @@ export async function getPrestataireStats(): Promise<ApiResponse<PrestataireDash
   ) as Promise<ApiResponse<PrestataireDashboardStats>>;
 }
 
+/** GET /prestataire/dashboard/series — server-aggregated metrics for one period. */
+export async function getPrestataireDashboardSeries(
+  period: DashboardPeriod,
+): Promise<ApiResponse<PrestataireDashboardSeries>> {
+  return apiClient.get<PrestataireDashboardSeries>(
+    `/prestataire/dashboard/series?period=${encodeURIComponent(period)}`,
+  ) as Promise<ApiResponse<PrestataireDashboardSeries>>;
+}
+
 /**
  * GET /prestataire/incoming-requests
  * Returns paginated pending requests that this prestataire can respond to.
  * These are the items in the "Offers inbox" — requests with status 'pending'.
  */
 export async function getPrestataireIncomingRequests(): Promise<Paginated<Request>> {
-  return apiClient.get<Request>(
-    '/prestataire/incoming-requests',
-  ) as Promise<Paginated<Request>>;
+  return getAllPages<Request>('/prestataire/incoming-requests');
 }
 
 /**
@@ -48,26 +63,27 @@ export async function getPrestataireIncomingRequests(): Promise<Paginated<Reques
  *   'active'   → status IN ('validated')          — awaiting client selection
  *   'accepted' → status IN ('selected')            — client chose this offer
  *   'sent'     → status IN ('pending')             — awaiting admin validation
- *   'shipped'  → offers whose linked order is shipped (uses adminNotes field in mock)
+ *   'shipped'  → offers whose live shipment/order state is shipped
  *   undefined  → all offers regardless of status
  */
 export async function getPrestataireOffers(
   status?: 'active' | 'accepted' | 'sent' | 'shipped',
-): Promise<Paginated<Offer>> {
+): Promise<Paginated<PrestataireOffer>> {
   const path = status
     ? `/prestataire/offers?status=${status}`
     : '/prestataire/offers';
-  return apiClient.get<Offer>(path) as Promise<Paginated<Offer>>;
+  return getAllPages<PrestataireOffer>(path);
 }
 
 /**
  * GET /prestataire/offers/:id
  * Returns a single offer belonging to the current prestataire.
  */
-export async function getPrestataireOffer(offerId: number): Promise<ApiResponse<Offer>> {
-  return apiClient.get<Offer>(
+export async function getPrestataireOffer(offerId: number): Promise<ApiResponse<PrestataireOffer>> {
+  assertPositiveId(offerId, 'offer id');
+  return apiClient.get<PrestataireOffer>(
     `/prestataire/offers/${offerId}`,
-  ) as Promise<ApiResponse<Offer>>;
+  ) as Promise<ApiResponse<PrestataireOffer>>;
 }
 
 // ── P3 sub-flow A: offer fill / decline / resend ─────────────────────────────
@@ -113,6 +129,7 @@ export async function submitOffer(
   requestId: number,
   payload: SubmitOfferPayload,
 ): Promise<ApiResponse<SubmitOfferResult>> {
+  assertPositiveId(requestId, 'request id');
   return apiClient.post<SubmitOfferResult>(
     `/prestataire/requests/${requestId}/offers`,
     payload,
@@ -127,6 +144,7 @@ export async function declineRequest(
   requestId: number,
   payload?: { reason?: string; comment?: string },
 ): Promise<ApiResponse<DeclineRequestResult>> {
+  assertPositiveId(requestId, 'request id');
   return apiClient.post<DeclineRequestResult>(
     `/prestataire/requests/${requestId}/decline`,
     payload ?? {},
@@ -140,6 +158,7 @@ export async function declineRequest(
 export async function resendOffer(
   offerId: number,
 ): Promise<ApiResponse<ResendOfferResult>> {
+  assertPositiveId(offerId, 'offer id');
   return apiClient.post<ResendOfferResult>(
     `/prestataire/offers/${offerId}/resend`,
     {},
@@ -173,6 +192,7 @@ export async function shipOffer(
   offerId: number,
   payload: ShipOfferPayload,
 ): Promise<ApiResponse<ShipOfferResult>> {
+  assertPositiveId(offerId, 'offer id');
   return apiClient.post<ShipOfferResult>(
     `/prestataire/offers/${offerId}/ship`,
     payload,
@@ -181,10 +201,11 @@ export async function shipOffer(
 
 export async function getOfferShipment(
   offerId: number,
-): Promise<ApiResponse<MockShipment | null>> {
-  return apiClient.get<MockShipment | null>(
+): Promise<ApiResponse<PrestataireShipment | null>> {
+  assertPositiveId(offerId, 'offer id');
+  return apiClient.get<PrestataireShipment | null>(
     `/prestataire/offers/${offerId}/shipment`,
-  ) as Promise<ApiResponse<MockShipment | null>>;
+  ) as Promise<ApiResponse<PrestataireShipment | null>>;
 }
 
 // ── P4: partner orders ────────────────────────────────────────────────────────
@@ -192,28 +213,60 @@ export async function getOfferShipment(
 /**
  * GET /prestataire/orders[?status=...]
  * Returns orders that contain at least one item from this prestataire.
- * On the partner side, "accepted" means offer.status='selected' and the order
- * exists; "shipped" = order.status='shipped'; "delivered" = order.status='delivered'.
+ * Status filters use only the current partner's purchase-order lines.
  *
  * @param status — 'accepted' | 'shipped' | 'delivered' | undefined (all)
  */
 export async function getPrestataireOrders(
   status?: 'accepted' | 'shipped' | 'delivered',
-): Promise<Paginated<Order>> {
+): Promise<Paginated<PrestataireOrder>> {
   const path = status
     ? `/prestataire/orders?status=${status}`
     : '/prestataire/orders';
-  return apiClient.get<Order>(path) as Promise<Paginated<Order>>;
+  return getAllPages<PrestataireOrder>(path);
 }
 
 /**
  * GET /prestataire/orders/:orderId
  * Returns a single order (with items) relevant to this prestataire.
  */
-export async function getPrestataireOrder(orderId: number): Promise<ApiResponse<Order>> {
-  return apiClient.get<Order>(
+export async function getPrestataireOrder(orderId: number): Promise<ApiResponse<PrestataireOrder>> {
+  assertPositiveId(orderId, 'order id');
+  return apiClient.get<PrestataireOrder>(
     `/prestataire/orders/${orderId}`,
-  ) as Promise<ApiResponse<Order>>;
+  ) as Promise<ApiResponse<PrestataireOrder>>;
+}
+
+export async function acknowledgePurchaseOrder(
+  purchaseOrderId: number,
+): Promise<ApiResponse<PrestatairePurchaseOrder>> {
+  assertPositiveId(purchaseOrderId, 'purchase order id');
+  return apiClient.post<PrestatairePurchaseOrder>(
+    `/prestataire/purchase-orders/${purchaseOrderId}/acknowledge`,
+    {},
+  ) as Promise<ApiResponse<PrestatairePurchaseOrder>>;
+}
+
+export async function preparePurchaseOrder(
+  purchaseOrderId: number,
+): Promise<ApiResponse<PrestatairePurchaseOrder>> {
+  assertPositiveId(purchaseOrderId, 'purchase order id');
+  return apiClient.post<PrestatairePurchaseOrder>(
+    `/prestataire/purchase-orders/${purchaseOrderId}/prepare`,
+    {},
+  ) as Promise<ApiResponse<PrestatairePurchaseOrder>>;
+}
+
+/** Ships an owned purchase order for either an offer-backed or product-backed line. */
+export async function shipPurchaseOrder(
+  purchaseOrderId: number,
+  payload: ShipOfferPayload,
+): Promise<ApiResponse<PrestatairePurchaseOrder>> {
+  assertPositiveId(purchaseOrderId, 'purchase order id');
+  return apiClient.post<PrestatairePurchaseOrder>(
+    `/prestataire/purchase-orders/${purchaseOrderId}/ship`,
+    payload,
+  ) as Promise<ApiResponse<PrestatairePurchaseOrder>>;
 }
 
 // ── P5: profile / company / wallet / history / notifications ─────────────────
@@ -225,7 +278,10 @@ export interface UpdatePrestataireProfilePayload {
   lastName?: string;
   phone?: string;
   email?: string;
+  /** Owned temporary path returned by POST /uploads/images, or null to clear. */
   avatar?: string | null;
+  /** Required by Laravel when phone or email changes. */
+  currentPassword?: string;
 }
 
 /**
@@ -246,9 +302,19 @@ export async function getPrestataireProfile(): Promise<ApiResponse<PrestatairePr
 export async function updatePrestataireProfile(
   payload: UpdatePrestataireProfilePayload,
 ): Promise<ApiResponse<PrestataireProfile>> {
+  const textPayload: UpdatePrestataireProfilePayload = {
+    ...(payload.firstName !== undefined ? { firstName: payload.firstName } : {}),
+    ...(payload.lastName !== undefined ? { lastName: payload.lastName } : {}),
+    ...(payload.phone !== undefined ? { phone: payload.phone } : {}),
+    ...(payload.email !== undefined ? { email: payload.email } : {}),
+    ...(payload.avatar !== undefined ? { avatar: payload.avatar } : {}),
+    ...(payload.currentPassword !== undefined
+      ? { currentPassword: payload.currentPassword }
+      : {}),
+  };
   return apiClient.put<PrestataireProfile>(
     '/prestataire/profile',
-    payload,
+    textPayload,
   ) as Promise<ApiResponse<PrestataireProfile>>;
 }
 
@@ -256,7 +322,11 @@ export async function updatePrestataireProfile(
 
 export type UpdatePrestataireCompanyPayload = Partial<
   Omit<PrestataireCompany, 'id' | 'userId' | 'status' | 'createdAt' | 'updatedAt'>
->;
+> & {
+  /** Write-only bank fields; Laravel never returns them in PrestataireCompany. */
+  bankRib?: string | null;
+  bankName?: string | null;
+};
 
 /**
  * GET /prestataire/company
@@ -296,6 +366,10 @@ export interface RequestWithdrawalResult {
   requiresVerification: boolean;
 }
 
+export interface ConfirmWithdrawalPayload {
+  code: string;
+}
+
 /**
  * GET /prestataire/wallet
  * Returns the prestataire's wallet: current balance, pending payout, and full
@@ -323,6 +397,18 @@ export async function requestWithdrawal(
   ) as Promise<ApiResponse<RequestWithdrawalResult>>;
 }
 
+/** POST /prestataire/wallet/withdrawals/:id/confirm */
+export async function confirmWithdrawal(
+  withdrawalId: number,
+  code: string,
+): Promise<ApiResponse<Withdrawal>> {
+  const payload: ConfirmWithdrawalPayload = { code };
+  return apiClient.post<Withdrawal>(
+    `/prestataire/wallet/withdrawals/${withdrawalId}/confirm`,
+    payload,
+  ) as Promise<ApiResponse<Withdrawal>>;
+}
+
 /**
  * GET /prestataire/wallet/withdrawals
  * Returns all withdrawal requests made by the current prestataire.
@@ -340,10 +426,8 @@ export async function getWithdrawals(): Promise<Paginated<Withdrawal>> {
  * Returns the prestataire's full offer history (all statuses, all time).
  * For order history use `getPrestataireOrders`.
  */
-export async function getPrestataireOffersHistory(): Promise<Paginated<Offer>> {
-  return apiClient.get<Offer>(
-    '/prestataire/offers/history',
-  ) as Promise<Paginated<Offer>>;
+export async function getPrestataireOffersHistory(): Promise<Paginated<PrestataireOffer>> {
+  return getAllPages<PrestataireOffer>('/prestataire/offers/history');
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────
@@ -353,9 +437,7 @@ export async function getPrestataireOffersHistory(): Promise<Paginated<Offer>> {
  * Returns the prestataire's notification list (most-recent first).
  */
 export async function getPrestataireNotifications(): Promise<Paginated<Notification>> {
-  return apiClient.get<Notification>(
-    '/prestataire/notifications',
-  ) as Promise<Paginated<Notification>>;
+  return getAllPages<Notification>('/prestataire/notifications');
 }
 
 /**
@@ -365,11 +447,26 @@ export async function getPrestataireNotifications(): Promise<Paginated<Notificat
 export async function markPrestataireNotificationRead(
   id: number,
 ): Promise<ApiResponse<Notification>> {
+  assertPositiveId(id, 'notification id');
   return apiClient.post<Notification>(
     `/prestataire/notifications/${id}/read`,
     {},
   ) as Promise<ApiResponse<Notification>>;
 }
 
+export interface MarkAllPrestataireNotificationsReadResult {
+  updated: number;
+}
+
+/** POST /prestataire/notifications/read-all */
+export async function markAllPrestataireNotificationsRead(): Promise<
+  ApiResponse<MarkAllPrestataireNotificationsReadResult>
+> {
+  return apiClient.post<MarkAllPrestataireNotificationsReadResult>(
+    '/prestataire/notifications/read-all',
+    {},
+  ) as Promise<ApiResponse<MarkAllPrestataireNotificationsReadResult>>;
+}
+
 // Re-export the status type for convenience so callers can import from '@/api'
-export type { OfferStatus };
+export type { DashboardPeriod, OfferStatus };

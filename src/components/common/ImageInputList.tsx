@@ -1,22 +1,23 @@
 import Colors from "@/constants/Colors";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  StyleSheet,
-  ScrollView,
-  TouchableWithoutFeedback,
-  TouchableOpacity,
   ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View as NativeView,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import { useTranslation } from "react-i18next";
 import CustomIcon from "./CustomIcon";
 import ImageInput from "./ImageInput";
 import { Text } from "./Text";
-import Image from "./Image";
 import View from "./View";
 
 interface ImageInputListProps {
   defaultimageUris?: string[];
+  imageUris?: string[];
   onRemoveImage?: (uri: string) => void;
   onAddImage?: (uri: string) => void;
   upload?: boolean;
@@ -26,22 +27,25 @@ interface ImageInputListProps {
 
 const ImageInputList: React.FC<ImageInputListProps> = ({
   defaultimageUris = [],
+  imageUris: controlledImageUris,
   onRemoveImage,
   onAddImage,
   upload = true,
   canRemove = true,
   canAdd = true,
 }) => {
+  const { t } = useTranslation();
   const scrollView = useRef<ScrollView>(null);
-  const [imageUris, setImageUris] = useState<string[]>(defaultimageUris);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [imageUris, setImageUris] = useState<string[]>(controlledImageUris ?? defaultimageUris);
+  const [loading, setLoading] = useState(false);
 
-  const handleAddImage = (uri: string) => {
-    setImageUris([...imageUris, uri]);
-    onAddImage?.(uri); // Trigger the callback when an image is added
-  };
+  useEffect(() => {
+    if (controlledImageUris) setImageUris(controlledImageUris);
+  }, [controlledImageUris]);
 
   const selectImage = async () => {
+    if (loading) return;
+    setLoading(true);
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -49,90 +53,81 @@ const ImageInputList: React.FC<ImageInputListProps> = ({
         aspect: [4, 3],
         quality: 1,
       });
-
       if (!result.canceled) {
-        setLoading(true);
-        const uri = result.assets[0].uri; // Get the selected image URI
-        handleAddImage(uri);
-        setLoading(false);
+        const uri = result.assets[0]?.uri;
+        if (uri && !imageUris.includes(uri)) {
+          setImageUris((current) => [...current, uri]);
+          onAddImage?.(uri);
+        }
       }
-    } catch (error) {
-      console.error("Error selecting an image", error);
+    } finally {
       setLoading(false);
     }
   };
 
-  const handleRemoveImage = (uri: string) => {
-    Alert.alert(
-      "Supprimer",
-      "Êtes-vous sûr de vouloir supprimer cette image?",
-      [{ text: "Oui", onPress: () => removeImage?.(uri) }, { text: "Non" }]
-    );
-  };
   const removeImage = (uri: string) => {
-    setImageUris(imageUris.filter((imageUri) => imageUri !== uri));
-    onRemoveImage?.(uri); // Trigger the callback when an image is removed
+    setImageUris((current) => current.filter((imageUri) => imageUri !== uri));
+    onRemoveImage?.(uri);
+  };
+
+  const confirmRemoveImage = (uri: string) => {
+    Alert.alert(t("requestFlow.removeImageTitle"), t("requestFlow.removeImageConfirm"), [
+      { text: t("requestFlow.yes"), onPress: () => removeImage(uri) },
+      { text: t("requestFlow.no") },
+    ]);
   };
 
   return (
     <View style={styles.container}>
-      {loading && <ActivityIndicator size="small" color={Colors.primary} />}
-      {canAdd && (
-        <TouchableOpacity onPress={selectImage} style={styles.addContainer}>
+      {loading ? <ActivityIndicator size="small" color={Colors.primary} /> : null}
+      {canAdd ? (
+        <TouchableOpacity
+          onPress={() => void selectImage()}
+          disabled={loading}
+          style={styles.addContainer}
+          accessibilityRole="button"
+          accessibilityLabel={t("requestFlow.addImage")}
+        >
           <View style={styles.addBtn}>
             <CustomIcon name="camera" size={48} />
-            <Text type="defaultTwo">Ajouter une image</Text>
+            <Text type="defaultTwo">requestFlow.addImage</Text>
           </View>
         </TouchableOpacity>
-      )}
-
-      <View>
-        <ScrollView
-          ref={scrollView}
-          horizontal
-          onContentSizeChange={() => {
-            scrollView.current?.scrollToEnd({ animated: true });
-          }}
-        >
-          <View flexDirection="row" gap={8}>
-            {imageUris.map((uri) => (
-              <View key={uri} style={styles.imageContainer}>
-                <ImageInput
-                  style={styles.image}
-                  defaultImage={uri}
-                  upload={upload}
-                />
-                {canRemove && (
-                  <TouchableOpacity
-                    style={styles.removeContainer}
-                    onPress={() => handleRemoveImage(uri)}
-                  >
-                    <CustomIcon name="trash" size={30} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-      </View>
+      ) : null}
+      <ScrollView
+        ref={scrollView}
+        horizontal
+        onContentSizeChange={() => scrollView.current?.scrollToEnd({ animated: true })}
+      >
+        <View flexDirection="row" gap={8}>
+          {imageUris.map((uri) => (
+            <NativeView key={uri} style={styles.imageContainer} accessibilityLabel={uri}>
+              <ImageInput style={styles.image} defaultImage={uri} upload={upload} />
+              {canRemove ? (
+                <TouchableOpacity
+                  style={styles.removeContainer}
+                  onPress={() => confirmRemoveImage(uri)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("requestFlow.removeImage")}
+                >
+                  <CustomIcon name="trash" size={30} />
+                </TouchableOpacity>
+              ) : null}
+            </NativeView>
+          ))}
+        </View>
+      </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    // flexDirection: "row",
-    // alignItems: "center",
-    // backgroundColor: "red",
-  },
+  container: {},
   addContainer: {
-    // flex: 1,
     alignItems: "center",
     backgroundColor: Colors.white,
     height: 120,
     justifyContent: "center",
-    // marginVertical: 10,
-    // width: "100%",
     borderRadius: 10,
     shadowColor: Colors.borderLight,
     shadowOffset: { width: 0, height: 5 },
@@ -142,23 +137,10 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: Colors.light,
   },
-  addBtn: {
-    alignItems: "center",
-    // backgroundColor: "red",
-    flex: 1,
-    justifyContent: "center",
-    width: "100%",
-  },
-  imageContainer: {
-    marginTop: 15,
-  },
-  image: {
-    height: 120,
-    width: 148,
-  },
-  removeContainer: {
-    alignItems: "center",
-  },
+  addBtn: { alignItems: "center", flex: 1, justifyContent: "center", width: "100%" },
+  imageContainer: { marginTop: 15 },
+  image: { height: 120, width: 148 },
+  removeContainer: { alignItems: "center" },
 });
 
 export default ImageInputList;

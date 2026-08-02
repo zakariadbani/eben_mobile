@@ -10,22 +10,23 @@
  *   - Détails de l'offre: status + shipped date
  *   - Remarques sur la pièce: order notes
  *   - Parts list with qty/condition
- *   - Prix: partner net revenue (priceBc approximation)
+ *   - Prix: server-owned partner net revenue
  *   - Shipping / tracking section (when shipped)
  *
- * MARGIN: shows net revenue to partner = sum(unitPrice × qty × 0.94/1.06).
+ * MARGIN: displays only immutable purchase-order net snapshots.
  * RTL-aware. All strings FR keys → auto-translated; translate={false} for
  * refs, prices, tracking numbers, dates.
  */
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
+  TextInput,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import Screen from "@/components/common/Screen";
@@ -36,105 +37,108 @@ import CustomHeader from "@/components/common/CustomHeader";
 import ProgressStepperComponent from "@/components/screens/shared/app/ProgressStepperComponent";
 import Colors from "@/constants/Colors";
 
-import { getPrestataireOrder } from "@/api/resources/prestataire";
-import type { Order, OrderStatus } from "@/interfaces/Order";
+import {
+  acknowledgePurchaseOrder,
+  getPrestataireOrder,
+  preparePurchaseOrder,
+  shipPurchaseOrder,
+} from "@/api/resources/prestataire";
+import { ApiClientError } from "@/api/types";
+import type {
+  PrestataireOrder,
+  PrestataireOrderItem,
+  PrestatairePurchaseOrder,
+  PurchaseOrderStatus,
+} from "@/interfaces/Order";
 
 // ── Status stepper ─────────────────────────────────────────────────────────────
 
 type StepperInfo = { steps: string[]; currentStep: number };
 
-const STEPPER_STEPS = [
-  "Acceptée",
-  "Expédiée",
-  "Livrée",
-];
-
-function getStepperInfo(status: OrderStatus): StepperInfo {
+function getStepperInfo(status: PurchaseOrderStatus, steps: string[]): StepperInfo {
   switch (status) {
-    case "confirmed":
-    case "processing":
-      return { steps: STEPPER_STEPS, currentStep: 0 };
+    case "sent":
+    case "acknowledged":
+    case "preparing":
+    case "ready":
+      return { steps, currentStep: 0 };
     case "shipped":
-      return { steps: STEPPER_STEPS, currentStep: 1 };
-    case "delivered":
-      return { steps: STEPPER_STEPS, currentStep: 2 };
+      return { steps, currentStep: 1 };
+    case "received":
+      return { steps, currentStep: 2 };
     default:
-      return { steps: STEPPER_STEPS, currentStep: 0 };
+      return { steps, currentStep: 0 };
   }
 }
 
 // ── Status badge ───────────────────────────────────────────────────────────────
 
-type StatusCfg = { label: string; labelAr: string; color: string; bg: string };
+type StatusCfg = { translationKey: string; color: string; bg: string };
 
 const ORDER_STATUS_BADGE: Record<string, StatusCfg> = {
-  confirmed: {
-    label: "Acceptée",
-    labelAr: "مقبول",
+  sent: {
+    translationKey: "partner.orders.purchaseOrderStatus.sent",
     color: Colors.noticeUnread,
     bg: Colors.noticeRead,
   },
-  processing: {
-    label: "En traitement",
-    labelAr: "قيد المعالجة",
+  acknowledged: {
+    translationKey: "partner.orders.purchaseOrderStatus.acknowledged",
     color: Colors.grayMidDark,
     bg: Colors.backgroundGray,
   },
+  preparing: {
+    translationKey: "partner.orders.purchaseOrderStatus.preparing",
+    color: Colors.grayMidDark,
+    bg: Colors.backgroundGray,
+  },
+  ready: {
+    translationKey: "partner.orders.purchaseOrderStatus.ready",
+    color: Colors.greenDark,
+    bg: Colors.noticeRead,
+  },
   shipped: {
-    label: "Expédié",
-    labelAr: "تم الشحن",
+    translationKey: "partner.orders.purchaseOrderStatus.shipped",
     color: Colors.white,
     bg: Colors.blue,
   },
-  delivered: {
-    label: "Livré",
-    labelAr: "تم التوصيل",
+  received: {
+    translationKey: "partner.orders.purchaseOrderStatus.received",
     color: Colors.white,
     bg: Colors.greenDark,
   },
   cancelled: {
-    label: "Annulé",
-    labelAr: "ملغى",
+    translationKey: "partner.orders.purchaseOrderStatus.cancelled",
     color: Colors.white,
     bg: Colors.red,
-  },
-  refunded: {
-    label: "Remboursé",
-    labelAr: "مسترد",
-    color: Colors.grayMidDark,
-    bg: Colors.pink,
   },
 };
 
 function fallbackStatusCfg(status: string): StatusCfg {
   return ORDER_STATUS_BADGE[status] ?? {
-    label: status,
-    labelAr: status,
+    translationKey: status,
     color: Colors.grayMidDark,
     bg: Colors.backgroundGray,
   };
 }
 
+function aggregateFulfillmentStatus(items: PrestataireOrderItem[]): PurchaseOrderStatus {
+  const priority: PurchaseOrderStatus[] = [
+    "sent", "acknowledged", "preparing", "ready", "shipped", "received", "cancelled",
+  ];
+  return priority.find((status) => items.some((item) => item.purchaseOrder.status === status))
+    ?? "cancelled";
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("fr-MA", {
+function formatDate(iso: string, locale: string): string {
+  return new Date(iso).toLocaleDateString(locale, {
     day: "2-digit",
     month: "short",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-/**
- * Partner net for the whole order.
- * priceBc ≈ priceClient × (0.94 / 1.06)
- */
-function partnerNet(order: Order): number {
-  const itemsTotal =
-    order.items?.reduce((acc, i) => acc + i.totalPrice, 0) ?? order.subtotal;
-  return Math.round(itemsTotal * (0.94 / 1.06) * 100) / 100;
 }
 
 // ── Section wrapper ────────────────────────────────────────────────────────────
@@ -172,43 +176,91 @@ const sectionStyles = StyleSheet.create({
 export default function PrestataireOrderDetailScreen(): React.ReactElement {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === "ar";
-  const router = useRouter();
-
+  const locale = isArabic ? "ar-MA" : "fr-MA";
   const rawParams = useLocalSearchParams();
   const orderId = Number(rawParams.orderId ?? 0);
 
-  const [order, setOrder] = useState<Order | null>(null);
+  const [order, setOrder] = useState<PrestataireOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [transitionError, setTransitionError] = useState<string | null>(null);
+  const [mutatingPurchaseOrderId, setMutatingPurchaseOrderId] = useState<number | null>(null);
+  const [trackingByPurchaseOrder, setTrackingByPurchaseOrder] = useState<Record<number, string>>({});
+  const mutationLock = useRef<number | null>(null);
+  const requestEpoch = useRef(0);
 
   // ── Load order ─────────────────────────────────────────────────────────────────
 
   const fetchOrder = useCallback(async () => {
+    const epoch = ++requestEpoch.current;
+    if (!Number.isSafeInteger(orderId) || orderId <= 0) {
+      setOrder(null);
+      setError("partner.orders.notFound");
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const res = await getPrestataireOrder(orderId);
-      const fetched = res.data;
-      if (
-        fetched &&
-        !Array.isArray(fetched) &&
-        typeof fetched === "object" &&
-        "id" in fetched
-      ) {
-        setOrder(fetched as Order);
-      } else {
-        setOrder(null);
-      }
+      if (epoch !== requestEpoch.current) return;
+      setOrder(res.data);
     } catch {
-      setError("Impossible de charger la commande");
+      if (epoch !== requestEpoch.current) return;
+      setError("partner.orders.detailLoadError");
     } finally {
-      setLoading(false);
+      if (epoch === requestEpoch.current) setLoading(false);
     }
   }, [orderId]);
 
-  useEffect(() => {
-    fetchOrder();
-  }, [fetchOrder]);
+  useFocusEffect(useCallback(() => {
+    void fetchOrder();
+    return () => {
+      requestEpoch.current += 1;
+    };
+  }, [fetchOrder]));
+
+  const replacePurchaseOrder = useCallback((updated: PrestatairePurchaseOrder) => {
+    setOrder((current) => {
+      if (current === null) return null;
+      const items = current.items.map((item) => item.purchaseOrder.id === updated.id
+        ? { ...item, purchaseOrder: updated }
+        : item);
+      return { ...current, items, fulfillmentStatus: aggregateFulfillmentStatus(items) };
+    });
+  }, []);
+
+  const transition = useCallback(async (
+    item: PrestataireOrderItem,
+    action: "acknowledge" | "prepare" | "ship",
+  ) => {
+    if (mutationLock.current !== null) return;
+    mutationLock.current = item.purchaseOrder.id;
+    setMutatingPurchaseOrderId(item.purchaseOrder.id);
+    setTransitionError(null);
+    try {
+      const trackingNumber = trackingByPurchaseOrder[item.purchaseOrder.id]?.trim() ?? "";
+      if (action === "ship" && trackingNumber.length === 0) {
+        setTransitionError("partner.ship.errorRequired");
+        return;
+      }
+      const result = action === "acknowledge"
+        ? await acknowledgePurchaseOrder(item.purchaseOrder.id)
+        : action === "prepare"
+          ? await preparePurchaseOrder(item.purchaseOrder.id)
+          : await shipPurchaseOrder(item.purchaseOrder.id, { trackingNumber });
+      replacePurchaseOrder(result.data);
+    } catch (caught) {
+      const isConflict = caught instanceof ApiClientError && caught.status === 409;
+      setTransitionError(isConflict
+        ? "partner.orders.transitionConflict"
+        : "partner.orders.transitionError");
+      if (isConflict) await fetchOrder();
+    } finally {
+      mutationLock.current = null;
+      setMutatingPurchaseOrderId(null);
+    }
+  }, [fetchOrder, replacePurchaseOrder, trackingByPurchaseOrder]);
 
   // ── Loading / error states ─────────────────────────────────────────────────────
 
@@ -227,10 +279,10 @@ export default function PrestataireOrderDetailScreen(): React.ReactElement {
       <Screen whatsapp={false} padding>
         <View flex alignItems="center" justifyContent="center" style={styles.center}>
           <Text type="default" color={Colors.gray} center>
-            {error ?? "Commande introuvable"}
+            {t(error ?? "partner.orders.notFound")}
           </Text>
           <View mt={16}>
-            <Button title="Réessayer" variant="primary" onPress={fetchOrder} />
+          <Button title="partner.ordersHistory.retry" variant="primary" onPress={fetchOrder} />
           </View>
         </View>
       </Screen>
@@ -239,11 +291,13 @@ export default function PrestataireOrderDetailScreen(): React.ReactElement {
 
   // ── Derived values ─────────────────────────────────────────────────────────────
 
-  const stepperInfo = getStepperInfo(order.status);
-  const statusCfg = fallbackStatusCfg(order.status);
-  const net = partnerNet(order);
-  const isShipped = order.status === "shipped" || order.status === "delivered";
-  const trackingNumber = order.notes; // in mock, order.notes carries the tracking info
+  const stepperInfo = getStepperInfo(order.fulfillmentStatus, [
+    t("partner.orders.step.accepted"),
+    t("partner.orders.step.shipped"),
+    t("partner.orders.step.delivered"),
+  ]);
+  const statusCfg = fallbackStatusCfg(order.fulfillmentStatus);
+  const net = order.netTotal;
 
   // ── Render ─────────────────────────────────────────────────────────────────────
 
@@ -270,19 +324,19 @@ export default function PrestataireOrderDetailScreen(): React.ReactElement {
           <View flex>
             <View flexDirection="row" alignItems="center" gap={4}>
               <Text type="small" color={Colors.gray}>
-                Réf :
+                {t("partner.orders.referenceLabel")}
               </Text>
               <Text type="small" semiBold color={Colors.brand} translate={false}>
                 {order.reference}
               </Text>
             </View>
             <Text type="small" color={Colors.gray} translate={false}>
-              {formatDate(order.createdAt)}
+              {formatDate(order.createdAt, locale)}
             </Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusCfg.bg }]}>
             <Text type="small" color={statusCfg.color} translate={false}>
-              {isArabic ? statusCfg.labelAr : statusCfg.label}
+              {t(statusCfg.translationKey)}
             </Text>
           </View>
         </View>
@@ -300,34 +354,15 @@ export default function PrestataireOrderDetailScreen(): React.ReactElement {
           <View flexDirection="row" alignItems="center" gap={8}>
             <View style={[styles.statusBadgeInline, { backgroundColor: statusCfg.bg }]}>
               <Text type="small" color={statusCfg.color} translate={false}>
-                {isArabic ? statusCfg.labelAr : statusCfg.label}
+                {t(statusCfg.translationKey)}
               </Text>
             </View>
           </View>
 
-          {isShipped && order.confirmedAt ? (
-            <View flexDirection="row" alignItems="center" gap={6} style={styles.metaRow}>
-              <Text type="small" color={Colors.gray}>
-                {t("partner.ship.sentAt")}
-              </Text>
-              <Text type="small" semiBold color={Colors.brand} translate={false}>
-                {formatDate(order.updatedAt)}
-              </Text>
-            </View>
-          ) : null}
-
-          {/* Tracking number */}
-          {isShipped && trackingNumber ? (
-            <View style={styles.trackingBox}>
-              <Text type="small" color={Colors.grayMidDark} translate={false}>
-                {trackingNumber}
-              </Text>
-            </View>
-          ) : null}
         </Section>
 
         {/* ── Remarques sur la pièce ───────────────────────────── */}
-        {order.notes && !isShipped ? (
+        {order.notes ? (
           <Section title={t("partner.offerDetail.remarks")}>
             <Text type="default" color={Colors.grayMidDark} translate={false} style={styles.notesText}>
               {order.notes}
@@ -336,59 +371,99 @@ export default function PrestataireOrderDetailScreen(): React.ReactElement {
         ) : null}
 
         {/* ── Parts list ───────────────────────────────────────── */}
-        {order.items && order.items.length > 0 ? (
-          <Section title={t("Pièces")}>
+        {order.items.length > 0 ? (
+          <Section title={t("partner.orders.parts")}>
             {order.items.map((part) => (
               <View
                 key={part.id}
-                flexDirection="row"
-                alignItems="center"
-                gap={10}
                 style={styles.partRow}
+                gap={8}
               >
-                <View flex>
+                <View flexDirection="row" alignItems="center" gap={10}>
+                  <View flex>
+                    <Text type="label" semiBold color={Colors.brand} translate={false}>
+                      {isArabic
+                        ? (part.categoryTitleAr ?? part.categoryTitle ?? "—")
+                        : (part.categoryTitle ?? "—")}
+                    </Text>
+                    <Text type="small" color={Colors.gray} translate={false}>
+                      {`${t("partner.offerDetail.qty")} ${part.quantity}`}
+                    </Text>
+                  </View>
                   <Text type="label" semiBold color={Colors.brand} translate={false}>
-                    {isArabic
-                      ? (part.categoryTitleAr ?? part.categoryTitle ?? "—")
-                      : (part.categoryTitle ?? "—")}
-                  </Text>
-                  <Text type="small" color={Colors.gray} translate={false}>
-                    {`${t("partner.offerDetail.qty")} ${part.quantity}`}
+                    {`${part.netAmount.toLocaleString(locale)} Dhs`}
                   </Text>
                 </View>
-                <Text type="label" semiBold color={Colors.brand} translate={false}>
-                  {`${part.totalPrice.toLocaleString("fr-MA")} Dhs`}
-                </Text>
+                <View flexDirection="row" alignItems="center" gap={8}>
+                  <Text type="small" color={Colors.grayMidDark} flex>
+                    {t(`partner.orders.purchaseOrderStatus.${part.purchaseOrder.status}`)}
+                  </Text>
+                  {part.purchaseOrder.shippedAt ? (
+                    <Text type="small" color={Colors.gray} translate={false}>
+                      {formatDate(part.purchaseOrder.shippedAt, locale)}
+                    </Text>
+                  ) : null}
+                </View>
+                {part.purchaseOrder.trackingNumber ? (
+                  <View style={styles.trackingBox}>
+                    <Text type="small" color={Colors.grayMidDark} translate={false}>
+                      {part.purchaseOrder.trackingNumber}
+                    </Text>
+                  </View>
+                ) : null}
+                {part.purchaseOrder.status === "sent" ? (
+                  <Button
+                    title="partner.orders.acknowledge"
+                    variant="primary"
+                    disabled={mutatingPurchaseOrderId !== null}
+                    onPress={() => transition(part, "acknowledge")}
+                  />
+                ) : part.purchaseOrder.status === "acknowledged" ? (
+                  <Button
+                    title="partner.orders.prepare"
+                    variant="primary"
+                    disabled={mutatingPurchaseOrderId !== null}
+                    onPress={() => transition(part, "prepare")}
+                  />
+                ) : part.purchaseOrder.status === "preparing" || part.purchaseOrder.status === "ready" ? (
+                  <View gap={8}>
+                    <TextInput
+                      value={trackingByPurchaseOrder[part.purchaseOrder.id] ?? ""}
+                      onChangeText={(value) => setTrackingByPurchaseOrder((current) => ({
+                        ...current,
+                        [part.purchaseOrder.id]: value,
+                      }))}
+                      placeholder={t("partner.ship.trackingPlaceholder")}
+                      accessibilityLabel={t("partner.ship.trackingLabel")}
+                      style={[styles.trackingInput, isArabic && styles.trackingInputRtl]}
+                    />
+                    <Button
+                      title="partner.orders.ship"
+                      variant="greenDark"
+                      disabled={mutatingPurchaseOrderId !== null}
+                      onPress={() => transition(part, "ship")}
+                    />
+                  </View>
+                ) : null}
               </View>
             ))}
           </Section>
+        ) : null}
+
+        {transitionError ? (
+          <View style={styles.ctaBox}>
+            <Text type="small" color={Colors.red} center>{t(transitionError)}</Text>
+          </View>
         ) : null}
 
         {/* ── Prix (net revenue) ───────────────────────────────── */}
         <Section title={t("partner.offerDetail.price")}>
           <View style={styles.priceBox}>
             <Text type="subTitle" bold color={Colors.brand} translate={false}>
-              {`${net.toLocaleString("fr-MA")} Dhs TTC`}
+              {`${net.toLocaleString(locale)} Dhs`}
             </Text>
           </View>
         </Section>
-
-        {/* ── Ship CTA (only when confirmed, not yet shipped) ───── */}
-        {order.status === "confirmed" ? (
-          <View style={styles.ctaBox}>
-            <Button
-              title="Marquer comme expédié"
-              variant="greenDark"
-              leftIcon="truck"
-              iconTypeName="FontAwesome5"
-              sizeIcon={16}
-              onPress={() => {
-                // Navigate to ship flow (reuses the offers ship screen pattern)
-                router.back();
-              }}
-            />
-          </View>
-        ) : null}
 
         {/* Bottom spacer */}
         <View style={styles.bottomSpacer} />
@@ -454,6 +529,18 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
+  },
+  trackingInput: {
+    borderWidth: 1,
+    borderColor: Colors.greyLight2,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: Colors.brand,
+    textAlign: "left",
+  },
+  trackingInputRtl: {
+    textAlign: "right",
   },
   notesText: {
     lineHeight: 22,

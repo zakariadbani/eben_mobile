@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   ImageBackground,
   Modal,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -18,7 +19,7 @@ import { Text } from "@/components/common/Text";
 import ItemIncomingRequestCard from "@/components/screens/prestataire/ItemIncomingRequestCard";
 import ItemPartnerOfferCard from "@/components/screens/prestataire/ItemPartnerOfferCard";
 import Colors from "@/constants/Colors";
-import type { Offer } from "@/interfaces/Offer";
+import type { PrestataireOffer } from "@/interfaces/Offer";
 import type { Request } from "@/interfaces/Request";
 
 type OffersView = "hub" | "incoming" | "accepted" | "sent";
@@ -34,10 +35,10 @@ export default function PrestataireOffersScreen(): React.ReactElement {
   const view: OffersView = isOffersView(rawView) ? rawView : "hub";
 
   const [incoming, setIncoming] = useState<Request[]>([]);
-  const [active, setActive] = useState<Offer[]>([]);
-  const [accepted, setAccepted] = useState<Offer[]>([]);
-  const [sent, setSent] = useState<Offer[]>([]);
+  const [offers, setOffers] = useState<PrestataireOffer[]>([]);
+  const [shippedOfferIds, setShippedOfferIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
   const [filterVisible, setFilterVisible] = useState(state === "filter");
   const [selectedFilter, setSelectedFilter] = useState("all");
@@ -47,30 +48,38 @@ export default function PrestataireOffersScreen(): React.ReactElement {
     setFilterVisible(state === "filter");
   }, [state]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
     setError(false);
     try {
-      const [incomingResult, activeResult, acceptedResult, sentResult] = await Promise.all([
+      const [incomingResult, offersResult, shippedResult] = await Promise.all([
         getPrestataireIncomingRequests(),
-        getPrestataireOffers("active"),
-        getPrestataireOffers("accepted"),
-        getPrestataireOffers("sent"),
+        getPrestataireOffers(undefined),
+        getPrestataireOffers("shipped"),
       ]);
       setIncoming(incomingResult.data);
-      setActive(activeResult.data);
-      setAccepted(acceptedResult.data);
-      setSent(sentResult.data);
+      setOffers(offersResult.data);
+      setShippedOfferIds(new Set(shippedResult.data.map((offer) => offer.id)));
     } catch {
       setError(true);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    void load(true);
+  }, [load]);
+
+  const active = useMemo(() => offers.filter((offer) => offer.status === "validated"), [offers]);
+  const accepted = useMemo(() => offers.filter((offer) => offer.status === "selected"), [offers]);
+  const sent = useMemo(() => offers.filter((offer) => offer.status === "pending"), [offers]);
 
   const changeView = (next: OffersView) => {
     router.setParams({ view: next === "hub" ? undefined : next, state: undefined });
@@ -85,11 +94,28 @@ export default function PrestataireOffersScreen(): React.ReactElement {
   const visibleOffers = useMemo(() => {
     const source = view === "accepted" ? accepted : view === "sent" ? sent : active;
     let filtered = source;
-    if (selectedFilter === "progress") filtered = source.filter((offer) => offer.status === "pending" || offer.status === "validated");
-    if (selectedFilter === "rejected") filtered = source.filter((offer) => offer.status === "rejected");
-    if (selectedFilter === "paid") filtered = source.filter((offer) => offer.status === "selected");
+    if (selectedFilter === "progress") filtered = offers.filter((offer) => offer.status === "pending" || offer.status === "validated");
+    if (selectedFilter === "rejected") filtered = offers.filter((offer) => offer.status === "rejected");
+    if (selectedFilter === "paid") filtered = offers.filter((offer) => offer.status === "selected");
     return [...filtered].sort((a, b) => sortAsc ? a.id - b.id : b.id - a.id);
-  }, [accepted, active, selectedFilter, sent, sortAsc, view]);
+  }, [accepted, active, offers, selectedFilter, sent, sortAsc, view]);
+
+  const visibleIncoming = useMemo(() => {
+    const filterLabel = selectedFilter === "transmission"
+      ? t("partner.offers.category.transmission")
+      : selectedFilter === "brakes"
+        ? t("partner.offers.category.brakes")
+        : null;
+    const normalizedFilter = filterLabel?.toLocaleLowerCase(i18n.language);
+    const filtered = normalizedFilter
+      ? incoming.filter((request) => request.items?.some((item) =>
+          [item.categoryTitle, item.categoryTitleAr]
+            .filter((title): title is string => Boolean(title))
+            .some((title) => title.toLocaleLowerCase(i18n.language).includes(normalizedFilter)),
+        ))
+      : incoming;
+    return [...filtered].sort((a, b) => sortAsc ? a.id - b.id : b.id - a.id);
+  }, [i18n.language, incoming, selectedFilter, sortAsc, t]);
 
   const renderHeader = (title: string, onBack: () => void) => (
     <View style={styles.header} flexDirection="row" alignItems="center">
@@ -129,18 +155,30 @@ export default function PrestataireOffersScreen(): React.ReactElement {
       { key: "sent" as const, icon: "file-send-outline", count: sent.length, label: t("partner.offers.sentTitle") },
     ];
     const stats = [
-      { icon: "file-document-outline", value: incoming.length, label: t("partner.offers.stats.received"), positive: true },
-      { icon: "file-remove-outline", value: Math.max(0, incoming.length - active.length), label: t("partner.offers.stats.missed"), positive: false },
-      { icon: "file-send-outline", value: sent.length, label: t("partner.offers.stats.sent"), positive: true },
-      { icon: "file-check-outline", value: accepted.length, label: t("partner.offers.stats.accepted"), positive: true },
-      { icon: "file-cancel-outline", value: 0, label: t("partner.offers.stats.rejected"), positive: false },
+      { icon: "file-document-outline", value: incoming.length, label: t("partner.offers.stats.received") },
+      { icon: "file-send-outline", value: sent.length, label: t("partner.offers.stats.sent") },
+      { icon: "file-check-outline", value: accepted.length, label: t("partner.offers.stats.accepted") },
+      { icon: "file-cancel-outline", value: offers.filter((offer) => offer.status === "rejected").length, label: t("partner.offers.stats.rejected") },
     ];
 
     return (
       <>
         {renderHeader(t("partner.offers.title"), () => router.back())}
-        <ScrollView contentContainerStyle={styles.hubContent} showsVerticalScrollIndicator={false}>
-          {menu.map((item) => (
+        <ScrollView
+          contentContainerStyle={styles.hubContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+        >
+          {loading ? (
+            <ActivityIndicator size="large" color={Colors.primary} style={styles.loader} />
+          ) : error ? (
+            <View style={styles.message} alignItems="center" gap={12}>
+              <Text center color={Colors.red}>{t("partner.offers.loadError.offers")}</Text>
+              <TouchableOpacity style={styles.smallButton} onPress={() => void load()} accessibilityRole="button">
+                <Text type="labelTwo" semiBold>{t("partner.offers.retry")}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : menu.map((item) => (
             <View key={item.key} style={styles.menuCard} flexDirection="row" alignItems="center" gap={12}>
               <Icon name={item.icon} type="MaterialCommunityIcons" size={30} iconColor={Colors.black} />
               <Text type="textTwo" semiBold flex>
@@ -152,27 +190,19 @@ export default function PrestataireOffersScreen(): React.ReactElement {
             </View>
           ))}
 
-          <View style={styles.statsHeading} flexDirection="row" alignItems="center">
+          {!loading && !error ? <View style={styles.statsHeading} flexDirection="row" alignItems="center">
             <Text type="titleTwo" semiBold flex>{t("partner.offers.stats.title")}</Text>
-            <Icon name="calendar" type="Feather" size={18} iconColor={Colors.gray} />
-            <Text type="labelTwo" color={Colors.gray} style={styles.period}>{t("partner.offers.stats.period")}</Text>
-            <Icon name="chevron-down" type="Feather" size={18} iconColor={Colors.gray} />
-          </View>
+          </View> : null}
 
-          <View style={styles.statsGrid} flexDirection="row">
+          {!loading && !error ? <View style={styles.statsGrid} flexDirection="row">
             {stats.map((item) => (
               <View key={item.label} style={styles.statCard}>
                 <Icon name={item.icon} type="MaterialCommunityIcons" size={23} iconColor={Colors.black} />
                 <Text type="labelTwo" semiBold style={styles.statLabel}>{item.label}</Text>
-                <View flexDirection="row" alignItems="center" gap={8}>
-                  <Text type="textTwo" semiBold translate={false}>{item.value}</Text>
-                  <Text type="small" color={item.positive ? Colors.greenDark : Colors.redLight} translate={false}>
-                    {item.positive ? "+13%" : "-13%"}
-                  </Text>
-                </View>
+                <Text type="textTwo" semiBold translate={false}>{item.value}</Text>
               </View>
             ))}
-          </View>
+          </View> : null}
         </ScrollView>
       </>
     );
@@ -181,14 +211,16 @@ export default function PrestataireOffersScreen(): React.ReactElement {
   const renderList = () => (
     <>
       {renderHeader(listTitle[view as Exclude<OffersView, "hub">], () => changeView("hub"))}
-      <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+      >
         <View style={styles.listTools} flexDirection="row" alignItems="center">
-          <Text type="titleTwo" semiBold flex>
-            {view === "incoming" ? t("partner.offers.category.brakes") : t("partner.offers.month")}
-          </Text>
-          <TouchableOpacity style={styles.toolButton} onPress={() => setSortAsc(true)}><Icon name="arrow-up" type="Feather" size={26} iconColor={sortAsc ? Colors.greenDark : Colors.black} /></TouchableOpacity>
-          <TouchableOpacity style={styles.toolButton} onPress={() => setSortAsc(false)}><Icon name="arrow-down" type="Feather" size={26} iconColor={!sortAsc ? Colors.greenDark : Colors.black} /></TouchableOpacity>
-          <TouchableOpacity style={styles.toolButton} onPress={() => setFilterVisible(true)}>
+          <View flex />
+          <TouchableOpacity style={styles.toolButton} onPress={() => setSortAsc(true)} accessibilityRole="button" accessibilityLabel={t("partner.offers.sortAscending")}><Icon name="arrow-up" type="Feather" size={26} iconColor={sortAsc ? Colors.greenDark : Colors.black} /></TouchableOpacity>
+          <TouchableOpacity style={styles.toolButton} onPress={() => setSortAsc(false)} accessibilityRole="button" accessibilityLabel={t("partner.offers.sortDescending")}><Icon name="arrow-down" type="Feather" size={26} iconColor={!sortAsc ? Colors.greenDark : Colors.black} /></TouchableOpacity>
+          <TouchableOpacity style={styles.toolButton} onPress={() => setFilterVisible(true)} accessibilityRole="button" accessibilityLabel={t("partner.offers.filter.title")}>
             <Icon name="filter" type="Feather" size={26} iconColor={Colors.black} />
           </TouchableOpacity>
         </View>
@@ -198,13 +230,18 @@ export default function PrestataireOffersScreen(): React.ReactElement {
         ) : error ? (
           <View style={styles.message} alignItems="center" gap={12}>
             <Text center color={Colors.red}>{t("partner.offers.loadError.offers")}</Text>
-            <TouchableOpacity style={styles.smallButton} onPress={load}><Text type="labelTwo" semiBold>{t("partner.offers.retry")}</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.smallButton} onPress={() => void load()} accessibilityRole="button"><Text type="labelTwo" semiBold>{t("partner.offers.retry")}</Text></TouchableOpacity>
           </View>
         ) : view === "incoming" ? (
-          incoming.length > 0 ? incoming.map((item) => <ItemIncomingRequestCard key={item.id} item={item} />) : <Text center color={Colors.gray}>{t("partner.offers.empty.incoming")}</Text>
+          visibleIncoming.length > 0 ? visibleIncoming.map((item) => <ItemIncomingRequestCard key={item.id} item={item} />) : <Text center color={Colors.gray}>{t("partner.offers.empty.incoming")}</Text>
         ) : visibleOffers.length > 0 ? (
           visibleOffers.map((item) => (
-            <ItemPartnerOfferCard key={item.id} item={item} listMode={view === "accepted" ? "accepted" : "sent"} />
+            <ItemPartnerOfferCard
+              key={item.id}
+              item={item}
+              listMode={view === "accepted" ? "accepted" : "sent"}
+              isShipped={shippedOfferIds.has(item.id)}
+            />
           ))
         ) : (
           <Text center color={Colors.gray}>{t(`partner.offers.empty.${view}`)}</Text>
@@ -282,7 +319,6 @@ const styles = StyleSheet.create({
   menuCard: { minHeight: 82, borderWidth: 1, borderColor: Colors.primary, borderRadius: 6, paddingHorizontal: 14, marginBottom: 12, backgroundColor: Colors.white },
   smallButton: { backgroundColor: Colors.primary, borderRadius: 5, paddingHorizontal: 12, paddingVertical: 8 },
   statsHeading: { marginTop: 26, marginBottom: 14 },
-  period: { marginHorizontal: 6 },
   statsGrid: { flexWrap: "wrap", gap: 12 },
   statCard: { width: "30.7%", minHeight: 100, padding: 8, borderRadius: 7, backgroundColor: Colors.white, shadowColor: Colors.gray, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.18, shadowRadius: 5, elevation: 3 },
   statLabel: { minHeight: 42, marginTop: 5 },

@@ -45,9 +45,15 @@ export interface User {
   updatedAt: string;
 }
 
-/** Subset returned on auth (/api/v1/auth/login). */
-export interface AuthUser
-  extends Pick<User, 'id' | 'name' | 'email' | 'phone' | 'role' | 'avatar' | 'status'> {
+/** Backend auth user returned by /api/v1/auth endpoints. */
+export interface AuthUser {
+  id: number;
+  name: string;
+  email: string | null;
+  phone: string;
+  role: 'client' | 'ferrailleur';
+  avatar: string | null;
+  status: 'active' | 'inactive' | 'suspended';
   token: string;
 }
 

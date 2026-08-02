@@ -2,12 +2,5 @@ import React from 'react';
 import { Redirect } from 'expo-router';
 
 export default function PrestataireWithdrawSuccessScreen(): React.ReactElement {
-  return (
-    <Redirect
-      href={{
-        pathname: '/(prestataire)/profile/wallet',
-        params: { state: 'processing' },
-      }}
-    />
-  );
+  return <Redirect href="/(prestataire)/profile/wallet" />;
 }

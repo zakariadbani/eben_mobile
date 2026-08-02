@@ -59,7 +59,7 @@ const ReviewItemComponent: React.FC<ReviewItemComponentProps> = ({ review }) => 
       </View>
 
       {/* ── Review title (bold, if present) ──────────────────────────── */}
-      {review.reviewTitle != null && review.reviewTitle.trim().length > 0 && (
+      {(review.title ?? review.reviewTitle) != null && (review.title ?? review.reviewTitle)?.trim().length !== 0 && (
         <Text
           type="label"
           bold
@@ -67,7 +67,7 @@ const ReviewItemComponent: React.FC<ReviewItemComponentProps> = ({ review }) => 
           translate={false}
           style={styles.reviewTitle}
         >
-          {review.reviewTitle}
+          {review.title ?? review.reviewTitle}
         </Text>
       )}
 

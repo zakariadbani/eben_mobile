@@ -1,14 +1,5 @@
 /**
  * Mock product data — part listings available for direct purchase.
- *
- * Pricing follows the margin rule (stored immutably at creation time):
- *   priceFerrailleur × 1.06 = price  (client price shown to buyer)
- *   priceFerrailleur × 0.94 = priceBc (purchase-order price to ferrailleur)
- *
- * Examples:
- *   priceFerrailleur = 2525.00  →  price = 2676.50,  priceBc = 2373.50
- *   priceFerrailleur =  180.00  →  price =  190.80,  priceBc =  169.20
- *   priceFerrailleur =  850.00  →  price =  901.00,  priceBc =  799.00
  */
 
 import type { Product } from '@/interfaces/Product';
@@ -29,9 +20,7 @@ export const mockProducts: Product[] = [
     titleAr: 'طقم بطانات الفرامل الأمامية بريمبو',
     condition: 'en_stock',
     articleNumber: '18548 10001',
-    // priceFerrailleur = 2525.00 → price = 2676.50, priceBc = 2373.50
     price: 2676.50,
-    priceBc: 2373.50,
     promoPrice: undefined,
     images: [
       'https://picsum.photos/id/514/800/800',
@@ -68,9 +57,7 @@ export const mockProducts: Product[] = [
     titleAr: 'طقم بطانات الفرامل الأمامية — مستعمل',
     condition: 'occasion',
     articleNumber: '18548 10002',
-    // priceFerrailleur = 850.00 → price = 901.00, priceBc = 799.00
     price: 901.00,
-    priceBc: 799.00,
     promoPrice: undefined,
     images: [
       'https://picsum.photos/id/655/800/800',
@@ -103,9 +90,7 @@ export const mockProducts: Product[] = [
     titleAr: 'خرطوم الفرامل الأمامي بوش',
     condition: 'en_stock',
     articleNumber: '18548 10003',
-    // priceFerrailleur = 180.00 → price = 190.80, priceBc = 169.20
     price: 190.80,
-    priceBc: 169.20,
     // promo: was 190.80, now 159.90
     promoPrice: 159.90,
     images: [
@@ -140,9 +125,7 @@ export const mockProducts: Product[] = [
     titleAr: 'قرص الفرامل الخلفي — مستعمل',
     condition: 'occasion',
     articleNumber: '18548 10004',
-    // priceFerrailleur = 320.00 → price = 339.20, priceBc = 300.80
     price: 339.20,
-    priceBc: 300.80,
     promoPrice: undefined,
     images: [
       'https://picsum.photos/id/102/800/800',
@@ -176,9 +159,7 @@ export const mockProducts: Product[] = [
     titleAr: 'طقم التوزيع الكامل',
     condition: 'en_stock',
     articleNumber: '18548 10005',
-    // priceFerrailleur = 1200.00 → price = 1272.00, priceBc = 1128.00
     price: 1272.00,
-    priceBc: 1128.00,
     promoPrice: undefined,
     images: [
       'https://picsum.photos/id/500/800/800',
@@ -213,9 +194,7 @@ export const mockProducts: Product[] = [
     titleAr: 'المصد الأمامي — مستعمل',
     condition: 'occasion',
     articleNumber: '18548 10006',
-    // priceFerrailleur = 850.00 → price = 901.00, priceBc = 799.00
     price: 901.00,
-    priceBc: 799.00,
     promoPrice: undefined,
     images: [
       'https://picsum.photos/id/400/800/800',
@@ -381,6 +360,11 @@ export const mockBasket: Basket = {
   id: 1,
   userId: 1,
   requestId: null,
+  subtotal: 2996.3,
+  discountAmount: 0,
+  shippingFee: 0,
+  taxAmount: 0,
+  total: 2996.3,
   createdAt: '2024-10-10T07:00:00Z',
   updatedAt: '2024-10-10T10:00:00Z',
   items: [

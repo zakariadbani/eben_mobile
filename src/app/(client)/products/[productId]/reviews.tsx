@@ -11,7 +11,7 @@
  *   - Empty state via EmptyListComponent
  *   - Sticky / bottom CTA: "Laisser un avis"
  *
- * Data: getReviews(productId) — mock-backed, real-swap-ready.
+ * Data: getReviews(productId) from the public live API.
  * RTL: all rows through common/View flexDirection="row".
  */
 
@@ -30,23 +30,33 @@ import ReviewItemComponent from "@/components/screens/shared/app/ReviewItemCompo
 import RatingStars from "@/components/screens/shared/app/RatingStars";
 
 import { getReviews } from "@/api";
+import { Role, useSession } from "@/context/AuthContext";
 import type { Review } from "@/interfaces/Review";
 import Colors from "@/constants/Colors";
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 const ReviewsScreen: React.FC = () => {
-  const { productId } = useLocalSearchParams<{ productId: string }>();
+  const rawParams = useLocalSearchParams();
   const router = useRouter();
   const { t } = useTranslation();
+  const { role } = useSession();
 
-  const numericProductId = Number(productId ?? 0);
+  const productId = typeof rawParams.productId === "string" ? rawParams.productId : "";
+  const numericProductId = /^\d+$/.test(productId) ? Number(productId) : Number.NaN;
+  const validProductId = Number.isSafeInteger(numericProductId) && numericProductId > 0;
 
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (!validProductId) {
+      setReviews([]);
+      setLoading(false);
+      setError(t("auth.error.generic"));
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -57,7 +67,7 @@ const ReviewsScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [numericProductId, t]);
+  }, [numericProductId, t, validProductId]);
 
   useEffect(() => {
     void load();
@@ -70,6 +80,10 @@ const ReviewsScreen: React.FC = () => {
       : 0;
 
   const handleLeaveReview = () => {
+    if (role !== Role.CLIENT) {
+      router.push("/(auth)/ClientLoginScreen" as Href);
+      return;
+    }
     router.push({
       pathname: "/(client)/products/[productId]/review",
       params: { productId: String(numericProductId) },
@@ -171,7 +185,7 @@ const ReviewsScreen: React.FC = () => {
     </View>
   ) : error ? (
     <EmptyListComponent
-      title={t("reviews.loadError")}
+      title={error ?? t("reviews.loadError")}
       actionButton={{ title: t("reviews.retry"), onPress: load }}
     />
   ) : (

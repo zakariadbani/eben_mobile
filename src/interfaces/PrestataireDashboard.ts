@@ -10,6 +10,26 @@
 
 import type { OfferStatus } from './Offer';
 
+/** Canonical Laravel dashboard aggregation periods. */
+export type DashboardPeriod = '1j' | '7j' | '1m' | '6m' | '1a' | 'max';
+
+/** One server-aggregated point in a Prestataire dashboard series. */
+export interface PrestataireDashboardSeriesBucket {
+  label: string;
+  revenue: number;
+  offersReceived: number;
+  offersActive: number;
+  offersAccepted: number;
+  offersSent: number;
+  pendingPayout: number;
+}
+
+/** Returned by GET /prestataire/dashboard/series. */
+export interface PrestataireDashboardSeries {
+  period: DashboardPeriod;
+  buckets: PrestataireDashboardSeriesBucket[];
+}
+
 /** Small summary row for a recent offer shown in the dashboard feed. */
 export interface RecentOfferSummary {
   offerId: number;
@@ -17,15 +37,16 @@ export interface RecentOfferSummary {
   requestReference: string;
   /** The ferrailleur's own price (priceFerrailleur). */
   priceFerrailleur: number;
+  quantity: number;
   status: OfferStatus;
   /** Part category label (French). */
-  categoryTitle?: string;
-  categoryTitleAr?: string;
+  categoryTitle: string | null;
+  categoryTitleAr: string | null;
   createdAt: string;
   /** ISO timestamp when this offer expires — used for the countdown chip. */
-  expiresAt?: string;
-  /** Category image resolved at mock-serve time via categoryImageFor(). */
-  categoryImage?: ReturnType<typeof require> | string | null;
+  expiresAt: string | null;
+  /** Category image URL returned by Laravel. */
+  categoryImage: string | null;
 }
 
 /**

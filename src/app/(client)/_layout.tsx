@@ -553,6 +553,10 @@ export default function ClientLayout() {
         options={{ title: t("Modifier mon profil"), tabBarButton: () => null, header: darkHeader }}
       />
       <Tabs.Screen
+        name="settings/profile/verify-phone"
+        options={{ title: t("settings.profile.verifyPhoneTitle"), tabBarButton: () => null, header: darkHeader }}
+      />
+      <Tabs.Screen
         name="settings/orders/index"
         options={{ title: t("Mes commandes"), tabBarButton: () => null, header: darkHeader }}
       />

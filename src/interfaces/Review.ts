@@ -11,7 +11,7 @@
  * `rating` enforced 1–5 on the DB with CHECK constraint.
  */
 
-export type ReviewableType = 'offer' | 'ferrailleur' | 'order_item';
+export type ReviewableType = 'offer' | 'ferrailleur' | 'order_item' | 'product';
 
 export interface Review {
   id: number;
@@ -29,5 +29,7 @@ export interface Review {
   /** Optional reviewer city (shown in parentheses after name). */
   reviewerCity?: string | null;
   /** Optional review title (bold headline above body text). */
+  title?: string | null;
+  /** @deprecated Compatibility alias for older mock fixtures. */
   reviewTitle?: string | null;
 }

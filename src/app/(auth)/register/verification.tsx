@@ -1,22 +1,59 @@
 import React, { useState } from "react";
 import { StyleSheet } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import Screen from "@/components/common/Screen";
 import View from "@/components/common/View";
 import PhoneVerificationComponent from "@/components/screens/shared/PhoneVerificationComponent";
 import Colors from "@/constants/Colors";
 import { Role, useSession } from "@/context/AuthContext";
 
+function formatPhone(value: string | null): string {
+  if (!value) return "";
+  const local = value.replace(/^\+212/, "0").replace(/\D/g, "");
+  return local.replace(/(\d{2})(?=\d)/g, "$1 ");
+}
+
 export default function RegistrationVerificationScreen() {
   const router = useRouter();
-  const { login } = useSession();
-  const { phone = "" } = useLocalSearchParams<{ phone?: string }>();
+  const {
+    pendingRegistrationPhone,
+    pendingRegistrationOtpSent,
+    resendRegistrationOtp,
+    verifyRegistration,
+  } = useSession();
+  const { t } = useTranslation();
   const [isValid, setIsValid] = useState(false);
+  const [error, setError] = useState<string | null>(
+    !pendingRegistrationPhone
+      ? t("auth.otp.noPendingRegistration")
+      : pendingRegistrationOtpSent === false
+        ? t("auth.otp.initialSendError")
+        : null,
+  );
 
-  const handleValidation = (valid: boolean) => {
+  const handleValidation = async (valid: boolean, code: string) => {
     setIsValid(valid);
-    if (valid && login(phone, "registered", Role.CLIENT)) {
-      router.push("/(auth)/register/car-selection");
+    if (!valid || !pendingRegistrationPhone) return;
+    setError(null);
+    try {
+      const role = await verifyRegistration(code);
+      if (role === Role.CLIENT) {
+        router.push("/(auth)/register/car-selection");
+      }
+    } catch {
+      setIsValid(false);
+      setError(t("auth.otp.invalid"));
+    }
+  };
+
+  const handleResend = async () => {
+    setError(null);
+    try {
+      await resendRegistrationOtp();
+    } catch (resendError) {
+      setError(t("auth.otp.resendError"));
+      throw resendError;
     }
   };
 
@@ -27,7 +64,10 @@ export default function RegistrationVerificationScreen() {
           <PhoneVerificationComponent
             validate={handleValidation}
             isValid={isValid}
-            phoneNumber={phone}
+            phoneNumber={formatPhone(pendingRegistrationPhone)}
+            onResend={handleResend}
+            error={error}
+            startWithCooldown={pendingRegistrationOtpSent !== false}
           />
         </View>
       </View>

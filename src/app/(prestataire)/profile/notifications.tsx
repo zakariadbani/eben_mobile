@@ -1,462 +1,168 @@
-/**
- * /(prestataire)/profile/notifications.tsx
- *
- * Partner notifications — empty + full states.
- * Figma: "Profile-Notifications_Full" + "Profile-Notifications_Empty" (FR + AR variants).
- *
- * Data: getPrestataireNotifications()
- * Actions: markPrestataireNotificationRead(id) on row tap or menu
- *
- * Features:
- *   - Unread badge count in header
- *   - Per-row unread dot (Colors.noticeUnread amber)
- *   - Read row: dimmer background (Colors.noticeRead)
- *   - Unread row: white background
- *   - Type icon per notification type
- *   - Bilingual title + message (title/titleAr, message/messageAr)
- *   - Relative time (il y a X heure(s) / jour(s))
- *   - CTA button per notification type (Envoyer une offre / Détails / Expédier la pièce)
- *   - Empty state (illustration + message)
- *
- * RTL-aware via common/View + common/Text
- * translate={false} for refs, prices, dates, type=icon literals
- */
-
-import React, { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  StyleSheet,
-  TouchableOpacity,
-} from "react-native";
-import { useTranslation } from "react-i18next";
-import { Href, useLocalSearchParams, useRouter } from "expo-router";
-
-import { Screen } from "@/components/common/Screen";
-import View from "@/components/common/View";
-import { Text } from "@/components/common/Text";
-import Colors from "@/constants/Colors";
-import CustomHeader from "@/components/common/CustomHeader";
-import Icon from "@/components/common/Icon";
-import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
-import Button from "@/components/common/Button";
+import React, { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { useFocusEffect } from 'expo-router';
 
 import {
   getPrestataireNotifications,
+  markAllPrestataireNotificationsRead,
   markPrestataireNotificationRead,
-} from "@/api/resources/prestataire";
-import type { Notification, NotificationType } from "@/interfaces/Notification";
+} from '@/api/resources/prestataire';
+import Button from '@/components/common/Button';
+import CustomHeader from '@/components/common/CustomHeader';
+import Icon from '@/components/common/Icon';
+import { Screen } from '@/components/common/Screen';
+import { Text } from '@/components/common/Text';
+import View from '@/components/common/View';
+import EmptyListComponent from '@/components/screens/shared/app/EmptyListComponent';
+import Colors from '@/constants/Colors';
+import type { Notification, NotificationType } from '@/interfaces/Notification';
 
-// ── Notification type → icon + CTA label config ────────────────────────────────
-
-interface TypeConfig {
-  icon: string;
-  ctaKey: string;
-  /** CTA action: 'details' | 'send_offer' | 'ship' | null */
-  ctaAction: "details" | "send_offer" | "ship" | null;
-}
-
-const TYPE_CONFIG: Partial<Record<NotificationType, TypeConfig>> = {
-  list_received: {
-    icon: "file-clock-outline",
-    ctaKey: "partner.notifications.cta.sendOffer",
-    ctaAction: "send_offer",
-  },
-  payment: {
-    icon: "sack",
-    ctaKey: "partner.notifications.cta.details",
-    ctaAction: "details",
-  },
-  shipped: {
-    icon: "truck-fast-outline",
-    ctaKey: "partner.notifications.cta.details",
-    ctaAction: "details",
-  },
-  delivered: {
-    icon: "package-variant-closed-check",
-    ctaKey: "partner.notifications.cta.details",
-    ctaAction: "details",
-  },
-  list_sent: {
-    icon: "file-check-outline",
-    ctaKey: "partner.notifications.cta.ship",
-    ctaAction: "ship",
-  },
-  account_update: {
-    icon: "bell-outline",
-    ctaKey: "partner.notifications.cta.details",
-    ctaAction: "details",
-  },
-  message: {
-    icon: "message-text-outline",
-    ctaKey: "partner.notifications.cta.details",
-    ctaAction: "details",
-  },
+const ICONS: Partial<Record<NotificationType, string>> = {
+  list_received: 'file-clock-outline',
+  list_sent: 'file-check-outline',
+  payment: 'sack',
+  shipped: 'truck-fast-outline',
+  delivered: 'package-variant-closed-check',
+  message: 'message-text-outline',
 };
 
-function typeConfig(type: NotificationType): TypeConfig {
-  return (
-    TYPE_CONFIG[type] ?? {
-      icon: "bell-outline",
-      ctaKey: "partner.notifications.cta.details",
-      ctaAction: "details",
-    }
-  );
+function relativeTime(iso: string, t: (key: string, options?: { count: number }) => string): string {
+  const milliseconds = Math.max(0, Date.now() - new Date(iso).getTime());
+  const hours = Math.floor(milliseconds / 3_600_000);
+  if (milliseconds < 60_000) return t('partner.notifications.timeNow');
+  if (hours < 24) return t('partner.notifications.timeHours', { count: hours });
+  return t('partner.notifications.timeDays', { count: Math.floor(hours / 24) });
 }
 
-// ── Relative time helper ───────────────────────────────────────────────────────
-
-function relativeTime(
-  iso: string,
-  t: (key: string, options?: { count: number }) => string,
-): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const diffH = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffD = Math.floor(diffH / 24);
-
-  if (diffMs < 60_000) return t('partner.notifications.timeNow');
-  if (diffH < 24) return t('partner.notifications.timeHours', { count: diffH });
-  return t('partner.notifications.timeDays', { count: diffD });
-}
-
-// ── Notification row ───────────────────────────────────────────────────────────
-
-interface NotifRowProps {
-  item: Notification;
-  isArabic: boolean;
-  onMarkRead: (id: number) => void;
-  onCta: (item: Notification, action: TypeConfig["ctaAction"]) => void;
-}
-
-function NotifRow({
-  item,
-  isArabic,
-  onMarkRead,
-  onCta,
-}: NotifRowProps): React.ReactElement {
+function NotificationRow({ item, isArabic, onRead }: { item: Notification; isArabic: boolean; onRead: (id: number) => void }): React.ReactElement {
   const { t } = useTranslation();
-  const cfg = typeConfig(item.type);
-  const displayTitle = isArabic ? (item.titleAr ?? item.title) : item.title;
-  const displayMessage = isArabic ? (item.messageAr ?? item.message) : item.message;
-  const timeLabel = relativeTime(item.createdAt, t);
-
-  const rowBg = item.isRead ? Colors.noticeRead : Colors.white;
-
-  const handlePress = () => {
-    if (!item.isRead) {
-      onMarkRead(item.id);
-    }
-    onCta(item, cfg.ctaAction);
-  };
-
+  const title = isArabic ? item.titleAr ?? item.title : item.title;
+  const message = isArabic ? item.messageAr ?? item.message : item.message;
   return (
     <TouchableOpacity
-      onPress={handlePress}
+      onPress={() => { if (!item.isRead) onRead(item.id); }}
+      disabled={item.isRead}
       activeOpacity={0.8}
-      style={[styles.row, { backgroundColor: rowBg }]}
+      style={[styles.row, { backgroundColor: item.isRead ? Colors.noticeRead : Colors.white }]}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{ disabled: item.isRead }}
     >
-      {/* Unread dot */}
-      {!item.isRead && <View style={styles.unreadDot} />}
-      <View style={styles.menuDots}>
-        <Icon name="dots-vertical" type="MaterialCommunityIcons" size={20} iconColor={Colors.greyLight2} />
-      </View>
-
-      {/* Icon */}
+      {!item.isRead ? <View style={styles.unreadDot} /> : null}
       <View style={styles.iconBox}>
-        <Icon name={cfg.icon} type="MaterialCommunityIcons" size={28} iconColor={Colors.brand} />
+        <Icon name={ICONS[item.type] ?? 'bell-outline'} type="MaterialCommunityIcons" size={28} iconColor={Colors.brand} />
       </View>
-
-      {/* Body */}
-      <View flex gap={4} style={styles.bodyBox}>
-        {/* Title */}
-        <Text type="label" semiBold={!item.isRead} color={Colors.brand} translate={false}>
-          {displayTitle}
-        </Text>
-
-        {/* Message */}
-        <Text type="small" color={Colors.grayMidDark} translate={false} numberOfLines={3}>
-          {displayMessage}
-        </Text>
-
-        {/* Time + CTA row */}
-        <View flexDirection="row" alignItems="center" gap={8} style={styles.bottomRow}>
-          <Text type="small" color={Colors.gray} translate={false} flex>
-            {timeLabel}
-          </Text>
-          {cfg.ctaAction ? (
-            <Button
-              title={t(cfg.ctaKey)}
-              variant="primary"
-              fit
-              style={styles.ctaBtn}
-              onPress={handlePress}
-            />
-          ) : null}
-        </View>
+      <View flex gap={4}>
+        <Text type="label" semiBold={!item.isRead} color={Colors.brand} translate={false}>{title}</Text>
+        <Text type="small" color={Colors.grayMidDark} translate={false} numberOfLines={3}>{message}</Text>
+        <Text type="small" color={Colors.gray} translate={false}>{relativeTime(item.createdAt, t)}</Text>
       </View>
     </TouchableOpacity>
   );
 }
 
-// ── Main screen ────────────────────────────────────────────────────────────────
-
 export default function PrestataireNotificationsScreen(): React.ReactElement {
   const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === "ar";
-  const router = useRouter();
-  const { state } = useLocalSearchParams<{ state?: string }>();
-
+  const isArabic = i18n.language === 'ar';
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadOnly, setUnreadOnly] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [mutationBusy, setMutationBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const requestEpoch = useRef(0);
 
   const fetchNotifications = useCallback(async () => {
+    const epoch = ++requestEpoch.current;
     setLoading(true);
     setError(null);
-    if (state === 'empty') {
-      setNotifications([]);
-      setLoading(false);
-      return;
-    }
     try {
-      const res = await getPrestataireNotifications();
-      setNotifications(res.data);
+      const response = await getPrestataireNotifications();
+      if (epoch === requestEpoch.current) setNotifications(response.data);
     } catch {
-      setError(t('partner.notifications.loadError'));
+      if (epoch === requestEpoch.current) setError(t('partner.notifications.loadError'));
     } finally {
-      setLoading(false);
+      if (epoch === requestEpoch.current) setLoading(false);
     }
-  }, [state, t]);
+  }, [t]);
 
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+  useFocusEffect(useCallback(() => {
+    void fetchNotifications();
+    return () => { requestEpoch.current += 1; };
+  }, [fetchNotifications]));
 
-  // ── Mark read ────────────────────────────────────────────────────────────
-
-  const handleMarkRead = useCallback(async (id: number) => {
-    // Optimistic update
-    setNotifications((prev) =>
-      prev.map((n) =>
-        n.id === id ? { ...n, isRead: true, readAt: new Date().toISOString() } : n,
-      ),
-    );
+  const markRead = useCallback(async (id: number) => {
+    setMutationError(null);
+    setNotifications((current) => current.map((item) => item.id === id ? { ...item, isRead: true, readAt: new Date().toISOString() } : item));
     try {
       await markPrestataireNotificationRead(id);
     } catch {
-      // Revert on failure — re-fetch
-      fetchNotifications();
+      setMutationError(t('partner.notifications.mutationError'));
+      void fetchNotifications();
     }
-  }, [fetchNotifications]);
+  }, [fetchNotifications, t]);
 
-  // ── CTA handler ──────────────────────────────────────────────────────────
+  const markAllRead = useCallback(async () => {
+    setMutationBusy(true);
+    setMutationError(null);
+    const before = notifications;
+    const readAt = new Date().toISOString();
+    setNotifications((current) => current.map((item) => ({ ...item, isRead: true, readAt: item.readAt ?? readAt })));
+    try {
+      await markAllPrestataireNotificationsRead();
+    } catch {
+      setNotifications(before);
+      setMutationError(t('partner.notifications.mutationError'));
+    } finally {
+      setMutationBusy(false);
+    }
+  }, [notifications, t]);
 
-  const handleCta = useCallback(
-    (item: Notification, action: TypeConfig["ctaAction"]) => {
-      if (!action) return;
-      const data = item.data ?? {};
+  const unreadCount = notifications.filter((item) => !item.isRead).length;
+  const visible = unreadOnly ? notifications.filter((item) => !item.isRead) : notifications;
 
-      if (action === "send_offer") {
-        const requestId = data["requestId"];
-        if (requestId) {
-          router.push(
-            `/(prestataire)/offers/${requestId}/fill` as Href,
-          );
-        }
-        return;
-      }
-
-      if (action === "ship") {
-        const offerId = data["offerId"];
-        if (offerId) {
-          router.push(
-            `/(prestataire)/offers/${offerId}/ship` as Href,
-          );
-        }
-        return;
-      }
-
-      // "details" — route by notification type
-      if (item.type === "payment" || item.type === "shipped" || item.type === "delivered") {
-        const orderId = data["orderId"];
-        if (orderId) {
-          router.push(`/(prestataire)/orders/${orderId}` as Href);
-        }
-        return;
-      }
-    },
-    [router],
+  const content = loading ? (
+    <View flex alignItems="center" justifyContent="center"><ActivityIndicator size="large" color={Colors.primary} /></View>
+  ) : error ? (
+    <EmptyListComponent title={error} actionButton={{ title: t('partner.notifications.retry'), variant: 'primary', onPress: fetchNotifications }} />
+  ) : notifications.length === 0 ? (
+    <EmptyListComponent title={t('partner.notifications.empty')} />
+  ) : visible.length === 0 ? (
+    <EmptyListComponent title={t('partner.notifications.noUnread')} />
+  ) : (
+    <FlatList data={visible} keyExtractor={(item) => String(item.id)} renderItem={({ item }) => <NotificationRow item={item} isArabic={isArabic} onRead={markRead} />} ItemSeparatorComponent={() => <View style={styles.separator} />} contentContainerStyle={styles.listContent} />
   );
-
-  // ── Derived stats ────────────────────────────────────────────────────────
-
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
-  const visibleNotifications = unreadOnly
-    ? notifications.filter((notification) => !notification.isRead)
-    : notifications;
-
-  // ── Render ───────────────────────────────────────────────────────────────
-
-  const renderContent = () => {
-    if (loading) {
-      return (
-        <View style={styles.centeredBox}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-        </View>
-      );
-    }
-
-    if (error) {
-      return (
-        <EmptyListComponent
-          title={error}
-          actionButton={{
-            title: t('partner.notifications.retry'),
-            variant: "primary",
-            onPress: fetchNotifications,
-          }}
-        />
-      );
-    }
-
-    if (notifications.length === 0) {
-      return (
-        <EmptyListComponent title={t('partner.notifications.empty')} />
-      );
-    }
-
-    return (
-      <FlatList<Notification>
-        data={visibleNotifications}
-        keyExtractor={(n) => String(n.id)}
-        renderItem={({ item }) => (
-          <NotifRow
-            item={item}
-            isArabic={isArabic}
-            onMarkRead={handleMarkRead}
-            onCta={handleCta}
-          />
-        )}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-      />
-    );
-  };
 
   return (
     <Screen whatsapp={false} scrollable={false}>
-      <View style={styles.wrapper}>
-        {/* Yellow header with back arrow */}
+      <View flex style={styles.wrapper}>
         <CustomHeader title={t('partner.notifications.title')} />
-
-        {/* Sub-header: bell icon + unread count + filter icon */}
         <View style={styles.subHeader} flexDirection="row" alignItems="center" gap={8}>
           <Icon name="bell" size={18} iconColor={Colors.brand} type="Feather" />
-          <Text type="label" semiBold color={Colors.brand}>
-            {t('partner.notifications.title')}
-          </Text>
-          {unreadCount > 0 ? (
-            <Text type="small" color={Colors.grayMidDark} translate={false}>
-              {`· ${unreadCount} ${t('partner.notifications.unread')}`}
-            </Text>
-          ) : null}
+          <Text type="label" semiBold color={Colors.brand}>{t('partner.notifications.title')}</Text>
+          {unreadCount > 0 ? <Text type="small" color={Colors.grayMidDark} translate={false}>{t('partner.notifications.unreadCount', { count: unreadCount })}</Text> : null}
           <View flex />
-          <TouchableOpacity activeOpacity={0.7} onPress={() => setUnreadOnly((value) => !value)}>
+          {unreadCount > 0 ? <Button title={t('partner.notifications.markAllRead')} fit disabled={mutationBusy} onPress={() => { void markAllRead(); }} /> : null}
+          <TouchableOpacity onPress={() => setUnreadOnly((value) => !value)} accessibilityRole="button" accessibilityLabel={t('partner.notifications.filterUnread')} accessibilityState={{ selected: unreadOnly }} style={styles.filterButton}>
             <Icon name="filter" size={18} iconColor={unreadOnly ? Colors.greenDark : Colors.brand} type="Feather" />
           </TouchableOpacity>
         </View>
-
-        {/* Content */}
-        <View flex style={styles.contentArea}>
-          {renderContent()}
-        </View>
+        {mutationError ? <Text accessibilityRole="alert" type="small" color={Colors.error} center style={styles.mutationError}>{mutationError}</Text> : null}
+        <View flex>{content}</View>
       </View>
     </Screen>
   );
 }
 
-// ── Styles ─────────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  wrapper: {
-    flex: 1,
-    backgroundColor: Colors.backgroundLight,
-  },
-  subHeader: {
-    backgroundColor: Colors.white,
-    paddingHorizontal: 16,
-    minHeight: 64,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.backgroundGray,
-  },
-  unreadBubble: {
-    backgroundColor: Colors.backgroundGray,
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  contentArea: {
-    flex: 1,
-    backgroundColor: Colors.backgroundLight,
-  },
-  listContent: {
-    paddingBottom: 32,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: Colors.backgroundGray,
-    marginLeft: 16,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    minHeight: 110,
-    position: "relative",
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.noticeUnread,
-    position: "absolute",
-    top: 54,
-    end: 16,
-  },
-  menuDots: {
-    position: 'absolute',
-    top: 10,
-    end: 14,
-  },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 0,
-    backgroundColor: Colors.white,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-    flexShrink: 0,
-  },
-  bodyBox: {
-    flex: 1,
-  },
-  bottomRow: {
-    marginTop: 4,
-  },
-  ctaBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    minHeight: 0,
-  },
-  centeredBox: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 60,
-  },
+  wrapper: { backgroundColor: Colors.backgroundLight },
+  subHeader: { backgroundColor: Colors.white, minHeight: 64, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.backgroundGray },
+  filterButton: { padding: 10 },
+  mutationError: { paddingHorizontal: 16, paddingVertical: 8 },
+  listContent: { paddingBottom: 32 },
+  separator: { height: 1, backgroundColor: Colors.backgroundGray, marginStart: 16 },
+  row: { flexDirection: 'row', alignItems: 'flex-start', minHeight: 106, padding: 16, position: 'relative' },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.noticeUnread, position: 'absolute', top: 49, end: 16 },
+  iconBox: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', marginEnd: 12, flexShrink: 0 },
 });

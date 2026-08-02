@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   StyleSheet,
   TouchableOpacity,
@@ -104,6 +105,8 @@ export const Button: React.FC<ButtonProps> = ({
   ...touchableProps
 }) => {
   const router = useRouter(); // Get the router instance
+  const { t } = useTranslation();
+  const translatedTitle = title ? t(title) : undefined;
 
   // Function to handle navigation if navigateTo prop is provided
   const handlePress = () => {
@@ -161,7 +164,7 @@ export const Button: React.FC<ButtonProps> = ({
         onPress={handlePress}
         disabled={disabled}
         accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel || title || leftIcon || rightIcon}
+        accessibilityLabel={accessibilityLabel || translatedTitle || leftIcon || rightIcon}
         accessibilityState={{ ...touchableProps.accessibilityState, disabled }}
       >
         <View style={[styles.container, styleContainer]} flexDirection="row">
@@ -179,7 +182,7 @@ export const Button: React.FC<ButtonProps> = ({
           {/* Render children if provided, otherwise render title */}
           {children
             ? children
-            : title && (
+            : translatedTitle && (
                 <Text
                   type="defaultTwo"
                   semiBold
@@ -190,7 +193,7 @@ export const Button: React.FC<ButtonProps> = ({
                     styleTitle,
                   ]}
                 >
-                  {title}
+                  {translatedTitle}
                 </Text>
               )}
           {rightIcon &&

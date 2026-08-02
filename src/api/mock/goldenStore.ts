@@ -1,5 +1,5 @@
 import type { Basket } from '@/interfaces/Basket';
-import type { ClientOffer, Offer } from '@/interfaces/Offer';
+import type { ClientOffer, Offer, PrestataireOffer } from '@/interfaces/Offer';
 import type { Order, OrderItem } from '@/interfaces/Order';
 import type { Request, RequestItem, RequestSummary } from '@/interfaces/Request';
 import { mockOrders } from './mockOrders';
@@ -63,6 +63,27 @@ const toClientOffer = (offer: Offer): ClientOffer => {
   delete client.priceFerrailleur;
   delete client.priceBc;
   return client as ClientOffer;
+};
+const toPrestataireOffer = (offer: Offer): PrestataireOffer => {
+  const partner = { ...offer } as Partial<Offer>;
+  delete partner.ferrailleurId;
+  delete partner.priceClient;
+  delete partner.priceBc;
+  delete partner.validatedBy;
+  const requestItem = state.requests
+    .find(({ id }) => id === offer.requestId)
+    ?.items?.find(({ id }) => id === offer.requestItemId);
+  return {
+    ...partner,
+    condition: requestItem?.condition ?? 'en_stock',
+    quantity: requestItem?.quantity ?? 1,
+    images: offer.images ?? [],
+    categoryTitle: requestItem?.categoryTitle ?? null,
+    categoryTitleAr: requestItem?.categoryTitleAr ?? null,
+    categoryImage: requestItem?.categoryImage ?? null,
+    ferrailleurName: null,
+    shippingEligible: offer.status === 'selected' && !state.shipments.some(({ offerId }) => offerId === offer.id),
+  } as PrestataireOffer;
 };
 
 function createRequest(payload: CreateRequestPayload) {
@@ -206,9 +227,10 @@ function placeOrder(payload: PlaceOrderPayload) {
     categoryTitle: item.categoryTitle, categoryTitleAr: item.categoryTitleAr,
   }));
   const subtotal = roundMoney(items.reduce((sum, item) => sum + item.totalPrice, 0));
+  const taxAmount = roundMoney(subtotal * 0.2);
   const order: Order = {
     id, reference: 'ORD-' + String(id).padStart(6, '0'), userId: 1, addressId: payload.addressId, couponId: null,
-    subtotal, discountAmount: 0, shippingFee: 0, total: roundMoney(subtotal * 1.2), status: 'confirmed',
+    subtotal, discountAmount: 0, shippingFee: 0, taxAmount, total: subtotal + taxAmount, status: 'confirmed',
     paymentMethod: payload.paymentMethod, paymentStatus: 'pending', notes: payload.notes ?? null,
     confirmedBy: null, confirmedAt: timestamp, createdAt: timestamp, updatedAt: timestamp, items,
   };
@@ -255,7 +277,7 @@ export function handleGoldenRequest(method: string, path: string, body?: unknown
       const shipped = state.shipments.some(({ offerId }) => offerId === offer.id);
       return status === 'active' ? offer.status === 'validated' : status === 'accepted' ? offer.status === 'selected' && !shipped :
         status === 'sent' ? offer.status === 'pending' : status === 'shipped' ? shipped : true;
-    })));
+    }).map(toPrestataireOffer)));
   }
   if (method === 'GET' && (path === '/prestataire/orders' || path.includes('/prestataire/orders?'))) {
     const status = new URLSearchParams(path.split('?')[1] ?? '').get('status');
@@ -293,7 +315,7 @@ export function handleGoldenRequest(method: string, path: string, body?: unknown
   match = path.match(/^\/prestataire\/offers\/(\d+)\/ship$/);
   if (method === 'POST' && match) return shipOffer(Number(match[1]), body as ShipOfferPayload);
   match = path.match(/^\/prestataire\/offers\/(\d+)$/);
-  if (method === 'GET' && match) return one(clone(offerById(Number(match[1]))));
+  if (method === 'GET' && match) return one(clone(toPrestataireOffer(offerById(Number(match[1])))));
   match = path.match(/^\/prestataire\/orders\/(\d+)$/);
   if (method === 'GET' && match) { const orderId = Number(match[1]); const row = state.orders.find(({ id }) => id === orderId); if (!row) throw new Error('Order not found'); return one(clone(row)); }
   return undefined;

@@ -10,14 +10,14 @@
  *   - OrderCard: Details→ link top-right, green date, yellow CTA bottom-right
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import Screen from '@/components/common/Screen';
 import View from '@/components/common/View';
@@ -28,6 +28,7 @@ import Icon from '@/components/common/Icon';
 import ConfirmModal from '@/components/common/ConfirmModal';
 import { getOrders } from '@/api/resources/orders';
 import type { Order, OrderStatus } from '@/interfaces/Order';
+import Button from '@/components/common/Button';
 
 // ── Status display config ────────────────────────────────────────────────────
 
@@ -277,8 +278,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
 const OrdersListScreen: React.FC = () => {
   const router = useRouter();
-  const { state } = useLocalSearchParams<{ state?: string }>();
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const isAr = i18n.language === 'ar';
   const locale = isAr ? 'ar-MA' : 'fr-MA';
 
@@ -298,11 +298,7 @@ const OrdersListScreen: React.FC = () => {
   // Month picker modal state
   const [monthPickerVisible, setMonthPickerVisible] = useState(false);
 
-  useEffect(() => {
-    loadOrders();
-  }, []);
-
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -316,11 +312,13 @@ const OrdersListScreen: React.FC = () => {
         setSelectedMonth(keys[0]);
       }
     } catch {
-      setError('Impossible de charger les commandes');
+      setError(t('settings.orders.loadError'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useFocusEffect(useCallback(() => { void loadOrders(); }, [loadOrders]));
 
   /** Distinct month keys sorted newest-first. */
   const availableMonths = useMemo(() => {
@@ -335,7 +333,6 @@ const OrdersListScreen: React.FC = () => {
 
   /** Visible orders after month + status filters + sort. */
   const visibleOrders = useMemo(() => {
-    if (state === 'empty') return [];
     let filtered = orders.filter((o) => monthKey(o.createdAt) === selectedMonth);
     if (activeStatuses.size > 0) {
       filtered = filtered.filter((o) => activeStatuses.has(o.status));
@@ -345,7 +342,7 @@ const OrdersListScreen: React.FC = () => {
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       return sortDir === 'asc' ? diff : -diff;
     });
-  }, [orders, selectedMonth, activeStatuses, sortDir, state]);
+  }, [orders, selectedMonth, activeStatuses, sortDir]);
 
   const monthLabel = selectedMonth
     ? formatMonthLabel(selectedMonth, locale)
@@ -397,6 +394,7 @@ const OrdersListScreen: React.FC = () => {
           <Text type="label" color={Colors.error} center>
             {error}
           </Text>
+          <Button title={t('settings.retry')} onPress={() => { void loadOrders(); }} variant="primary" />
         </View>
       </Screen>
     );

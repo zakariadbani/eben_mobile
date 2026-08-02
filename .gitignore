@@ -94,7 +94,13 @@ memory/
 
 .planning/
 .custom-screenshot-replica/
+/.codex-remote-attachments/
 
 # AI review artifacts
 .grill/
 screenshots/
+.screenshots/
+graphify-out/
+
+# Local Expo integration target (never commit environment-specific URLs)
+.env.local

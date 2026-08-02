@@ -1,78 +1,121 @@
 /**
  * apiClient — the single HTTP abstraction for all EBEN API calls.
- *
- * TODAY: resolves from mock data (imported from src/data/mock/).
- * SWAP POINT: replace `mockRequest` body below with a real `fetch` call against
- * `API_BASE_URL`. Everything above this file (resource functions, interfaces) stays unchanged.
- *
- * Usage:
- *   import { apiClient } from '@/api/client';
- *   const res = await apiClient.get<Category[]>('/categories');
  */
 
-import type { ApiResponse, Paginated, ApiError } from './types';
-import { API_BASE_URL } from './config';
-// Static import — used in mock mode only. When switching to real mode, delete this import.
+import { ApiClientError, type ApiResponse, type Paginated } from './types';
+import { API_BASE_URL, API_MODE } from './config';
 import { mockRegistry } from './mock/registry';
 import { handleGoldenRequest } from './mock/goldenStore';
 
-// ─── Token storage seam ───────────────────────────────────────────────────────
-// Today: in-memory only.
-// TODO: swap to SecureStore (expo-secure-store) when real auth is wired.
-let _authToken: string | null = null;
+export { ApiClientError } from './types';
+
+let authToken: string | null = null;
+let unauthorizedHandler: (() => void) | null = null;
+
+const isFormData = (value: unknown): value is FormData =>
+  typeof FormData !== 'undefined' && value instanceof FormData;
+
+type EnvelopeShape = { success: boolean; message?: unknown; errors?: unknown };
+
+const isEnvelope = (value: unknown): value is EnvelopeShape =>
+  value !== null &&
+  typeof value === 'object' &&
+  !Array.isArray(value) &&
+  'success' in value &&
+  typeof value.success === 'boolean';
+
+function fieldErrors(value: unknown): Record<string, string[]> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return {};
+
+  const valid: Record<string, string[]> = {};
+  for (const [field, messages] of Object.entries(value as Record<string, unknown>)) {
+    if (Array.isArray(messages) && messages.every((message) => typeof message === 'string')) {
+      valid[field] = messages;
+    }
+  }
+  return valid;
+}
+
+function throwRequestError(
+  message: string,
+  status: number | null,
+  errors: Record<string, string[]> = {},
+  requestToken?: string | null,
+): never {
+  if (status === 401 && requestToken !== undefined && requestToken === authToken) {
+    unauthorizedHandler?.();
+  }
+  throw new ApiClientError(message, status, errors);
+}
 
 export const apiClient = {
   setToken(token: string | null): void {
-    _authToken = token;
+    authToken = token;
   },
 
   getToken(): string | null {
-    return _authToken;
+    return authToken;
   },
 
-  /**
-   * Low-level request function.
-   *
-   * MOCK MODE (current): the mock registry intercepts the path and returns typed data.
-   * REAL MODE (future): uncomment the fetch block below and delete the mock block.
-   */
+  setUnauthorizedHandler(handler: (() => void) | null): void {
+    unauthorizedHandler = handler;
+  },
+
   async request<T>(
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     path: string,
     body?: unknown,
   ): Promise<ApiResponse<T> | Paginated<T>> {
-    // ── MOCK MODE ────────────────────────────────────────────────────────────
-    // mockRegistry is statically imported above. Delete that import + this block when
-    // switching to real mode and uncomment the fetch block below.
-    const stateResult = handleGoldenRequest(method, path, body);
-    if (stateResult) {
-      return stateResult as ApiResponse<T> | Paginated<T>;
-    }
-    const key = `${method}:${path}`;
-    const handler = mockRegistry[key] ?? mockRegistry[`${method}:*`];
-    if (handler) {
-      return handler(body) as ApiResponse<T> | Paginated<T>;
-    }
-    // Unregistered mock — return empty success so screens don't crash during dev.
-    console.warn(`[apiClient] No mock registered for ${key}`);
-    return { success: true, data: [] as unknown as T } as ApiResponse<T>;
-    // ── END MOCK MODE ────────────────────────────────────────────────────────
+    if (API_MODE === 'mock') {
+      const stateResult = handleGoldenRequest(method, path, body);
+      if (stateResult) return stateResult as ApiResponse<T> | Paginated<T>;
 
-    // ── REAL MODE (uncomment when backend is live) ───────────────────────────
-    // const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    // if (_authToken) headers['Authorization'] = `Bearer ${_authToken}`;
-    // const res = await fetch(`${API_BASE_URL}${path}`, {
-    //   method,
-    //   headers,
-    //   body: body !== undefined ? JSON.stringify(body) : undefined,
-    // });
-    // const json = (await res.json()) as ApiResponse<T> | Paginated<T> | ApiError;
-    // if (!json.success) {
-    //   const err = json as ApiError;
-    //   throw new Error(err.message ?? 'API error');
-    // }
-    // return json as ApiResponse<T> | Paginated<T>;
-    // ── END REAL MODE ────────────────────────────────────────────────────────
+      const key = `${method}:${path}`;
+      const handler = mockRegistry[key];
+      if (handler) return handler(body) as ApiResponse<T> | Paginated<T>;
+
+      throwRequestError(`No mock registered for ${key}`, null);
+    }
+
+    const formData = isFormData(body);
+    const requestToken = authToken;
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (!formData) headers['Content-Type'] = 'application/json';
+    if (requestToken) headers.Authorization = `Bearer ${requestToken}`;
+
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}${path}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : formData ? body : JSON.stringify(body),
+      });
+    } catch {
+      throwRequestError('Network request failed', null);
+    }
+
+    let json: unknown;
+    try {
+      json = await response.json();
+    } catch {
+      throwRequestError('Invalid API response', response.status, {}, requestToken);
+    }
+
+    if (!isEnvelope(json)) {
+      throwRequestError('Invalid API response', response.status, {}, requestToken);
+    }
+
+    if (!response.ok || !json.success) {
+      const message = typeof json.message === 'string' && json.message ? json.message : 'API request failed';
+      throwRequestError(
+        message,
+        response.status,
+        fieldErrors(json.errors),
+        requestToken,
+      );
+    }
+
+    return json as ApiResponse<T> | Paginated<T>;
   },
 
   async get<T>(path: string): Promise<ApiResponse<T> | Paginated<T>> {

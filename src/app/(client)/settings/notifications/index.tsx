@@ -8,15 +8,15 @@
  * Empty state: illustration + "Vous n'avez pas de notifications".
  */
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
   StyleSheet,
   TouchableOpacity,
   View as RNView,
+  ActivityIndicator,
 } from "react-native";
 import { useTranslation } from "react-i18next";
-import { useLocalSearchParams } from "expo-router";
 
 import Screen from "@/components/common/Screen";
 import { Text } from "@/components/common/Text";
@@ -133,7 +133,7 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
               accessibilityLabel={t("Marquer comme lu")}
             >
               <Text type="small" color={Colors.brand} semiBold>
-                {"Détails"}
+                {t('settings.notifications.details')}
               </Text>
             </TouchableOpacity>
           )}
@@ -155,51 +155,63 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 const NotificationsScreen: React.FC = () => {
-  const { state } = useLocalSearchParams<{ state?: string }>();
+  const { t } = useTranslation();
 
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const activeIds = useRef(new Set<number>());
+  const markingAll = useRef(false);
 
-  const visibleItems = state === "empty" ? [] : items;
+  const visibleItems = items;
   const unreadCount = visibleItems.filter((n) => !n.isRead).length;
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await getNotifications();
       setItems(res.data);
+    } catch {
+      setError(t('settings.notifications.loadError'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   const handleMarkRead = useCallback(async (id: number) => {
+    if (activeIds.current.has(id)) return;
+    activeIds.current.add(id);
+    setMutationError(null);
     try {
-      await markNotificationRead(id);
-      setItems((prev) =>
-        prev.map((n) =>
-          n.id === id ? { ...n, isRead: true, readAt: new Date().toISOString() } : n,
-        ),
-      );
+      const response = await markNotificationRead(id);
+      setItems((prev) => prev.map((item) => item.id === id ? response.data : item));
     } catch {
-      // silent — optimistic UI still applied if the call fails
+      setMutationError(t('settings.notifications.mutationError'));
+    } finally {
+      activeIds.current.delete(id);
     }
-  }, []);
+  }, [t]);
 
   const handleMarkAllRead = useCallback(async () => {
+    if (markingAll.current) return;
+    markingAll.current = true;
+    setMutationError(null);
     try {
       await markAllRead();
-      setItems((prev) =>
-        prev.map((n) => ({ ...n, isRead: true, readAt: new Date().toISOString() })),
-      );
+      const refreshed = await getNotifications();
+      setItems(refreshed.data);
     } catch {
-      // silent
+      setMutationError(t('settings.notifications.mutationError'));
+    } finally {
+      markingAll.current = false;
     }
-  }, []);
+  }, [t]);
 
   return (
     <Screen>
@@ -211,19 +223,25 @@ const NotificationsScreen: React.FC = () => {
       >
         <Icon name="notifications-outline" type="Ionicons" size={22} iconColor={Colors.brand} />
         <Text type="label" semiBold color={Colors.brand} flex>
-          {"Notifications"}
+          {t('settings.notifications.title')}
         </Text>
         {unreadCount > 0 && (
           <TouchableOpacity onPress={handleMarkAllRead} style={styles.markAllBtn}>
             <Text type="small" color={Colors.orange}>
-              {`${unreadCount} non lus`}
+              {t('settings.notifications.unread', { count: unreadCount })}
             </Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {!loading && visibleItems.length === 0 ? (
-        <EmptyListComponent title={"Vous n'avez pas de notifications"} />
+      {mutationError ? <Text accessibilityRole="alert" color={Colors.error} center>{mutationError}</Text> : null}
+      {loading ? <ActivityIndicator size="large" color={Colors.primary} /> : error ? (
+        <View gap={12} alignItems="center">
+          <Text accessibilityRole="alert" color={Colors.error}>{error}</Text>
+          <Button title={t('settings.retry')} onPress={() => { void load(); }} variant="primary" />
+        </View>
+      ) : visibleItems.length === 0 ? (
+        <EmptyListComponent title={t('settings.notifications.empty')} />
       ) : (
         <FlatList
           data={visibleItems}

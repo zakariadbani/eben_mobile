@@ -34,6 +34,16 @@ export interface Basket {
   userId: number;
   /** Source request the basket was built from; null for a standalone basket. */
   requestId: number | null;
+  /** Server-owned item subtotal. Never recompute on-device. */
+  subtotal: number;
+  /** Server-owned voucher discount. Never recompute on-device. */
+  discountAmount: number;
+  /** Server-owned delivery charge. Never recompute on-device. */
+  shippingFee: number;
+  /** Server-owned tax snapshot. Never recompute on-device. */
+  taxAmount: number;
+  /** Server-owned payable total. Never recompute on-device. */
+  total: number;
   createdAt: string;
   updatedAt: string;
   items?: BasketItem[];

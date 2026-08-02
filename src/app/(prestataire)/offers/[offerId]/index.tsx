@@ -41,8 +41,8 @@ import CustomIcon from '@/components/common/CustomIcon';
 import ItemPartnerOfferCard from '@/components/screens/prestataire/ItemPartnerOfferCard';
 import Colors from '@/constants/Colors';
 
-import { getPrestataireOffer, getPrestataireOffers } from '@/api/resources/prestataire';
-import type { Offer } from '@/interfaces/Offer';
+import { getOfferShipment, getPrestataireOffer, getPrestataireOffers } from '@/api/resources/prestataire';
+import type { PrestataireOffer, PrestataireShipment } from '@/interfaces/Offer';
 
 // ── Countdown helper ──────────────────────────────────────────────────────────
 
@@ -96,8 +96,8 @@ const INLINE_STATUS: Record<string, InlineStatus> = {
   },
 };
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-MA', {
+function formatDate(iso: string, locale: string): string {
+  return new Date(iso).toLocaleDateString(locale, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -113,41 +113,57 @@ export default function PrestataireOfferDetailScreen(): React.ReactElement {
 
   const rawParams = useLocalSearchParams();
   const offerId = Number(rawParams.offerId ?? 0);
+  const hasValidOfferId = Number.isSafeInteger(offerId) && offerId > 0;
 
-  const [offer, setOffer] = useState<Offer | null>(null);
+  const [offer, setOffer] = useState<PrestataireOffer | null>(null);
+  const [shipment, setShipment] = useState<PrestataireShipment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [otherOffers, setOtherOffers] = useState<Offer[]>([]);
+  const [otherOffers, setOtherOffers] = useState<PrestataireOffer[]>([]);
 
   // ── Load single offer ────────────────────────────────────────────────────────
 
   const fetchOffer = useCallback(async () => {
     setLoading(true);
     setError(null);
+    if (!hasValidOfferId) {
+      setOffer(null);
+      setShipment(null);
+      setLoading(false);
+      return;
+    }
     try {
-      const res = await getPrestataireOffer(offerId);
+      const [res, shipmentRes] = await Promise.all([
+        getPrestataireOffer(offerId),
+        getOfferShipment(offerId),
+      ]);
       const fetched = res.data;
       if (fetched && !Array.isArray(fetched) && typeof fetched === 'object' && 'id' in fetched) {
-        setOffer(fetched as Offer);
+        setOffer(fetched);
       } else {
         setOffer(null);
       }
+      setShipment(shipmentRes.data);
     } catch {
       setError(t('partner.offerDetail.loadError'));
     } finally {
       setLoading(false);
     }
-  }, [offerId, t]);
+  }, [hasValidOfferId, offerId, t]);
 
   const fetchOtherOffers = useCallback(async () => {
+    if (!hasValidOfferId) {
+      setOtherOffers([]);
+      return;
+    }
     try {
       const res = await getPrestataireOffers();
       setOtherOffers(res.data.filter((o) => o.id !== offerId).slice(0, 6));
     } catch {
       // silent — non-critical
     }
-  }, [offerId]);
+  }, [hasValidOfferId, offerId]);
 
   useEffect(() => {
     fetchOffer();
@@ -184,8 +200,8 @@ export default function PrestataireOfferDetailScreen(): React.ReactElement {
   // ── Derived display values ────────────────────────────────────────────────────
 
   const inlineStatus = INLINE_STATUS[offer.status] ?? INLINE_STATUS['pending']!;
-  const isShipped = Boolean(offer.adminNotes?.toLowerCase().includes('expédi'));
-  const canShip = offer.status === 'selected' && !isShipped;
+  const isShipped = shipment !== null;
+  const canShip = offer.status === 'selected' && offer.shippingEligible && !isShipped;
   const headerTitle = isShipped
     ? 'partner.ship.shippedDetailTitle'
     : offer.status === 'selected'
@@ -276,7 +292,7 @@ export default function PrestataireOfferDetailScreen(): React.ReactElement {
                 partner.offerDetail.condition
               </Text>
               <Text type="small" semiBold color={Colors.brand} translate={false}>
-                {t(offer.availability === 'available' ? 'partner.fill.conditionOccasion' : 'partner.offerDetail.notAvailableLabel')}
+                {t(offer.condition === 'occasion' ? 'partner.fill.conditionOccasion' : 'partner.fill.conditionEnStock')}
               </Text>
             </View>
             <View flexDirection="row" alignItems="center" gap={4}>
@@ -284,7 +300,7 @@ export default function PrestataireOfferDetailScreen(): React.ReactElement {
                 partner.offerDetail.qty
               </Text>
               <Text type="small" semiBold color={Colors.brand} translate={false}>
-                1
+                {offer.quantity}
               </Text>
             </View>
           </View>
@@ -367,7 +383,7 @@ export default function PrestataireOfferDetailScreen(): React.ReactElement {
               partner.offerDetail.date
             </Text>
             <Text type="small" color={Colors.brand} translate={false}>
-              {formatDate(offer.createdAt)}
+              {formatDate(offer.createdAt, isArabic ? 'ar-MA' : 'fr-MA')}
             </Text>
           </View>
         </View>

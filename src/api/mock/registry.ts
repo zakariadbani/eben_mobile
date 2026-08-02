@@ -182,6 +182,7 @@ export const mockRegistry: Record<string, MockHandler> = {
       subtotal: 2996.30,
       discountAmount: 0,
       shippingFee: 0,
+      taxAmount: 0,
       total: 2996.30,
       status: 'confirmed',
       paymentMethod: b.paymentMethod,

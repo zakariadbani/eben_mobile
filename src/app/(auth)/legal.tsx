@@ -1,1 +1,1 @@
-export { default } from "../(client)/settings/pages/Legal";
+export { default } from "@/components/screens/shared/LegalUnavailableScreen";

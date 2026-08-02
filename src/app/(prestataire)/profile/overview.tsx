@@ -17,7 +17,7 @@
  * Data: getPrestataireStats() — PrestataireDashboardStats
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -36,13 +36,19 @@ import CustomIcon from '@/components/common/CustomIcon';
 import Button from '@/components/common/Button';
 import { Screen } from '@/components/common/Screen';
 
-import { getPrestataireStats } from '@/api';
-import type { PrestataireDashboardStats } from '@/interfaces/PrestataireDashboard';
+import {
+  getPrestataireDashboardSeries,
+  getPrestataireStats,
+} from '@/api/resources/prestataire';
+import type {
+  DashboardPeriod,
+  PrestataireDashboardSeries,
+  PrestataireDashboardSeriesBucket,
+  PrestataireDashboardStats,
+} from '@/interfaces/PrestataireDashboard';
 import Colors from '@/constants/Colors';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-type Period = '1j' | '7j' | '1m' | '6m' | '1a' | 'MAX';
 
 type MetricKey =
   | 'offersReceivedCount'
@@ -55,24 +61,25 @@ type MetricKey =
 interface MetricOption {
   key: MetricKey;
   labelKey: string;
+  seriesKey: keyof Omit<PrestataireDashboardSeriesBucket, 'label'>;
 }
 
 const METRIC_OPTIONS: MetricOption[] = [
-  { key: 'offersSentCount',     labelKey: 'partner.overview.metricSent' },
-  { key: 'offersReceivedCount', labelKey: 'partner.overview.metricReceived' },
-  { key: 'offersActiveCount',   labelKey: 'partner.overview.metricActive' },
-  { key: 'offersAcceptedCount', labelKey: 'partner.overview.metricAccepted' },
-  { key: 'revenue30d',          labelKey: 'partner.overview.metricRevenue' },
-  { key: 'pendingPayout',       labelKey: 'partner.overview.metricPayout' },
+  { key: 'offersSentCount', labelKey: 'partner.overview.metricSent', seriesKey: 'offersSent' },
+  { key: 'offersReceivedCount', labelKey: 'partner.overview.metricReceived', seriesKey: 'offersReceived' },
+  { key: 'offersActiveCount', labelKey: 'partner.overview.metricActive', seriesKey: 'offersActive' },
+  { key: 'offersAcceptedCount', labelKey: 'partner.overview.metricAccepted', seriesKey: 'offersAccepted' },
+  { key: 'revenue30d', labelKey: 'partner.overview.metricRevenue', seriesKey: 'revenue' },
+  { key: 'pendingPayout', labelKey: 'partner.overview.metricPayout', seriesKey: 'pendingPayout' },
 ];
 
-const PERIODS: { key: Period; labelKey: string }[] = [
+const PERIODS: { key: DashboardPeriod; labelKey: string }[] = [
   { key: '1j',  labelKey: 'partner.overview.period1d' },
   { key: '7j',  labelKey: 'partner.overview.period7d' },
   { key: '1m',  labelKey: 'partner.overview.period1m' },
   { key: '6m',  labelKey: 'partner.overview.period6m' },
   { key: '1a',  labelKey: 'partner.overview.period1y' },
-  { key: 'MAX', labelKey: 'partner.overview.periodMax' },
+  { key: 'max', labelKey: 'partner.overview.periodMax' },
 ];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -157,24 +164,46 @@ export default function OverviewScreen(): React.ReactElement {
   const router = useRouter();
 
   const [stats, setStats] = useState<PrestataireDashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [dashboardSeries, setDashboardSeries] = useState<PrestataireDashboardSeries | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [seriesLoading, setSeriesLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(false);
-  const [activePeriod, setActivePeriod] = useState<Period>('7j');
+  const [statsError, setStatsError] = useState(false);
+  const [seriesError, setSeriesError] = useState(false);
+  const [activePeriod, setActivePeriod] = useState<DashboardPeriod>('7j');
   const [activeMetric, setActiveMetric] = useState<MetricKey>('offersSentCount');
   const [metricMenuOpen, setMetricMenuOpen] = useState(false);
+  const seriesRequestGeneration = useRef(0);
 
   const loadStats = useCallback(async (isRefresh = false) => {
     try {
-      if (!isRefresh) setLoading(true);
-      setError(false);
+      if (!isRefresh) setStatsLoading(true);
+      setStatsError(false);
       const res = await getPrestataireStats();
-      if (res.data) setStats(res.data);
+      setStats(res.data);
     } catch {
-      setError(true);
+      setStatsError(true);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      setStatsLoading(false);
+    }
+  }, []);
+
+  const loadSeries = useCallback(async (period: DashboardPeriod, isRefresh = false) => {
+    const generation = ++seriesRequestGeneration.current;
+    try {
+      if (!isRefresh) {
+        setDashboardSeries(null);
+        setSeriesLoading(true);
+      }
+      setSeriesError(false);
+      const res = await getPrestataireDashboardSeries(period);
+      if (generation !== seriesRequestGeneration.current) return;
+      setDashboardSeries(res.data);
+    } catch {
+      if (generation !== seriesRequestGeneration.current) return;
+      setSeriesError(true);
+    } finally {
+      if (generation === seriesRequestGeneration.current) setSeriesLoading(false);
     }
   }, []);
 
@@ -182,32 +211,27 @@ export default function OverviewScreen(): React.ReactElement {
     void loadStats();
   }, [loadStats]);
 
+  useEffect(() => {
+    void loadSeries(activePeriod);
+  }, [activePeriod, loadSeries]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    void loadStats(true);
-  }, [loadStats]);
+    void Promise.allSettled([loadStats(true), loadSeries(activePeriod, true)])
+      .finally(() => setRefreshing(false));
+  }, [activePeriod, loadSeries, loadStats]);
 
   // ── Derived values ──────────────────────────────────────────────────────────
 
   const currentMetricOption = METRIC_OPTIONS.find((m) => m.key === activeMetric)!;
-  const currentValue = stats ? stats[activeMetric] : 0;
+  const chartValues = dashboardSeries?.buckets.map(
+    (bucket) => bucket[currentMetricOption.seriesKey],
+  ) ?? [];
+  const currentValue = chartValues[chartValues.length - 1] ?? 0;
   const isMonetary = activeMetric === 'revenue30d' || activeMetric === 'pendingPayout';
 
   const formatValue = (v: number) =>
     isMonetary ? `${v.toLocaleString('fr-MA')} MAD` : v.toString();
-
-  // Mock chart data derived from the single stat (real API would return time-series)
-  const chartValues = stats
-    ? [
-        Math.round(currentValue * 0.72),
-        Math.round(currentValue * 0.81),
-        Math.round(currentValue * 0.78),
-        Math.round(currentValue * 0.85),
-        Math.round(currentValue * 0.92),
-        Math.round(currentValue * 0.88),
-        currentValue,
-      ]
-    : [];
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -227,35 +251,6 @@ export default function OverviewScreen(): React.ReactElement {
       </View>
     </CustomHeader>
   );
-
-  if (loading) {
-    return (
-      <Screen whatsapp={false}>
-        {headerWithBell}
-        <View flex alignItems="center" justifyContent="center">
-          <ActivityIndicator color={Colors.primary} size="large" />
-        </View>
-      </Screen>
-    );
-  }
-
-  if (error) {
-    return (
-      <Screen whatsapp={false}>
-        {headerWithBell}
-        <View flex alignItems="center" justifyContent="center" p={24}>
-          <Text type="label" color={Colors.grayMidDark} center>
-            {t('partner.overview.loadError')}
-          </Text>
-          <Button
-            title={t('partner.overview.retry')}
-            onPress={() => loadStats()}
-            style={styles.retryBtn}
-          />
-        </View>
-      </Screen>
-    );
-  }
 
   return (
     <Screen whatsapp={false} scrollable={false}>
@@ -318,10 +313,24 @@ export default function OverviewScreen(): React.ReactElement {
             </View>
           ) : null}
 
-          {/* Big count */}
-          <Text type="title" bold color={Colors.brand} translate={false}>
-            {formatValue(currentValue)}
-          </Text>
+          {seriesLoading && !dashboardSeries ? (
+            <ActivityIndicator color={Colors.primary} />
+          ) : seriesError ? (
+            <View alignItems="center" gap={8}>
+              <Text type="label" color={Colors.grayMidDark} center>
+                {t('partner.overview.seriesLoadError')}
+              </Text>
+              <Button
+                title={t('partner.overview.seriesRetry')}
+                fit
+                onPress={() => void loadSeries(activePeriod)}
+              />
+            </View>
+          ) : (
+            <Text type="title" bold color={Colors.brand} translate={false}>
+              {formatValue(currentValue)}
+            </Text>
+          )}
           <Text type="small" color={Colors.gray}>
             {t('partner.overview.dateRange')}
           </Text>
@@ -352,11 +361,25 @@ export default function OverviewScreen(): React.ReactElement {
 
         {/* ── Chart ── */}
         <View style={styles.chartWrapper}>
-          <MiniChart values={chartValues} />
+          {seriesError ? <View style={styles.chartPlaceholder} /> : <MiniChart values={chartValues} />}
         </View>
 
         {/* ── KPI grid ── */}
-        {stats ? (
+        {statsLoading && !stats ? (
+          <ActivityIndicator color={Colors.primary} style={styles.statsLoader} />
+        ) : statsError ? (
+          <View alignItems="center" p={24}>
+            <Text type="label" color={Colors.grayMidDark} center>
+              {t('partner.overview.loadError')}
+            </Text>
+            <Button
+              title={t('partner.overview.retry')}
+              fit
+              onPress={() => void loadStats()}
+              style={styles.retryBtn}
+            />
+          </View>
+        ) : stats ? (
           <View style={styles.kpiGrid}>
             <View flexDirection="row" gap={12} style={styles.kpiRow}>
               <View flex>
@@ -520,5 +543,8 @@ const styles = StyleSheet.create({
   },
   retryBtn: {
     marginTop: 16,
+  },
+  statsLoader: {
+    marginVertical: 32,
   },
 });

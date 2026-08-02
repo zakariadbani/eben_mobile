@@ -20,7 +20,7 @@
  *   - ItemProductCardComponent.tsx (home carousel card onPress)
  */
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -41,8 +41,10 @@ import CustomModal from "@/components/common/CustomModal";
 import Icon from "@/components/common/Icon";
 import Colors from "@/constants/Colors";
 
-import { getProduct, addToBasket, addToWishlist } from "@/api";
+import { getProduct, addToBasket, addToWishlist, getWishlist, removeWishlistItem } from "@/api";
+import { Role, useSession } from "@/context/AuthContext";
 import type { Product } from "@/interfaces/Product";
+import type { Basket } from "@/interfaces/Basket";
 
 // ── Quantity stepper (inline — no dep on the shared Stepper which is progress steps) ──
 
@@ -174,12 +176,13 @@ type LoadState = "loading" | "success" | "error";
 const ProductDetailScreen: React.FC = () => {
   const router = useRouter();
   const { t, i18n } = useTranslation();
+  const { role } = useSession();
   const isArabic = i18n.language === "ar";
 
   const rawParams = useLocalSearchParams();
-  const productId = Number(
-    typeof rawParams.productId === "string" ? rawParams.productId : 0
-  );
+  const rawProductId = typeof rawParams.productId === "string" ? rawParams.productId : "";
+  const productId = /^\d+$/.test(rawProductId) ? Number(rawProductId) : Number.NaN;
+  const validProductId = Number.isSafeInteger(productId) && productId > 0;
   const requestedState = typeof rawParams.state === "string" ? rawParams.state : null;
 
   // ── State ────────────────────────────────────────────────────────────────────
@@ -187,54 +190,106 @@ const ProductDetailScreen: React.FC = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [qty, setQty] = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
+  const [wishlistItemId, setWishlistItemId] = useState<number | null>(null);
+  const [basketAfterAdd, setBasketAfterAdd] = useState<Basket | null>(null);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [addToBasketLoading, setAddToBasketLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [showPurchaseModal, setShowPurchaseModal] = useState(requestedState === "purchase");
   const [showSuccessModal, setShowSuccessModal] = useState(requestedState === "success");
+  const basketMutation = useRef(false);
+  const wishlistMutation = useRef(false);
 
   // ── Load product ─────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!productId) {
+  const load = useCallback(async () => {
+    if (!validProductId) {
+      setProduct(null);
       setLoadState("error");
       return;
     }
     setLoadState("loading");
-    getProduct(productId)
-      .then((res) => {
-        if (res.success && res.data) {
-          setProduct(res.data as Product);
-          setLoadState("success");
-        } else {
-          setLoadState("error");
+    try {
+      const response = await getProduct(productId);
+      setProduct(response.data);
+      if (role === Role.CLIENT) {
+        try {
+          const wishlist = await getWishlist();
+          const existing = wishlist.data.find((item) => item.categoryId === response.data.categoryId);
+          setWishlistItemId(existing?.id ?? null);
+          setWishlisted(existing !== undefined);
+        } catch {
+          setActionError(t("auth.error.generic"));
         }
-      })
-      .catch(() => setLoadState("error"));
-  }, [productId]);
+      }
+      setLoadState("success");
+    } catch {
+      setProduct(null);
+      setLoadState("error");
+    }
+  }, [productId, role, t, validProductId]);
+
+  useEffect(() => { void load(); }, [load]);
 
   // ── Actions ──────────────────────────────────────────────────────────────────
 
   const handleAddToBasket = useCallback(async () => {
-    if (!product || addToBasketLoading) return;
+    if (!product || basketMutation.current) return;
+    if (role !== Role.CLIENT) {
+      router.push("/(auth)/ClientLoginScreen" as Href);
+      return;
+    }
+    basketMutation.current = true;
+    setActionError(null);
     setAddToBasketLoading(true);
     try {
-      await addToBasket(product.id, qty);
+      const response = await addToBasket(product.id, qty);
+      setBasketAfterAdd(response.data);
       setShowPurchaseModal(false);
       setShowSuccessModal(true);
+    } catch {
+      setActionError(t("auth.error.generic"));
     } finally {
       setAddToBasketLoading(false);
+      basketMutation.current = false;
     }
-  }, [product, qty, addToBasketLoading]);
+  }, [product, qty, role, router, t]);
 
   const handleWishlist = useCallback(async () => {
-    if (!product || wishlistLoading) return;
+    if (!product || wishlistMutation.current) return;
+    if (role !== Role.CLIENT) {
+      router.push("/(auth)/ClientLoginScreen" as Href);
+      return;
+    }
+    wishlistMutation.current = true;
+    setActionError(null);
     setWishlistLoading(true);
     try {
-      await addToWishlist(product.id);
-      setWishlisted(true);
+      if (wishlistItemId !== null) {
+        const response = await removeWishlistItem(wishlistItemId);
+        if (response.data.id === wishlistItemId) {
+          setWishlistItemId(null);
+          setWishlisted(false);
+        }
+      } else {
+        const response = await addToWishlist(product.id);
+        setWishlistItemId(response.data.id);
+        setWishlisted(true);
+      }
+    } catch {
+      setActionError(t("auth.error.generic"));
     } finally {
       setWishlistLoading(false);
+      wishlistMutation.current = false;
     }
-  }, [product, wishlistLoading]);
+  }, [product, wishlistItemId, role, router, t]);
+
+  const openPurchase = useCallback(() => {
+    if (role !== Role.CLIENT) {
+      router.push("/(auth)/ClientLoginScreen" as Href);
+      return;
+    }
+    setShowPurchaseModal(true);
+  }, [role, router]);
 
   const handleReviewsPress = useCallback(() => {
     router.push({
@@ -269,13 +324,13 @@ const ProductDetailScreen: React.FC = () => {
     return (
       <Screen padding>
         <View flex style={styles.centered}>
-          <Text type="default" color={Colors.gray}>
-            {t("Produit introuvable")}
+          <Text type="default" color={Colors.gray} accessibilityRole="alert">
+            {t("auth.error.generic")}
           </Text>
           <Button
-            title={t("Retour")}
+            title={t("reviews.retry")}
             variant="primary"
-            onPress={() => router.back()}
+            onPress={() => void load()}
             style={styles.errorBackBtn}
             fit
           />
@@ -303,7 +358,7 @@ const ProductDetailScreen: React.FC = () => {
         {/* ── Gallery ─────────────────────────────────────────── */}
         <View style={styles.gallery}>
           <Image
-            source={require("@/assets/img/freins.png")}
+            source={product.images[0] ? { uri: product.images[0] } : require("@/assets/img/freins.png")}
             style={styles.galleryImage}
             resizeMode="contain"
           />
@@ -475,6 +530,11 @@ const ProductDetailScreen: React.FC = () => {
       </ScrollView>
 
       {/* ── Sticky bottom action bar ─────────────────────────── */}
+      {actionError ? (
+        <Text style={styles.actionError} accessibilityRole="alert" translate={false}>
+          {actionError}
+        </Text>
+      ) : null}
       <View style={styles.stickyBar}>
         {/* Wishlist heart */}
         <TouchableOpacity
@@ -512,7 +572,7 @@ const ProductDetailScreen: React.FC = () => {
                   : t("Ajouter au panier")
               }
               variant="primary"
-              onPress={() => setShowPurchaseModal(true)}
+              onPress={openPurchase}
               style={styles.addBtn}
               rightIcon={isOccasion ? undefined : "shopping-cart"}
               iconTypeName="FontAwesome5"
@@ -575,8 +635,13 @@ const ProductDetailScreen: React.FC = () => {
                 {isArabic ? product.titleAr : product.title}
               </Text>
               <Text type="small" color={Colors.gray} translate={false}>
-                {`${t("Qté")} : ${qty}  ·  ${(activePrice * qty).toLocaleString("fr-MA")} Dhs`}
+                {`${t("Qté")} : ${qty}`}
               </Text>
+              {basketAfterAdd ? (
+                <Text testID="product-basket-total" type="small" color={Colors.gray} translate={false}>
+                  {`${basketAfterAdd.total.toLocaleString("fr-MA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Dhs`}
+                </Text>
+              ) : null}
             </>
           )}
         </View>
@@ -592,6 +657,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 0 },
   centered: { justifyContent: "center", alignItems: "center" },
   errorBackBtn: { marginTop: 16, width: 160 },
+  actionError: { color: Colors.red, textAlign: "center", padding: 8 },
   gallery: {
     height: 220,
     backgroundColor: Colors.white,

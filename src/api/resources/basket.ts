@@ -12,6 +12,12 @@ import { apiClient } from '../client';
 import type { ApiResponse } from '../types';
 import type { Basket } from '@/interfaces/Basket';
 
+function requirePositiveInteger(value: number, name: string): void {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new TypeError(`${name} must be a positive integer`);
+  }
+}
+
 /**
  * Fetch the current user's basket (with items eager-loaded).
  */
@@ -30,6 +36,8 @@ export async function addToBasket(
   productId: number,
   quantity: number = 1,
 ): Promise<ApiResponse<Basket>> {
+  requirePositiveInteger(productId, 'productId');
+  requirePositiveInteger(quantity, 'quantity');
   return apiClient.post<Basket>('/basket/items', { productId, quantity });
 }
 
@@ -48,7 +56,9 @@ export interface CouponResult {
 export async function applyCoupon(
   code: string,
 ): Promise<ApiResponse<CouponResult>> {
-  return apiClient.post<CouponResult>('/basket/coupon', { code });
+  const normalizedCode = code.trim();
+  if (!normalizedCode) throw new TypeError('code must not be empty');
+  return apiClient.post<CouponResult>('/basket/coupon', { code: normalizedCode });
 }
 
 /**
@@ -62,6 +72,8 @@ export async function updateBasketItem(
   itemId: number,
   quantity: number,
 ): Promise<ApiResponse<Basket>> {
+  requirePositiveInteger(itemId, 'itemId');
+  requirePositiveInteger(quantity, 'quantity');
   return apiClient.put<Basket>(`/basket/items/${itemId}`, { quantity });
 }
 
@@ -73,5 +85,6 @@ export async function updateBasketItem(
 export async function removeBasketItem(
   itemId: number,
 ): Promise<ApiResponse<Basket>> {
+  requirePositiveInteger(itemId, 'itemId');
   return apiClient.del<Basket>(`/basket/items/${itemId}`);
 }

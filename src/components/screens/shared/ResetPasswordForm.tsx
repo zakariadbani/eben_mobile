@@ -1,12 +1,10 @@
 import React from "react";
 import { StyleSheet } from "react-native";
-import {
-  Form,
-  FormField,
-  FormSubmit,
-} from "@/components/common/forms";
-import { useGlobalValidation } from "@/helpers/validationHelper";
+import { useTranslation } from "react-i18next";
+import { Form, FormField, FormSubmit } from "@/components/common/forms";
 import { Text } from "@/components/common/Text";
+import Colors from "@/constants/Colors";
+import { useGlobalValidation } from "@/helpers/validationHelper";
 
 interface FormValues {
   password: string;
@@ -15,70 +13,76 @@ interface FormValues {
 
 interface ResetPasswordFormProps {
   onSubmit: (values: FormValues) => Promise<void>;
+  error?: string | null;
 }
 
-const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ onSubmit }) => {
+const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({
+  onSubmit,
+  error,
+}) => {
   const { createValidationSchema } = useGlobalValidation();
-
-  const initialValues: FormValues = {
-    password: "",
-    passwordConfirmation: "",
-  };
-
+  const { t } = useTranslation();
   const validationSchema = createValidationSchema([
     {
       name: "password",
-      rules: ["required", "min:6"],
-      label: "Mot de passe",
-      errorMessages: {
-        min: "Le mot de passe doit au moins contenir 6 caractères",
-      },
+      rules: ["required", "min:8"],
+      label: "auth.fields.password",
+      errorMessages: { min: t("auth.recovery.passwordLength") },
     },
     {
       name: "passwordConfirmation",
-      rules: ["required", "oneOf"], // Note the use of oneOf here
-      label: "Confirmation du mot de passe",
-      refField: "password", // Reference to the password field
+      rules: ["required", "oneOf"],
+      label: "auth.fields.passwordConfirmation",
+      refField: "password",
       errorMessages: {
-        required: "Vous devez confirmer votre mot de passe",
-        oneOf: "Les mots de passe doivent correspondre", // Custom error message for oneOf
+        required: t("auth.recovery.passwordConfirmationRequired"),
+        oneOf: t("auth.recovery.passwordMismatch"),
       },
     },
   ]);
+
   return (
     <Form
-      initialValues={initialValues}
+      initialValues={{ password: "", passwordConfirmation: "" }}
       onSubmit={onSubmit}
       validationSchema={validationSchema}
     >
       <Text style={styles.subTitle} type="loginDefault" center bold>
-        Saisissez votre nouveau mot de passe
+        auth.recovery.newPasswordInstructions
       </Text>
       <FormField
-        label="Mot de passe"
+        label="auth.fields.password"
         autoCapitalize="none"
         name="password"
         placeholder="••••••"
         secureTextEntry
         textContentType="password"
-        variant={"secondary"}
+        variant="secondary"
         hidePasswordToggle
         textStyle={styles.inputText}
         labelStyle={styles.fieldLabel}
       />
       <FormField
-        label="Répéter le mot de passe"
+        label="auth.fields.passwordConfirmation"
         autoCapitalize="none"
         name="passwordConfirmation"
         placeholder="••••••"
         secureTextEntry
         textContentType="password"
-        variant={"secondary"}
+        variant="secondary"
         hidePasswordToggle
         textStyle={styles.inputText}
         labelStyle={styles.fieldLabel}
       />
-      <FormSubmit title="Confirmer" />
+      {error ? (
+        <Text style={styles.error} accessibilityRole="alert">
+          {error}
+        </Text>
+      ) : null}
+      <FormSubmit
+        title="auth.recovery.confirm"
+        submittingTitle="auth.recovery.confirming"
+      />
     </Form>
   );
 };
@@ -93,6 +97,11 @@ const styles = StyleSheet.create({
   },
   inputText: {
     fontSize: 15,
+  },
+  error: {
+    color: Colors.errorInbackgroundBrand,
+    marginBottom: 12,
+    textAlign: "center",
   },
 });
 

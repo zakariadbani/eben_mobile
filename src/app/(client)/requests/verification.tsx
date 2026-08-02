@@ -1,147 +1,116 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { ScrollView, StyleSheet } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, ScrollView, StyleSheet } from "react-native";
 import { Href, useLocalSearchParams, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
+import Screen from "@/components/common/Screen";
 import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
 import Button from "@/components/common/Button";
 import Colors from "@/constants/Colors";
 import type { Request } from "@/interfaces/Request";
 import { getRequest, sendRequest } from "@/api/resources/requests";
-import RequestListScreen from "./index";
+
+function positiveId(value: string | undefined): number | null {
+  if (!value || !/^\d+$/.test(value)) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
 
 export default function VerificationScreen() {
   const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === "ar";
   const router = useRouter();
-  const { requestId: rawRequestId, reference = "" } = useLocalSearchParams<{ requestId?: string; reference?: string }>();
-  const requestId = Number(rawRequestId ?? 0);
+  const params = useLocalSearchParams<{ requestId?: string }>();
+  const requestId = positiveId(params.requestId);
+  const sendingRef = useRef(false);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [request, setRequest] = useState<Request | null>(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(false);
-  const [request, setRequest] = useState<Request | null>(null);
 
-  useEffect(() => {
-    if (!requestId) return;
-    getRequest(requestId).then((result) => setRequest(result.data)).catch(() => setRequest(null));
+  const load = useCallback(async () => {
+    if (requestId === null) { setState("error"); return; }
+    setState("loading");
+    try {
+      const response = await getRequest(requestId);
+      setRequest(response.data);
+      setState("ready");
+    } catch {
+      setState("error");
+    }
   }, [requestId]);
 
-  const handleSend = useCallback(async () => {
-    if (sending) return;
+  useEffect(() => { void load(); }, [load]);
+
+  const send = async () => {
+    if (sendingRef.current || requestId === null || !request) return;
+    sendingRef.current = true;
     setSending(true);
     setSendError(false);
     try {
-      if (!requestId) throw new Error("Invalid request");
-      const result = await sendRequest(requestId);
-      router.replace({ pathname: "/(client)/requests/success", params: { reference: reference || result.data.reference } } as Href);
+      const response = await sendRequest(requestId);
+      router.replace({
+        pathname: "/(client)/requests/success",
+        params: { requestId: String(response.data.id) },
+      } as Href);
     } catch {
       setSendError(true);
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
-  }, [reference, requestId, router, sending]);
+  };
+
+  if (state === "loading") {
+    return <Screen><View flex style={styles.centered}><ActivityIndicator color={Colors.primary} /></View></Screen>;
+  }
+  if (state === "error" || !request) {
+    return (
+      <Screen padding>
+        <View flex style={styles.centered} gap={12}>
+          <Text accessibilityRole="alert">{requestId === null ? "requestFlow.invalidRoute" : "requestFlow.requestNotFound"}</Text>
+          {requestId !== null ? <Button title="requestFlow.retry" onPress={() => void load()} /> : null}
+          <Button title="requestFlow.back" variant="white" onPress={router.back} />
+        </View>
+      </Screen>
+    );
+  }
 
   return (
-    <View style={styles.root}>
-      <RequestListScreen />
-      <View style={styles.scrim} />
-      <View style={styles.sheet}>
-        <View style={styles.handle} />
-        <ScrollView contentContainerStyle={styles.content}>
-          {(request?.items ?? []).map((item) => (
-            <View key={item.id} style={styles.item}>
-              <Text semiBold translate={false}>{`${item.quantity}x`}</Text>
-              <Text semiBold translate={false} style={styles.itemTitle}>
-                {isArabic ? item.categoryTitleAr ?? item.categoryTitle : item.categoryTitle}
-              </Text>
-            </View>
-          ))}
-          <Text type="headerTitle" semiBold style={styles.commentTitle}>
-            Commentaire:
-          </Text>
-          <Text style={styles.comment} translate={false}>
-            {request?.notes ?? "—"}
-          </Text>
-        </ScrollView>
-        <View style={styles.actionBar}>
-          {sendError ? (
-            <Text type="small" color={Colors.error} center style={styles.sendError}>
-              {t("Une erreur est survenue. Veuillez réessayer.")}
+    <Screen>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text type="headerTitle" semiBold>requestFlow.verificationTitle</Text>
+        <Text type="small" color={Colors.gray} style={styles.reference}>
+          {t("requestFlow.requestReference", { reference: request.reference })}
+        </Text>
+        {(request.items ?? []).map((item) => (
+          <View key={item.id} style={styles.item}>
+            <Text semiBold translate={false}>
+              {i18n.language === "ar" ? item.categoryTitleAr ?? item.categoryTitle : item.categoryTitle}
             </Text>
-          ) : null}
-          <Button
-            title="Non, modifier"
-            variant="pink"
-            rightIcon="pen"
-            iconType="custom"
-            style={styles.button}
-            onPress={router.back}
-          />
-          <Button
-            title="Oui, Envoyez"
-            disabled={sending}
-            variant="green"
-            rightIcon="send"
-            iconType="custom"
-            style={styles.button}
-            onPress={handleSend}
-          />
+            <Text type="small" color={Colors.gray}>
+              {t("requestFlow.quantity", { count: item.quantity })}
+            </Text>
+          </View>
+        ))}
+        <Text semiBold style={styles.commentTitle}>requestFlow.comment</Text>
+        <Text translate={false}>{request.notes ?? t("requestFlow.noComment")}</Text>
+      </ScrollView>
+      <View style={styles.actions} gap={10}>
+        {sendError ? <Text accessibilityRole="alert" color={Colors.error}>requestFlow.sendError</Text> : null}
+        <View flexDirection="row" gap={10}>
+          <Button flex title="requestFlow.edit" variant="pink" disabled={sending} onPress={router.back} />
+          <Button flex title={sending ? "requestFlow.sending" : "requestFlow.send"} disabled={sending} onPress={() => void send()} />
         </View>
       </View>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  scrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.7)",
-  },
-  sheet: {
-    position: "absolute",
-    top: 100,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    overflow: "hidden",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    backgroundColor: Colors.white,
-  },
-  handle: {
-    alignSelf: "center",
-    width: 120,
-    height: 5,
-    borderRadius: 3,
-    marginTop: 10,
-    marginBottom: 10,
-    backgroundColor: Colors.grayDark,
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingBottom: 110,
-  },
-  item: {
-    alignItems: "flex-start",
-    gap: 6,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.greyLight2,
-  },
-  itemTitle: { fontFamily: "BarlowCondensedSemiBold" },
-  commentTitle: { marginTop: 14, marginBottom: 8 },
-  comment: { fontSize: 16, lineHeight: 20 },
-  actionBar: {
-    position: "absolute",
-    right: 0,
-    bottom: 0,
-    left: 0,
-    flexDirection: "row",
-    gap: 16,
-    padding: 16,
-    backgroundColor: Colors.white,
-    elevation: 8,
-  },
-  button: { flex: 1 },
-  sendError: { position: "absolute", top: -24, left: 16, right: 16 },
+  centered: { alignItems: "center", justifyContent: "center" },
+  content: { padding: 16, paddingBottom: 120 },
+  reference: { marginTop: 4, marginBottom: 16 },
+  item: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  commentTitle: { marginTop: 20, marginBottom: 6 },
+  actions: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 16, backgroundColor: Colors.white },
 });

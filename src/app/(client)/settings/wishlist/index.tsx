@@ -6,9 +6,9 @@
  * the product/category detail on tap.
  */
 
-import React, { useCallback, useEffect, useState } from "react";
-import { FlatList, StyleSheet, View as RNView } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, FlatList, StyleSheet, View as RNView } from "react-native";
+import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import Screen from "@/components/common/Screen";
@@ -22,6 +22,7 @@ import { getWishlist, removeWishlistItem } from "@/api";
 import type { WishlistItem } from "@/interfaces/Wishlist";
 import Colors from "@/constants/Colors";
 import Icon from "@/components/common/Icon";
+import Button from "@/components/common/Button";
 
 // ─── Mapper ──────────────────────────────────────────────────────────────────
 
@@ -42,36 +43,44 @@ function toSubCategoryItem(w: WishlistItem): SubCategoryItem {
 const WishlistScreen: React.FC = () => {
   const { t } = useTranslation();
   const router = useRouter();
-  const { state } = useLocalSearchParams<{ state?: string }>();
 
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const visibleItems = state === "empty" ? [] : items;
+  const [error, setError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const removingIds = useRef(new Set<number>());
+  const visibleItems = items;
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await getWishlist();
       setItems(res.data);
+    } catch {
+      setError(t('settings.wishlist.loadError'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   const handleRemove = useCallback(async (wishlistItemId: number) => {
-    // Optimistic removal
-    setItems((prev) => prev.filter((w) => w.id !== wishlistItemId));
+    if (removingIds.current.has(wishlistItemId)) return;
+    removingIds.current.add(wishlistItemId);
+    setMutationError(null);
     try {
-      await removeWishlistItem(wishlistItemId);
+      const response = await removeWishlistItem(wishlistItemId);
+      setItems((prev) => prev.filter((item) => item.id !== response.data.id));
     } catch {
-      // If it fails, reload to restore correct state
-      void load();
+      setMutationError(t('settings.wishlist.removeError'));
+    } finally {
+      removingIds.current.delete(wishlistItemId);
     }
-  }, [load]);
+  }, [t]);
 
   const handleNavigate = useCallback(
     (item: WishlistItem) => {
@@ -92,18 +101,24 @@ const WishlistScreen: React.FC = () => {
       >
         <Icon name="heart-outline" type="Ionicons" size={22} iconColor={Colors.brand} />
         <Text type="label" semiBold color={Colors.brand} flex>
-          {"Ma liste de souhaits"}
+          {t('settings.wishlist.title')}
         </Text>
         <Text type="small" color={Colors.gray} translate={false}>
           {`${visibleItems.length} ${t("article(s)")}`}
         </Text>
       </View>
 
-      {!loading && visibleItems.length === 0 ? (
+      {mutationError ? <Text accessibilityRole="alert" color={Colors.error} center>{mutationError}</Text> : null}
+      {loading ? <ActivityIndicator size="large" color={Colors.primary} /> : error ? (
+        <View gap={12} alignItems="center">
+          <Text accessibilityRole="alert" color={Colors.error}>{error}</Text>
+          <Button title={t('settings.retry')} onPress={() => { void load(); }} variant="primary" />
+        </View>
+      ) : visibleItems.length === 0 ? (
         <EmptyListComponent
-          title={"La liste est vide"}
+          title={t('settings.wishlist.empty')}
           actionButton={{
-            title: "Explorer les produits",
+            title: t('settings.wishlist.explore'),
             variant: "primary",
             navigateTo: "/(client)",
           }}

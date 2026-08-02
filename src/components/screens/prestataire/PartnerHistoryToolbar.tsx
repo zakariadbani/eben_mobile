@@ -45,11 +45,7 @@ export default function PartnerHistoryToolbar({
         <Text type="subTitle" semiBold color={Colors.brand} translate={false} flex>
           {monthLabel}
         </Text>
-        <Icon name="chevron-down" type="Feather" size={22} iconColor={Colors.brand} />
-        <Icon name="arrow-up" type="Feather" size={25} iconColor={Colors.brand} />
-        <Icon name="arrow-down" type="Feather" size={25} iconColor={Colors.brand} />
         <View style={styles.filterBlock}>
-          <Icon name="filter" type="Feather" size={24} iconColor={Colors.brand} />
           <Text type="label" semiBold color={Colors.greenDark} translate={false}>
             {`(${count})`}
           </Text>
@@ -90,7 +86,7 @@ const styles = StyleSheet.create({
   controls: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 18,
+    gap: 8,
   },
   rowRtl: {
     flexDirection: "row-reverse",

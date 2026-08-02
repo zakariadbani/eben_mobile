@@ -26,8 +26,8 @@ export interface PaginationMeta {
   perPage: number;
   currentPage: number;
   lastPage: number;
-  from: number;
-  to: number;
+  from: number | null;
+  to: number | null;
 }
 
 /** Error envelope (success: false). */
@@ -35,4 +35,15 @@ export interface ApiError {
   success: false;
   message: string;
   errors?: Record<string, string[]>;
+}
+
+export class ApiClientError extends Error {
+  constructor(
+    message: string,
+    readonly status: number | null = null,
+    readonly errors: Record<string, string[]> = {},
+  ) {
+    super(message);
+    this.name = 'ApiClientError';
+  }
 }

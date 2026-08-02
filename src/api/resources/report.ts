@@ -29,10 +29,21 @@ export interface ReportConfirmation {
 export async function reportAbuse(
   productId: number,
   reason: ProductReportReason,
-  details?: string,
+  details: string | undefined,
+  contactEmail: string,
+  acceptedTerms: true,
 ): Promise<ApiResponse<ReportConfirmation>> {
+  if (!Number.isSafeInteger(productId) || productId < 1) {
+    throw new TypeError('productId must be a positive integer');
+  }
+  if (contactEmail.trim().length === 0) {
+    throw new TypeError('contactEmail must not be blank');
+  }
+  if (acceptedTerms !== true) {
+    throw new TypeError('acceptedTerms must be true');
+  }
   return apiClient.post<ReportConfirmation>(
     `/products/${productId}/reports`,
-    { reason, details: details ?? null },
+    { reason, details: details ?? null, contactEmail: contactEmail.trim(), acceptedTerms },
   );
 }

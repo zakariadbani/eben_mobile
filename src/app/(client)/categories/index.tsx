@@ -8,8 +8,8 @@
  * /(client)/categories/[categoryId] with the selected condition as a param.
  */
 
-import React, { useEffect, useState } from "react";
-import { FlatList, Image, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, FlatList, Image, StyleSheet, TouchableOpacity, View as RNView } from "react-native";
 import { useRouter } from "expo-router";
 import type { Href } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -18,8 +18,10 @@ import Screen from "@/components/common/Screen";
 import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
 import PubPlacerDemandeBlockComponent from "@/components/screens/shared/app/PubPlacerDemandeBlockComponent";
+import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
 import Colors from "@/constants/Colors";
-import { mockCategoriesLevel1 } from "@/api/mock/mockCategories";
+import { getCategories } from "@/api";
+import { Role, useSession } from "@/context/AuthContext";
 import type { Category } from "@/interfaces/Category";
 import type { CategoryProps } from "@/interfaces/Category";
 
@@ -48,14 +50,26 @@ function toCategoryProps(cat: Category): CategoryProps {
 const CategoriesListScreen: React.FC = () => {
   const router = useRouter();
   const { t, i18n } = useTranslation();
+  const { role } = useSession();
 
   const [condition, setCondition] = useState<BrowseCondition>("occasion");
   const [categories, setCategories] = useState<Category[]>([]);
+  const [state, setState] = useState<"loading" | "error" | "ready">("loading");
+
+  const load = useCallback(async () => {
+    setState("loading");
+    try {
+      const response = await getCategories();
+      setCategories(response.data.filter((category) => category.level === 1));
+      setState("ready");
+    } catch {
+      setState("error");
+    }
+  }, []);
 
   useEffect(() => {
-    // Use mock data synchronously — swap for getCategories() once backend is live.
-    setCategories(mockCategoriesLevel1);
-  }, []);
+    void load();
+  }, [load]);
 
   const handleCategoryPress = (cat: Category) => {
     router.push({
@@ -63,6 +77,14 @@ const CategoriesListScreen: React.FC = () => {
       pathname: "/(client)/categories/[categoryId]",
       params: { categoryId: String(cat.id), condition },
     } as Href);
+  };
+
+  const handleRequestBanner = () => {
+    router.push((
+      role === Role.CLIENT
+        ? "/(client)/requests/CreateRequestScreen"
+        : "/(auth)/ClientLoginScreen"
+    ) as Href);
   };
 
   const renderItem = ({ item }: { item: Category }) => {
@@ -119,19 +141,44 @@ const CategoriesListScreen: React.FC = () => {
         </View>
 
         {/* ── Level-1 category grid ──────────────────────────── */}
-        <FlatList<Category>
-          data={categories}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderItem}
-          numColumns={2}
-          columnWrapperStyle={styles.gridRow}
-          scrollEnabled={false}
-          style={styles.grid}
-        />
+        {state === "loading" ? (
+          <ActivityIndicator color={Colors.primary} size="large" />
+        ) : state === "error" ? (
+          <EmptyListComponent
+            title={t("auth.error.generic")}
+            actionButton={{ title: t("reviews.retry"), onPress: load }}
+          />
+        ) : categories.length === 0 ? (
+          <EmptyListComponent title={t("wishlist.empty")} />
+        ) : (
+          <FlatList<Category>
+            data={categories}
+            keyExtractor={(item) => String(item.id)}
+            renderItem={renderItem}
+            numColumns={2}
+            columnWrapperStyle={styles.gridRow}
+            scrollEnabled={false}
+            style={styles.grid}
+          />
+        )}
 
         {/* ── Bottom CTA banner ─────────────────────────────── */}
         <View style={styles.pubBlock}>
-          <PubPlacerDemandeBlockComponent />
+          <TouchableOpacity
+            onPress={handleRequestBanner}
+            accessibilityRole="button"
+            accessibilityLabel={t("Placer une demande")}
+            activeOpacity={0.9}
+          >
+            <RNView
+              pointerEvents="none"
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              <PubPlacerDemandeBlockComponent />
+            </RNView>
+          </TouchableOpacity>
         </View>
       </View>
     </Screen>

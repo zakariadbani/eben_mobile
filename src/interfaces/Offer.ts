@@ -11,8 +11,8 @@
  *   priceBc            — priceFerrailleur × 0.94  (on the BC / bon de commande sent to ferrailleur)
  *
  * Platform spread = 12% total (6% from each side).
- * Do NOT compute these on the fly — store all three at creation time so historical
- * records remain immutable if the margin rate ever changes.
+ * The mobile submits only priceFerrailleur. Laravel derives and stores priceClient
+ * and priceBc so the device never computes margin-bearing values.
  *
  * ws.ts `dataOffer` fields: id, ref, comment, price, audio, images[].
  */
@@ -34,7 +34,7 @@ export interface Offer {
   requestItemId: number;
 
   /**
-   * MARGIN-CRITICAL price columns — always stored together.
+   * MARGIN-CRITICAL server-returned price columns — always stored together.
    *
    * priceClient = priceFerrailleur × 1.06  (shown to buyer)
    * priceBc     = priceFerrailleur × 0.94  (on the BC sent to ferrailleur)
@@ -80,4 +80,28 @@ export interface OfferItem extends Offer {
   categoryTitleAr?: string;
   categoryImage?: string | null;
   ferrailleurName?: string;
+}
+
+/** Redacted offer shape returned in the Prestataire namespace. */
+export interface PrestataireOffer
+  extends Omit<Offer, 'ferrailleurId' | 'priceClient' | 'priceBc' | 'validatedBy'> {
+  /** Canonical values from the linked request item. */
+  condition: import('./Request').PartCondition;
+  quantity: number;
+  images: string[];
+  categoryTitle: string | null;
+  categoryTitleAr: string | null;
+  categoryImage: string | null;
+  ferrailleurName: string | null;
+  /** Canonical backend decision: an unshipped purchase order currently accepts shipment. */
+  shippingEligible: boolean;
+}
+
+/** Shipment read-back returned for a Prestataire-owned offer. */
+export interface PrestataireShipment {
+  offerId: number;
+  trackingNumber: string;
+  carrier: string | null;
+  notes: string | null;
+  shippedAt: string | null;
 }

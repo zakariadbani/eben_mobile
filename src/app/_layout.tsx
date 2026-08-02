@@ -1,20 +1,13 @@
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
 import { useFonts } from "expo-font";
-import { Stack, useRouter, useSegments, Slot, Href } from "expo-router";
+import { Stack, useRouter, useSegments, Href } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { View, ActivityIndicator } from "react-native";
 
-import { useColorScheme } from "@/hooks/useColorScheme";
 import { SessionProvider, useSession } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import "@/localization/i18n";
 
-import { useTranslation } from "react-i18next";
 import {
   canAccessRoute,
   getUnauthenticatedRedirect,
@@ -25,7 +18,14 @@ import { ConfirmationProvider } from "@/context/ConfirmationContext";
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  return (
+    <SessionProvider>
+      <RootLayoutContent />
+    </SessionProvider>
+  );
+}
+
+function RootLayoutContent() {
 
   // Load fonts
   // Font files present in src/assets/fonts/:
@@ -57,17 +57,17 @@ export default function RootLayout() {
   // rather than hanging forever on a white screen.
   const fontsReady = fontsLoaded || !!fontError;
 
-  const { session, isLoading } = useSession();
+  const { isLoading } = useSession();
 
   // Hide splash screen once fonts are loaded (or failed — either way unblock).
   useEffect(() => {
-    if (fontsReady) {
+    if (fontsReady && !isLoading) {
       if (fontError) {
         console.warn("RootLayout: useFonts failed, using system fonts:", fontError);
       }
       SplashScreen.hideAsync();
     }
-  }, [fontsReady, fontError]);
+  }, [fontsReady, fontError, isLoading]);
 
   // Show loading spinner while loading session or fonts
   if (!fontsReady || isLoading) {
@@ -79,22 +79,16 @@ export default function RootLayout() {
   }
 
   return (
-    <SessionProvider>
-      <NotificationProvider>
-        <ConfirmationProvider>
-          {/* <ThemeProvider
-            value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-          > */}
-          <StackLayout />
-          {/* </ThemeProvider> */}
-        </ConfirmationProvider>
-      </NotificationProvider>
-    </SessionProvider>
+    <NotificationProvider>
+      <ConfirmationProvider>
+        <StackLayout />
+      </ConfirmationProvider>
+    </NotificationProvider>
   );
 }
 
 const StackLayout = () => {
-  const { session, isLoading, role } = useSession();
+  const { session, isLoading, role, pendingPhoneChangeVerificationPhone } = useSession();
   const segments = useSegments();
   const router = useRouter();
 
@@ -103,6 +97,11 @@ const StackLayout = () => {
       return; // Don't do anything while session is loading
     }
     const currentRoute = segments.join("/"); // Get the current route
+    const phoneVerificationRoute = "(client)/settings/profile/verify-phone";
+    const isRecoveryRoute =
+      currentRoute === "(auth)/ForgotPasswordScreen" ||
+      currentRoute.startsWith("(auth)/forgot-password/") ||
+      currentRoute.startsWith("(auth)/prestataire/forgot-password/");
 
     // If there's no session, only intentional preview routes are available.
     if (!session) {
@@ -113,7 +112,16 @@ const StackLayout = () => {
       return;
     }
 
-    if (currentRoute.startsWith("(auth)") && !currentRoute.startsWith("(auth)/register/")) {
+    if (pendingPhoneChangeVerificationPhone && currentRoute !== phoneVerificationRoute) {
+      router.replace(`/${phoneVerificationRoute}` as Href);
+      return;
+    }
+
+    if (
+      currentRoute.startsWith("(auth)") &&
+      !currentRoute.startsWith("(auth)/register/") &&
+      !isRecoveryRoute
+    ) {
       router.replace((role === "prestataire" ? "/(prestataire)/dashboard" : "/(client)") as Href);
       return;
     }
@@ -127,9 +135,7 @@ const StackLayout = () => {
         router.replace("/(prestataire)/dashboard");
       }
     }
-  }, [session, isLoading, segments, role, router]);
-
-  const { i18n } = useTranslation();
+  }, [session, isLoading, segments, role, router, pendingPhoneChangeVerificationPhone]);
 
   // useEffect(() => {
   //   // Check the current language direction and set RTL if needed

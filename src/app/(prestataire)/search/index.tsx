@@ -6,7 +6,7 @@ import {
   TextInput as RNTextInput,
   TouchableOpacity,
 } from "react-native";
-import { Tabs, useLocalSearchParams } from "expo-router";
+import { Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import { getPrestataireIncomingRequests } from "@/api/resources/prestataire";
@@ -21,20 +21,14 @@ import type { Request } from "@/interfaces/Request";
 export default function PrestataireSearchScreen(): React.ReactElement {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === "ar";
-  const { state } = useLocalSearchParams<{ state?: string }>();
   const [query, setQuery] = useState("");
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
 
-  const load = useCallback(async () => {
-    if (state === "empty") {
-      setRequests([]);
-      setLoading(false);
-      setError(false);
-      return;
-    }
-    setLoading(true);
+  const load = useCallback(async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
     setError(false);
     try {
       const result = await getPrestataireIncomingRequests();
@@ -43,11 +37,17 @@ export default function PrestataireSearchScreen(): React.ReactElement {
       setError(true);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [state]);
+  }, []);
 
   useEffect(() => {
-    load();
+    void load();
+  }, [load]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    void load(true);
   }, [load]);
 
   const results = useMemo(() => {
@@ -96,13 +96,15 @@ export default function PrestataireSearchScreen(): React.ReactElement {
       ) : error ? (
         <View flex alignItems="center" justifyContent="center" gap={14} p={24}>
           <Text center color={Colors.red}>{t("partner.search.loadError")}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={load}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => void load()} accessibilityRole="button">
             <Text type="labelTwo" semiBold>{t("partner.offers.retry")}</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <FlatList
           data={results}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => <ItemIncomingRequestCard item={item} />}
           contentContainerStyle={[styles.list, results.length === 0 ? styles.emptyList : null]}

@@ -8,6 +8,10 @@ describe("route permissions", () => {
     ["guest", undefined, "(prestataire)/dashboard"],
     ["guest profile", undefined, "(client)/settings/index"],
     ["guest profile edit", undefined, "(client)/settings/profile/index"],
+    ["guest request list", undefined, "(client)/requests/index"],
+    ["guest cart", undefined, "(client)/cart/index"],
+    ["client unapproved legal", "client" as const, "(client)/settings/pages/Legal"],
+    ["prestataire unapproved legal", "prestataire" as const, "(prestataire)/profile/legal"],
     ["client", "client" as const, "(prestataire)/dashboard"],
     ["prestataire", "prestataire" as const, "(client)/settings/index"],
     ["prestataire preview", "prestataire" as const, "(client)/index"],
@@ -26,9 +30,7 @@ describe("route permissions", () => {
     ["(client)/search/index"],
     ["(client)/products/[productId]"],
     ["(client)/products/[productId]/reviews"],
-    ["(client)/requests/index"],
     ["(client)/requests/login-to-send"],
-    ["(client)/cart/index"],
   ])("allows guest preview of %s", (route) => {
     expect(canAccessRoute(route)).toBe(true);
   });

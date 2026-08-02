@@ -1,22 +1,30 @@
-import { useEffect, useCallback, useReducer } from "react";
+import { useEffect, useCallback, useReducer, useRef } from "react";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
-type UseStateHook<T> = [[boolean, T | null], (value: T | null) => void];
+type UseStateHook<T> = [
+  [boolean, T | null],
+  (value: T | null) => Promise<void>,
+];
+
+type AsyncStateHook<T> = [[boolean, T | null], (value: T | null) => void];
 
 function useAsyncState<T>(
   initialValue: [boolean, T | null] = [true, null]
-): UseStateHook<T> {
+): AsyncStateHook<T> {
   return useReducer(
     (
-      state: [boolean, T | null],
-      action: T | null = null
+      _state: [boolean, T | null],
+      action: T | null,
     ): [boolean, T | null] => [false, action],
     initialValue
-  ) as UseStateHook<T>;
+  );
 }
 
-export async function setStorageItemAsync<T>(key: string, value: T | null) {
+export async function setStorageItemAsync<T>(
+  key: string,
+  value: T | null,
+): Promise<void> {
   if (Platform.OS === "web") {
     try {
       if (value === null) {
@@ -38,6 +46,17 @@ export async function setStorageItemAsync<T>(key: string, value: T | null) {
 
 export function useStorageState<T>(key: string): UseStateHook<T> {
   const [state, setState] = useAsyncState<T>();
+  const writeQueue = useRef<Promise<void>>(Promise.resolve());
+  const enqueueWrite = useCallback(
+    (value: T | null): Promise<void> => {
+      const write = writeQueue.current.then(() =>
+        setStorageItemAsync(key, value),
+      );
+      writeQueue.current = write.catch(() => undefined);
+      return write;
+    },
+    [key],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -81,7 +100,14 @@ export function useStorageState<T>(key: string): UseStateHook<T> {
         setState(value ? (JSON.parse(value) as T) : null);
       } catch (e) {
         console.warn("useStorageState: JSON.parse failed for key:", key, e);
-        setState(null);
+        await enqueueWrite(null).catch((deleteError) => {
+          console.warn(
+            "useStorageState: failed to delete malformed value for key:",
+            key,
+            deleteError,
+          );
+        });
+        if (!cancelled) setState(null);
       }
     };
 
@@ -91,15 +117,14 @@ export function useStorageState<T>(key: string): UseStateHook<T> {
       cancelled = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [key]);
+  }, [enqueueWrite, key, setState]);
 
   const setValue = useCallback(
-    (value: T | null) => {
+    async (value: T | null): Promise<void> => {
       setState(value);
-      setStorageItemAsync(key, value);
-      // console.log("Updated session:", value); // Add this line
+      await enqueueWrite(value);
     },
-    [key]
+    [enqueueWrite, setState]
   );
 
   return [state, setValue];

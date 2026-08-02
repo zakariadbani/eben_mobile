@@ -13,9 +13,8 @@
  *   CTA banner     — "Contactez le support pour modifier" (grey pill button)
  *   WhatsApp FAB   — inherited from Screen
  *
- * The Figma shows a VIEW-ONLY design where all fields are read-only and
- * modification is funnelled through support contact. The avatar camera button
- * is the sole editable action (placeholder alert in this sprint).
+ * Identity fields remain support-only. The avatar camera button uploads an
+ * owned temporary image and persists it through the live profile endpoint.
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -28,6 +27,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 
 import View from '@/components/common/View';
 import { Text } from '@/components/common/Text';
@@ -37,7 +37,10 @@ import CustomIcon from '@/components/common/CustomIcon';
 import Button from '@/components/common/Button';
 import { Screen } from '@/components/common/Screen';
 
-import { getPrestataireProfile } from '@/api';
+import { getPrestataireProfile, updatePrestataireProfile } from '@/api';
+import { uploadLocalImages } from '@/api/resources/uploads';
+import { ApiClientError } from '@/api/types';
+import { useSession } from '@/context/AuthContext';
 import type { PrestataireProfile } from '@/interfaces/User';
 import Colors from '@/constants/Colors';
 
@@ -65,10 +68,13 @@ function InfoRow({ iconName, iconType, value }: InfoRowProps): React.ReactElemen
 export default function EditProfileScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
+  const { refreshSessionProfile } = useSession();
 
   const [profile, setProfile] = useState<PrestataireProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [avatarSaving, setAvatarSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const loadProfile = useCallback(async () => {
     try {
@@ -87,12 +93,34 @@ export default function EditProfileScreen(): React.ReactElement {
     void loadProfile();
   }, [loadProfile]);
 
-  const handleCameraPress = () => {
-    Alert.alert(
-      t('partner.editProfile.changeAvatar'),
-      t('partner.editProfile.changeAvatarBody'),
-      [{ text: t('Fermer'), style: 'cancel' }],
-    );
+  const handleCameraPress = async () => {
+    setSaveError(null);
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setSaveError(t('partner.editProfile.photoPermission'));
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (result.canceled || result.assets.length === 0) return;
+      setAvatarSaving(true);
+      const [path] = await uploadLocalImages([result.assets[0].uri]);
+      if (!path) throw new Error('Missing uploaded image path');
+      const response = await updatePrestataireProfile({ avatar: path });
+      setProfile(response.data);
+      await refreshSessionProfile();
+    } catch (caught) {
+      const validationMessage = caught instanceof ApiClientError
+        ? Object.values(caught.errors)[0]?.[0]
+        : undefined;
+      setSaveError(validationMessage ?? t('partner.editProfile.avatarSaveError'));
+    } finally {
+      setAvatarSaving(false);
+    }
   };
 
   const handleSupportPress = () => {
@@ -171,13 +199,23 @@ export default function EditProfileScreen(): React.ReactElement {
       <View style={styles.avatarSection} flexDirection="row" alignItems="center">
         {/* Avatar + camera overlay */}
         <View style={styles.avatarWrapper}>
-          <Image source={require('@/assets/img/avatar.jpg')} style={styles.avatarCircle} />
+          {profile.avatar ? (
+            <Image source={{ uri: profile.avatar }} style={styles.avatarCircle} />
+          ) : (
+            <View style={styles.avatarFallback} alignItems="center" justifyContent="center">
+              <Icon name="user" size={42} iconColor={Colors.gray} type="Feather" />
+            </View>
+          )}
           <TouchableOpacity
             style={styles.cameraBtn}
-            onPress={handleCameraPress}
+            onPress={() => { void handleCameraPress(); }}
+            disabled={avatarSaving}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={t('partner.editProfile.changeAvatar')}
+            accessibilityState={{ disabled: avatarSaving, busy: avatarSaving }}
           >
-            <CustomIcon name="camera" size={16} />
+            {avatarSaving ? <ActivityIndicator size="small" color={Colors.brand} /> : <CustomIcon name="camera" size={16} />}
           </TouchableOpacity>
         </View>
 
@@ -224,6 +262,11 @@ export default function EditProfileScreen(): React.ReactElement {
           </Text>
         </TouchableOpacity>
       </View>
+      {saveError ? (
+        <Text accessibilityRole="alert" type="small" color={Colors.error} center style={styles.saveError}>
+          {saveError}
+        </Text>
+      ) : null}
     </Screen>
   );
 }
@@ -262,6 +305,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: Colors.borderLight,
+  },
+  avatarFallback: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.backgroundGray,
   },
   cameraBtn: {
     position: 'absolute',
@@ -309,6 +358,10 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 32,
     backgroundColor: Colors.white,
+  },
+  saveError: {
+    marginHorizontal: 16,
+    marginTop: 12,
   },
   supportBtn: {
     backgroundColor: Colors.backgroundGray,

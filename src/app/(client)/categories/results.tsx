@@ -1,31 +1,16 @@
-/**
- * CategoryResultsScreen — part listing for a chosen leaf category (level 3).
- *
- * Figma refs:
- *   En-stock results:  Search-Final-categories-(Brands)_En-stock
- *   Occasion results:  Search-Final-categories-(Brands)_Occasion
- *   Tyre results:      Search-Recherche-pneumatiques_Results
- *
- * This screen is intentionally generic:
- *   - categoryId  → filter results to this leaf category
- *   - condition   → "occasion" | "en_stock" — drives badge/button variant
- *   - searchQuery → optional free-text search (sub-flow C re-uses this screen)
- *
- * Results are mock data for now (replace with getProducts() call once backend
- * is live — import path: @/api/resources/products).
- *
- * Each result row uses ItemSubCategoryComponent:
- *   - occasion:  "Ajouter à la liste" yellow button
- *   - en_stock:  "Liste" yellow button (add to cart)
- * Both carry a heart icon (wishlist, decorative for now).
- */
-
-import React, { useEffect, useState } from "react";
-import { FlatList, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, View as RNView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import type { Href } from "expo-router";
 import { useTranslation } from "react-i18next";
 
+import {
+  addToWishlist,
+  getCategories,
+  getProductsByCategory,
+  searchAllPneumatics,
+  type PneumaticSearchParams,
+} from "@/api";
 import Screen from "@/components/common/Screen";
 import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
@@ -35,237 +20,328 @@ import ItemCategoryComponent from "@/components/screens/shared/app/ItemCategoryC
 import PubPlacerDemandeBlockComponent from "@/components/screens/shared/app/PubPlacerDemandeBlockComponent";
 import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
 import Colors from "@/constants/Colors";
-import { mockCategories } from "@/api/mock/mockCategories";
-import { categoryImageFor } from "@/api/mock/categoryImage";
-import type { Category } from "@/interfaces/Category";
-import type { CategoryProps } from "@/interfaces/Category";
+import { Role, useSession } from "@/context/AuthContext";
+import type { Category, CategoryProps } from "@/interfaces/Category";
+import type { Product } from "@/interfaces/Product";
+import type { Pneumatic } from "@/interfaces/Pneumatic";
 import type { BrowseCondition } from "./index";
 
-// ---------------------------------------------------------------------------
-// Mock product type — replace with the real Product interface once available.
-// ---------------------------------------------------------------------------
-interface MockProduct {
+interface ResultItem {
   id: number;
-  /** Article number shown as subtitle. */
-  articleNumber: string;
-  /** Category title shown as "Category: X". */
-  categoryTitle: string;
   title: string;
   titleAr: string;
+  articleNumber: string;
   price: number;
-  /** Whether this product has a promo/discount badge. */
-  promo?: boolean;
-  promoPrice?: number;
-  image?: ReturnType<typeof require> | string | null;
+  image: string | null;
+  isProduct: boolean;
 }
 
-/** Generate mock products for any category id. */
-function generateMockProducts(categoryId: number, count = 6): MockProduct[] {
-  return Array.from({ length: count }, (_, i) => ({
-    id: categoryId * 100 + i,
-    articleNumber: `18548 ${10000 + categoryId * 100 + i}`,
-    categoryTitle: "frein",
-    title: "Jeu de plaquettes de frein",
-    titleAr: "طقم بطانات الفرامل",
-    price: 2999,
-    promo: i % 3 === 2,
-    promoPrice: 2675.99,
-    image: categoryImageFor(categoryId),
-  }));
+const SEASONS: Record<string, PneumaticSearchParams["season"]> = {
+  "1": "summer",
+  "2": "winter",
+  "3": "all_season",
+};
+const BRANDS: Record<string, string> = {
+  "1": "Michelin",
+  "2": "Bridgestone",
+  "3": "Continental",
+  "4": "Goodyear",
+  "5": "Pirelli",
+  "6": "Dunlop",
+  "7": "Yokohama",
+  "8": "Falken",
+};
+const SPEED_RATINGS: Record<string, string> = {
+  "1": "H",
+  "2": "V",
+  "3": "W",
+  "4": "Y",
+  "5": "T",
+  "6": "S",
+};
+
+function singleParam(value: string | string[] | undefined): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
 
-function toCategoryProps(cat: Category): CategoryProps {
+function positiveNumber(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  if (!/^\d+$/.test(value)) return Number.NaN;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : Number.NaN;
+}
+
+function pneumaticParams(
+  raw: Record<string, string | string[] | undefined>,
+): PneumaticSearchParams | null {
+  const width = positiveNumber(singleParam(raw.largeurId));
+  const aspectRatio = positiveNumber(singleParam(raw.hauteurId));
+  const diameter = positiveNumber(singleParam(raw.diametreId));
+  if ([width, aspectRatio, diameter].some(Number.isNaN)) return null;
+
+  const seasonId = singleParam(raw.saisonId);
+  const brandId = singleParam(raw.fabricantId);
+  const speedId = singleParam(raw.indiceVitesseId);
+  const vehicleType = singleParam(raw.vehicleType);
+  if (
+    (seasonId && !SEASONS[seasonId]) ||
+    (brandId && brandId !== "0" && !BRANDS[brandId]) ||
+    (speedId && speedId !== "0" && !SPEED_RATINGS[speedId]) ||
+    (vehicleType !== undefined && vehicleType !== "auto" && vehicleType !== "4x4")
+  ) return null;
+
   return {
-    id: cat.id,
-    title: cat.title,
-    title_ar: cat.titleAr,
-    image: cat.image ?? undefined,
+    ...(width ? { width } : {}),
+    ...(aspectRatio ? { aspectRatio } : {}),
+    ...(diameter ? { diameter } : {}),
+    ...(seasonId ? { season: SEASONS[seasonId] } : {}),
+    ...(brandId && brandId !== "0" ? { brand: BRANDS[brandId] } : {}),
+    ...(speedId && speedId !== "0" ? { speedRating: SPEED_RATINGS[speedId] } : {}),
+    ...(vehicleType ? { vehicleType } : {}),
   };
 }
 
-// ---------------------------------------------------------------------------
-// Screen params
-//
-// Two entry points share this screen:
-//   A. Category-browse (sub-flow B):
-//        { categoryId, condition, searchQuery? }
-//   B. Tyre/part search (sub-flow C):
-//        { type, vehicleType, saisonId?, largeurId?, hauteurId?,
-//          diametreId?, fabricantId?, indiceVitesseId? }
-//      In this case categoryId is absent; `type` identifies the search kind.
-// ---------------------------------------------------------------------------
+function toCategoryProps(category: Category): CategoryProps {
+  return {
+    id: category.id,
+    title: category.title,
+    title_ar: category.titleAr,
+    image: category.image ?? undefined,
+  };
+}
+
+function productResult(product: Product): ResultItem {
+  return {
+    id: product.id,
+    title: product.title,
+    titleAr: product.titleAr,
+    articleNumber: product.articleNumber,
+    price: product.promoPrice ?? product.price,
+    image: product.images[0] ?? null,
+    isProduct: true,
+  };
+}
+
+function pneumaticResult(item: Pneumatic): ResultItem {
+  return {
+    id: item.id,
+    title: `${item.brand} ${item.model}`,
+    titleAr: `${item.brand} ${item.model}`,
+    articleNumber: `${item.width}/${item.aspectRatio} R${item.diameter}`,
+    price: item.price,
+    image: item.image,
+    isProduct: false,
+  };
+}
+
 const CategoryResultsScreen: React.FC = () => {
   const router = useRouter();
-  const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === "ar";
+  const { t } = useTranslation();
+  const { role } = useSession();
+  const rawParams = useLocalSearchParams() as Record<
+    string,
+    string | string[] | undefined
+  >;
+  const searchType = singleParam(rawParams.type);
+  const isPneumaticSearch = searchType === "pneumatiques" && rawParams.categoryId === undefined;
+  const rawCategoryId = singleParam(rawParams.categoryId);
+  const categoryId = positiveNumber(rawCategoryId);
+  const rawCondition = singleParam(rawParams.condition);
+  const condition: BrowseCondition = rawCondition === "en_stock" ? "en_stock" : "occasion";
+  const conditionValid =
+    rawCondition === undefined || rawCondition === "occasion" || rawCondition === "en_stock";
+  const query = singleParam(rawParams.searchQuery)?.trim() ?? "";
+  const widthParam = singleParam(rawParams.largeurId);
+  const aspectRatioParam = singleParam(rawParams.hauteurId);
+  const diameterParam = singleParam(rawParams.diametreId);
+  const seasonParam = singleParam(rawParams.saisonId);
+  const brandParam = singleParam(rawParams.fabricantId);
+  const speedParam = singleParam(rawParams.indiceVitesseId);
+  const vehicleTypeParam = singleParam(rawParams.vehicleType);
 
-  // expo-router useLocalSearchParams returns Record<string, string | string[]>.
-  const rawParams = useLocalSearchParams();
+  const [items, setItems] = useState<ResultItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [state, setState] = useState<"loading" | "error" | "ready">("loading");
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  // Detect which entry-point was used.
-  const searchType =
-    typeof rawParams.type === "string" ? rawParams.type : null;
-  const isSearchMode = searchType !== null && !rawParams.categoryId;
-
-  const categoryId = Number(rawParams.categoryId ?? 0);
-  const condition: BrowseCondition =
-    rawParams.condition === "en_stock" ? "en_stock" : "occasion";
-  const searchQuery =
-    typeof rawParams.searchQuery === "string" ? rawParams.searchQuery : "";
-
-  const [category, setCategory] = useState<Category | undefined>(undefined);
-  const [products, setProducts] = useState<MockProduct[]>([]);
-  const [levelOneCategories, setLevelOneCategories] = useState<Category[]>([]);
-
-  useEffect(() => {
-    if (isSearchMode) {
-      // Search-results mode: no real categoryId — show mock results.
-      setCategory(undefined);
-      setProducts(generateMockProducts(0));
-      setLevelOneCategories(mockCategories.filter((c) => c.level === 1));
-    } else {
-      const cat = mockCategories.find((c) => c.id === categoryId);
-      setCategory(cat);
-      setProducts(generateMockProducts(categoryId));
-      setLevelOneCategories(mockCategories.filter((c) => c.level === 1));
+  const load = useCallback(async () => {
+    const tyreFilters = isPneumaticSearch
+      ? pneumaticParams({
+          largeurId: widthParam,
+          hauteurId: aspectRatioParam,
+          diametreId: diameterParam,
+          saisonId: seasonParam,
+          fabricantId: brandParam,
+          indiceVitesseId: speedParam,
+          vehicleType: vehicleTypeParam,
+        })
+      : null;
+    const validCategory = categoryId !== undefined && !Number.isNaN(categoryId);
+    if ((!isPneumaticSearch && !validCategory) || !conditionValid || (isPneumaticSearch && !tyreFilters)) {
+      setState("error");
+      return;
     }
-  }, [categoryId, isSearchMode]);
 
-  const categoryDisplayTitle = category
-    ? isArabic
-      ? category.titleAr
-      : category.title
-    : "";
+    setState("loading");
+    try {
+      const [categoriesResponse, resultResponse] = await Promise.all([
+        getCategories(),
+        isPneumaticSearch
+          ? searchAllPneumatics(tyreFilters ?? {})
+          : getProductsByCategory(categoryId as number, condition, query || undefined),
+      ]);
+      setCategories(categoriesResponse.data.filter((category) => category.level === 1));
+      setItems(
+        isPneumaticSearch
+          ? (resultResponse.data as Pneumatic[]).map(pneumaticResult)
+          : (resultResponse.data as Product[]).map(productResult),
+      );
+      setState("ready");
+    } catch {
+      setState("error");
+    }
+  }, [
+    aspectRatioParam,
+    brandParam,
+    categoryId,
+    condition,
+    conditionValid,
+    diameterParam,
+    isPneumaticSearch,
+    query,
+    seasonParam,
+    speedParam,
+    vehicleTypeParam,
+    widthParam,
+  ]);
 
-  // Search-mode heading: use the localised search type label, or a fallback.
-  const searchModeHeading =
-    searchType === "pneumatiques"
-      ? t("Recherche pneumatiques")
-      : t("Recherche");
+  useEffect(() => { void load(); }, [load]);
 
-  const screenHeading = isSearchMode
-    ? searchModeHeading
-    : searchQuery
-      ? searchQuery
-      : categoryDisplayTitle;
-
-  const handleOtherCategoryPress = (cat: Category) => {
-    router.push({
-      // typedRoutes: dynamic path — [categoryId] segment registered in layout
-      pathname: "/(client)/categories/[categoryId]",
-      params: { categoryId: String(cat.id), condition },
-    } as Href);
+  const requireClient = (action: () => void) => {
+    if (role !== Role.CLIENT) {
+      router.push("/(auth)/ClientLoginScreen" as Href);
+      return;
+    }
+    action();
   };
 
-  // ── Occasion: "Ajouter" button ───────────────────────────────────────────
-  const occasionButton = {
-    variant: "primary",
-    title: t("Ajouter"),
-    sizeIcon: 14,
-    onPress: () => {
-      // TODO: add to request list — wire to cart/request context in Sprint C3.
-    },
+  const addWishlist = async (productId: number) => {
+    setActionError(null);
+    try {
+      await addToWishlist(productId);
+    } catch {
+      setActionError(t("auth.error.generic"));
+    }
   };
 
-  // ── Render a single product row ───────────────────────────────────────────
-  const renderProduct = ({ item }: { item: MockProduct }) => {
-    const sub = {
-      id: item.id,
-      title: item.title,
-      title_ar: item.titleAr,
-      image: item.image,
-      price: item.promoPrice ?? item.price,
-      articleNumber: item.articleNumber,
-    };
-
-    const handleProductPress = () => {
-      router.push({
+  const renderItem = ({ item }: { item: ResultItem }) => (
+    <TouchableOpacity
+      onPress={() => item.isProduct && router.push({
         pathname: "/(client)/products/[productId]",
         params: { productId: String(item.id) },
-      } as Href);
-    };
-
-    return (
-      <TouchableOpacity onPress={handleProductPress} activeOpacity={0.85} style={styles.productWrapper}>
-        <ItemSubCategoryComponent
-          item={sub}
-          showPrice
-          styleContainer={styles.resultCard}
-          actionButton={condition === "occasion" && !isSearchMode ? occasionButton : undefined}
-          actionButtonTwo={{
-            variant: "secondary",
-            leftIcon: "heart",
-            iconType: "standard",
-            sizeIcon: 16,
-            onPress: () => {
-              // TODO: wishlist toggle — Sprint C4.
-            },
-          }}
-        />
-      </TouchableOpacity>
-    );
-  };
+      } as Href)}
+      activeOpacity={0.85}
+      style={styles.productWrapper}
+    >
+      <ItemSubCategoryComponent
+        item={{
+          id: item.id,
+          title: item.title,
+          title_ar: item.titleAr,
+          image: item.image,
+          price: item.price,
+          articleNumber: item.articleNumber,
+        }}
+        showPrice
+        styleContainer={styles.resultCard}
+        actionButton={condition === "occasion" && item.isProduct ? {
+          variant: "primary",
+          title: t("Ajouter"),
+          onPress: () => requireClient(() => router.push({
+            pathname: "/(client)/requests/CreateRequestScreen",
+            params: { categoryId: String(categoryId), productId: String(item.id) },
+          } as Href)),
+        } : undefined}
+        actionButtonTwo={item.isProduct ? {
+          variant: "secondary",
+          leftIcon: "heart",
+          iconType: "standard",
+          onPress: () => requireClient(() => { void addWishlist(item.id); }),
+        } : undefined}
+      />
+    </TouchableOpacity>
+  );
 
   return (
     <Screen scrollable padding>
       <View style={styles.container}>
-        {/* ── Screen heading ─────────────────────────────────── */}
-        {!isSearchMode && screenHeading ? (
-          <Text type="titleSection" semiBold style={styles.screenTitle} translate={false}>
-            {screenHeading}
+        <Text type="titleSection" semiBold style={styles.screenTitle} translate={false}>
+          {isPneumaticSearch ? t("Recherche pneumatiques") : query || items[0]?.title || ""}
+        </Text>
+        {actionError ? (
+          <Text style={styles.actionError} accessibilityRole="alert" translate={false}>
+            {actionError}
           </Text>
         ) : null}
 
-        {/* ── Select all checkbox row (occasion only) ─────────── */}
-        {condition === "occasion" && !isSearchMode && products.length > 0 && (
-          <TouchableOpacity style={styles.selectAllRow} activeOpacity={0.7} disabled accessibilityState={{ disabled: true }}>
-            {/* RTL-aware row so checkbox + label mirror correctly in Arabic */}
-            <View flexDirection="row" alignItems="center" gap={10}>
-              <View style={styles.checkbox} />
-              <Text type="label" style={styles.selectAllLabel}>
-                Toutes les pièces de la porte d&apos;entrée sur le côté droit.
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
-
-        {/* ── Product list ───────────────────────────────────── */}
-        {products.length > 0 ? (
-          <FlatList<MockProduct>
-            data={products}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={renderProduct}
+        {state === "loading" ? (
+          <ActivityIndicator color={Colors.primary} size="large" />
+        ) : state === "error" ? (
+          <EmptyListComponent
+            title={t("auth.error.generic")}
+            actionButton={{ title: t("reviews.retry"), onPress: load }}
+          />
+        ) : items.length === 0 ? (
+          <EmptyListComponent title={t("wishlist.empty")} />
+        ) : (
+          <FlatList<ResultItem>
+            data={items}
+            keyExtractor={(item) => `${item.isProduct ? "product" : "tyre"}-${item.id}`}
+            renderItem={renderItem}
             scrollEnabled={false}
             ItemSeparatorComponent={() => <View style={styles.separator} />}
             style={styles.productList}
           />
-        ) : (
-          <EmptyListComponent title="Aucun résultat trouvé" />
         )}
 
-        {/* ── "Vous cherchez d'autres catégories ?" slider ──── */}
-        {levelOneCategories.length > 0 && (
+        {categories.length > 0 ? (
           <View style={styles.otherBlock}>
             <SliderBlockComponent<Category>
               titleBlock="Vous cherchez d'autres catégories ?"
               seeAllNavigate="/(client)/categories"
-              data={levelOneCategories}
+              data={categories}
               renderItem={({ item }) => (
                 <View style={styles.sliderCell}>
                   <ItemCategoryComponent
                     item={toCategoryProps(item)}
-                    onPress={() => handleOtherCategoryPress(item)}
+                    onPress={() => router.push({
+                      pathname: "/(client)/categories/[categoryId]",
+                      params: { categoryId: String(item.id), condition },
+                    } as Href)}
                     styleItem={styles.sliderItem}
                   />
                 </View>
               )}
             />
           </View>
-        )}
+        ) : null}
 
-        {/* ── Bottom CTA banner ─────────────────────────────── */}
         <View style={styles.pubBlock}>
-          <PubPlacerDemandeBlockComponent />
+          <TouchableOpacity
+            onPress={() => requireClient(() => router.push("/(client)/requests/CreateRequestScreen" as Href))}
+            accessibilityRole="button"
+            accessibilityLabel={t("Placer une demande")}
+            activeOpacity={0.9}
+          >
+            <RNView
+              pointerEvents="none"
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              <PubPlacerDemandeBlockComponent />
+            </RNView>
+          </TouchableOpacity>
         </View>
       </View>
     </Screen>
@@ -273,39 +349,10 @@ const CategoryResultsScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingVertical: 12,
-  },
-  screenTitle: {
-    color: Colors.brand,
-    marginBottom: 16,
-  },
-  // Occasion select-all row
-  selectAllRow: {
-    marginBottom: 16,
-    padding: 10,
-    backgroundColor: Colors.white,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.backgroundGray,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: Colors.gray,
-    backgroundColor: Colors.white,
-  },
-  selectAllLabel: {
-    flex: 1,
-    color: Colors.brand,
-  },
-  // Product list
-  productList: {
-    marginBottom: 24,
-  },
+  container: { flex: 1, paddingVertical: 12 },
+  screenTitle: { color: Colors.brand, marginBottom: 16 },
+  actionError: { color: Colors.red, textAlign: "center", marginBottom: 12 },
+  productList: { marginBottom: 24 },
   productWrapper: {
     backgroundColor: Colors.white,
     borderRadius: 8,
@@ -316,37 +363,12 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
-  resultCard: {
-    minHeight: 102,
-    paddingVertical: 12,
-  },
-  articleInfo: {
-    paddingHorizontal: 12,
-    paddingBottom: 10,
-    gap: 2,
-  },
-  promoBadge: {
-    backgroundColor: Colors.green,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  separator: {
-    height: 10,
-  },
-  // Other categories
-  otherBlock: {
-    marginBottom: 24,
-  },
-  sliderCell: {
-    marginRight: 12,
-  },
-  sliderItem: {
-    width: 110,
-  },
-  pubBlock: {
-    marginBottom: 40,
-  },
+  resultCard: { minHeight: 102, paddingVertical: 12 },
+  separator: { height: 10 },
+  otherBlock: { marginBottom: 24 },
+  sliderCell: { marginRight: 12 },
+  sliderItem: { width: 110 },
+  pubBlock: { marginBottom: 40 },
 });
 
 export default CategoryResultsScreen;

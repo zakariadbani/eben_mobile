@@ -1,404 +1,139 @@
-/**
- * /(prestataire)/profile/offers-history.tsx
- *
- * Partner offer history — all the prestataire's past offers, all statuses.
- * Figma: "Historique-des-offres" (FR + AR variants).
- *
- * Data: getPrestataireOffersHistory()
- * Shows: date group header, offer card (ref, category, date, status badge, net price, Détails CTA)
- * RTL-aware via common/View + common/Text
- * translate={false} for prices, refs, dates
- * MARGIN-CRITICAL: only priceFerrailleur shown (partner-facing screen)
- */
+import React, { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Href, useFocusEffect, useRouter } from 'expo-router';
 
-import React, { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  StyleSheet,
-  TouchableOpacity,
-} from "react-native";
-import { useTranslation } from "react-i18next";
-import { Href, useLocalSearchParams, useRouter } from "expo-router";
+import { getPrestataireOffersHistory } from '@/api/resources/prestataire';
+import CustomHeader from '@/components/common/CustomHeader';
+import { Screen } from '@/components/common/Screen';
+import { Text } from '@/components/common/Text';
+import View from '@/components/common/View';
+import EmptyListComponent from '@/components/screens/shared/app/EmptyListComponent';
+import PartnerHistoryToolbar from '@/components/screens/prestataire/PartnerHistoryToolbar';
+import Colors from '@/constants/Colors';
+import type { PrestataireOffer } from '@/interfaces/Offer';
 
-import { Screen } from "@/components/common/Screen";
-import View from "@/components/common/View";
-import { Text } from "@/components/common/Text";
-import Colors from "@/constants/Colors";
-import CustomHeader from "@/components/common/CustomHeader";
-import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
-import PartnerHistoryToolbar from "@/components/screens/prestataire/PartnerHistoryToolbar";
-
-import { getPrestataireOffersHistory } from "@/api/resources/prestataire";
-import type { Offer } from "@/interfaces/Offer";
-
-// ── Status badge config ────────────────────────────────────────────────────────
-
-type StatusCfg = { label: string; labelAr: string; color: string; bg: string };
-
-const OFFER_STATUS_BADGE: Record<string, StatusCfg> = {
-  validated: {
-    label: "Active",
-    labelAr: "نشط",
-    color: Colors.greenDark,
-    bg: "#D1FAE5",
-  },
-  selected: {
-    label: "Acceptée",
-    labelAr: "مقبولة",
-    color: Colors.white,
-    bg: Colors.blue,
-  },
-  pending: {
-    label: "Offre manquée",
-    labelAr: "عرض فائت",
-    color: Colors.white,
-    bg: Colors.red,
-  },
-  rejected: {
-    label: "Refusée",
-    labelAr: "مرفوضة",
-    color: Colors.white,
-    bg: Colors.red,
-  },
-  expired: {
-    label: "Expirée",
-    labelAr: "منتهية",
-    color: Colors.white,
-    bg: Colors.grayMidDark,
-  },
+const STATUS: Record<string, { key: string; color: string; backgroundColor: string }> = {
+  validated: { key: 'partner.offer.statusActive', color: Colors.greenDark, backgroundColor: '#D1FAE5' },
+  selected: { key: 'partner.offer.statusAccepted', color: Colors.white, backgroundColor: Colors.blue },
+  pending: { key: 'partner.offer.statusPending', color: Colors.brand, backgroundColor: Colors.primary },
+  rejected: { key: 'partner.offer.statusRejected', color: Colors.white, backgroundColor: Colors.red },
+  expired: { key: 'partner.offer.statusExpired', color: Colors.white, backgroundColor: Colors.grayMidDark },
 };
 
-function fallbackStatus(status: string): StatusCfg {
-  return (
-    OFFER_STATUS_BADGE[status] ?? {
-      label: status,
-      labelAr: status,
-      color: Colors.grayMidDark,
-      bg: Colors.backgroundGray,
-    }
-  );
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function formatDateShort(iso: string): string {
-  return new Date(iso).toLocaleDateString("fr-MA", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-/** Group offers by month-year string key. */
-function groupByMonth(offers: Offer[]): { key: string; data: Offer[] }[] {
-  const map = new Map<string, Offer[]>();
+function monthGroups(offers: PrestataireOffer[], locale: string): { label: string; data: PrestataireOffer[] }[] {
+  const groups = new Map<string, PrestataireOffer[]>();
   for (const offer of offers) {
-    const key = new Date(offer.createdAt).toLocaleDateString("fr-MA", {
-      month: "long",
-      year: "numeric",
-    });
-    const group = map.get(key) ?? [];
-    group.push(offer);
-    map.set(key, group);
+    const label = new Date(offer.createdAt).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+    groups.set(label, [...(groups.get(label) ?? []), offer]);
   }
-  return Array.from(map.entries()).map(([key, data]) => ({ key, data }));
+  return Array.from(groups, ([label, data]) => ({ label, data }));
 }
 
-// ── Offer card ─────────────────────────────────────────────────────────────────
+type ListItem =
+  | { kind: 'header'; key: string; label: string; count: number }
+  | { kind: 'offer'; key: string; offer: PrestataireOffer };
 
-interface OfferCardProps {
-  item: Offer;
-  isArabic: boolean;
-  onPress: () => void;
-}
-
-function OfferCard({ item, isArabic, onPress }: OfferCardProps): React.ReactElement {
-  const statusCfg = fallbackStatus(item.status);
-
+function OfferCard({ item, locale, t, onPress }: { item: PrestataireOffer; locale: string; t: (key: string) => string; onPress: () => void }): React.ReactElement {
+  const status = STATUS[item.status] ?? { key: item.status, color: Colors.grayMidDark, backgroundColor: Colors.backgroundGray };
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.75}
-      style={styles.card}
-    >
-      {/* Top: ref + status badge */}
-      <View flexDirection="row" alignItems="center" gap={8} style={styles.cardRow}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.75} style={styles.card} accessibilityRole="button" accessibilityLabel={`${t('partner.offersHistory.details')} ${item.reference}`}>
+      <View flexDirection="row" alignItems="center" gap={8} style={styles.cardTop}>
         <View flex gap={2}>
-          <View flexDirection="row" alignItems="center" gap={4}>
-            <Text type="small" color={Colors.gray}>
-              Réf :
-            </Text>
-            <Text type="small" semiBold color={Colors.brand} translate={false}>
-              {item.reference}
-            </Text>
-          </View>
-          <Text type="small" color={Colors.gray} translate={false}>
-            {formatDateShort(item.createdAt)}
-          </Text>
+          <Text type="small" color={Colors.gray} translate={false}>{`${t('partner.offersHistory.ref')} ${item.reference}`}</Text>
+          <Text type="small" color={Colors.gray} translate={false}>{new Date(item.createdAt).toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' })}</Text>
         </View>
-
-        <View style={[styles.statusBadge, { backgroundColor: statusCfg.bg }]}>
-          <Text type="small" color={statusCfg.color} translate={false}>
-            {isArabic ? statusCfg.labelAr : statusCfg.label}
-          </Text>
+        <View style={[styles.status, { backgroundColor: status.backgroundColor }]}>
+          <Text type="small" color={status.color}>{t(status.key)}</Text>
         </View>
       </View>
-
-      {/* Description / admin note */}
-      {item.description ? (
-        <View style={styles.descBox}>
-          <Text type="small" color={Colors.gray} translate={false} numberOfLines={2}>
-            {item.description}
-          </Text>
+      {item.description ? <Text type="small" color={Colors.grayMidDark} translate={false} numberOfLines={2} style={styles.description}>{item.description}</Text> : null}
+      <View flexDirection="row" alignItems="center" gap={10}>
+        <View flex>
+          <Text type="text" bold color={Colors.brand} translate={false}>{`${item.priceFerrailleur.toLocaleString(locale)} Dhs`}</Text>
+          <Text type="small" color={Colors.gray}>{t('partner.offersHistory.prixNet')}</Text>
         </View>
-      ) : null}
-
-      {/* Bottom: price + CTA */}
-      <View flexDirection="row" alignItems="center" gap={10} style={styles.cardBottom}>
-        <View flex gap={2}>
-          {/* MARGIN-CRITICAL: priceFerrailleur only (partner-facing) */}
-          <Text type="text" bold color={Colors.brand} translate={false}>
-            {`${item.priceFerrailleur.toLocaleString("fr-MA")} Dhs`}
-          </Text>
-          <Text type="small" color={Colors.gray}>
-            Votre prix net
-          </Text>
-        </View>
-        <View style={styles.ctaBadge}>
-          <Text type="small" semiBold color={Colors.brand} translate={false}>
-            {isArabic ? "التفاصيل" : "Détails"}
-          </Text>
-        </View>
+        <View style={styles.details}><Text type="small" semiBold color={Colors.brand}>{t('partner.offersHistory.details')}</Text></View>
       </View>
     </TouchableOpacity>
   );
 }
 
-// ── Section header ─────────────────────────────────────────────────────────────
-
-interface SectionHeaderProps {
-  label: string;
-  count: number;
-}
-
-function SectionHeader({ label, count }: SectionHeaderProps): React.ReactElement {
-  return (
-    <View style={styles.sectionHeader} flexDirection="row" alignItems="center" gap={8}>
-      <Text type="label" semiBold color={Colors.brand} translate={false}>
-        {label}
-      </Text>
-      <View style={styles.countBubble}>
-        <Text type="small" color={Colors.grayMidDark} translate={false}>
-          {`(${count})`}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-// ── List item type ─────────────────────────────────────────────────────────────
-
-type ListItem =
-  | { kind: "header"; key: string; label: string; count: number }
-  | { kind: "offer"; key: string; offer: Offer };
-
-// ── Main screen ────────────────────────────────────────────────────────────────
-
 export default function PrestataireOffersHistoryScreen(): React.ReactElement {
   const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === "ar";
+  const locale = i18n.language === 'ar' ? 'ar-MA' : 'fr-MA';
   const router = useRouter();
-  const { state } = useLocalSearchParams<{ state?: string }>();
-
-  const [offers, setOffers] = useState<Offer[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
+  const [offers, setOffers] = useState<PrestataireOffer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [query, setQuery] = useState('');
+  const requestEpoch = useRef(0);
 
   const fetchOffers = useCallback(async () => {
+    const epoch = ++requestEpoch.current;
     setLoading(true);
-    setError(null);
+    setError(false);
     try {
-      const res = await getPrestataireOffersHistory();
-      setOffers(res.data);
+      const response = await getPrestataireOffersHistory();
+      if (epoch === requestEpoch.current) setOffers(response.data);
     } catch {
-      setError("Impossible de charger les offres");
+      if (epoch === requestEpoch.current) setError(true);
     } finally {
-      setLoading(false);
+      if (epoch === requestEpoch.current) setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchOffers();
-  }, [fetchOffers]);
+  useFocusEffect(useCallback(() => {
+    void fetchOffers();
+    return () => { requestEpoch.current += 1; };
+  }, [fetchOffers]));
 
-  // ── Build flat list ────────────────────────────────────────────────────────
-
-  const listItems: ListItem[] = [];
   const normalizedQuery = query.trim().toLocaleLowerCase();
-  const visibleOffers = state === "empty"
-    ? []
-    : offers.filter((offer) => {
-        if (!normalizedQuery) return true;
-        return (
-          offer.reference.toLocaleLowerCase().includes(normalizedQuery) ||
-          offer.description?.toLocaleLowerCase().includes(normalizedQuery) === true
-        );
-      });
-  const groups = groupByMonth(visibleOffers);
-  for (const g of groups) {
-    listItems.push({ kind: "header", key: `h-${g.key}`, label: g.key, count: g.data.length });
-    for (const offer of g.data) {
-      listItems.push({ kind: "offer", key: `of-${offer.id}`, offer });
-    }
-  }
+  const visible = offers.filter((offer) => !normalizedQuery || offer.reference.toLocaleLowerCase().includes(normalizedQuery) || offer.description?.toLocaleLowerCase().includes(normalizedQuery) === true || offer.categoryTitle?.toLocaleLowerCase().includes(normalizedQuery) === true || offer.categoryTitleAr?.toLocaleLowerCase().includes(normalizedQuery) === true);
+  const groups = monthGroups(visible, locale);
+  const items: ListItem[] = groups.flatMap((group) => [
+    { kind: 'header' as const, key: `h-${group.label}`, label: group.label, count: group.data.length },
+    ...group.data.map((offer) => ({ kind: 'offer' as const, key: `o-${offer.id}`, offer })),
+  ]);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
-  const renderContent = () => {
-    if (loading) {
-      return (
-        <View style={styles.centeredBox}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+  const content = loading ? (
+    <View flex alignItems="center" justifyContent="center"><ActivityIndicator size="large" color={Colors.primary} /></View>
+  ) : error ? (
+    <EmptyListComponent title={t('partner.offersHistory.loadError')} actionButton={{ title: t('partner.offersHistory.retry'), variant: 'primary', onPress: fetchOffers }} />
+  ) : visible.length === 0 ? (
+    <EmptyListComponent title={t(query ? 'partner.offersHistory.noResults' : 'partner.offersHistory.empty')} />
+  ) : (
+    <FlatList
+      data={items}
+      keyExtractor={(item) => item.key}
+      renderItem={({ item }) => item.kind === 'header' ? (
+        <View style={styles.sectionHeader} flexDirection="row" alignItems="center" gap={8}>
+          <Text type="label" semiBold color={Colors.brand} translate={false}>{item.label}</Text>
+          <Text type="small" color={Colors.grayMidDark} translate={false}>{`(${item.count})`}</Text>
         </View>
-      );
-    }
-
-    if (error) {
-      return (
-        <EmptyListComponent
-          title={error}
-          actionButton={{
-            title: "Réessayer",
-            variant: "primary",
-            onPress: fetchOffers,
-          }}
-        />
-      );
-    }
-
-    if (visibleOffers.length === 0) {
-      return (
-        <EmptyListComponent title="Aucune offre dans l'historique" />
-      );
-    }
-
-    return (
-      <FlatList<ListItem>
-        data={listItems}
-        keyExtractor={(item) => item.key}
-        renderItem={({ item }) => {
-          if (item.kind === "header") {
-            return <SectionHeader label={item.label} count={item.count} />;
-          }
-          return (
-            <OfferCard
-              item={item.offer}
-              isArabic={isArabic}
-              onPress={() =>
-                router.push(
-                  `/(prestataire)/offers/${item.offer.id}` as Href,
-                )
-              }
-            />
-          );
-        }}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
-    );
-  };
+      ) : <OfferCard item={item.offer} locale={locale} t={t} onPress={() => router.push(`/(prestataire)/offers/${item.offer.id}` as Href)} />}
+      contentContainerStyle={styles.list}
+    />
+  );
 
   return (
     <Screen whatsapp={false} scrollable={false}>
-      <View style={styles.wrapper}>
-        {/* Yellow CustomHeader with back arrow */}
-        <CustomHeader title={t("partner.offersHistory.title")} />
-
-        <PartnerHistoryToolbar
-          monthLabel={groups[0]?.key ?? ""}
-          count={visibleOffers.length}
-          query={query}
-          onQueryChange={setQuery}
-        />
-
-        {/* Content */}
-        <View flex style={styles.contentArea}>
-          {renderContent()}
-        </View>
+      <View flex style={styles.wrapper}>
+        <CustomHeader title={t('partner.offersHistory.title')} />
+        <PartnerHistoryToolbar monthLabel={groups[0]?.label ?? ''} count={visible.length} query={query} onQueryChange={setQuery} />
+        <View flex>{content}</View>
       </View>
     </Screen>
   );
 }
 
-// ── Styles ─────────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  wrapper: {
-    flex: 1,
-    backgroundColor: Colors.backgroundGray,
-  },
-  contentArea: {
-    flex: 1,
-    backgroundColor: Colors.backgroundGray,
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 32,
-  },
-  sectionHeader: {
-    paddingVertical: 10,
-    marginTop: 4,
-  },
-  countBubble: {
-    backgroundColor: Colors.backgroundGray,
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  card: {
-    backgroundColor: Colors.white,
-    borderRadius: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    marginBottom: 10,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  cardRow: {
-    marginBottom: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    flexShrink: 0,
-  },
-  descBox: {
-    backgroundColor: Colors.backgroundGray,
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginBottom: 10,
-  },
-  cardBottom: {
-    marginTop: 4,
-  },
-  ctaBadge: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  centeredBox: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 60,
-  },
+  wrapper: { backgroundColor: Colors.backgroundGray },
+  list: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32 },
+  sectionHeader: { paddingVertical: 10, marginTop: 4 },
+  card: { backgroundColor: Colors.white, borderRadius: 10, padding: 14, marginBottom: 10, shadowColor: Colors.black, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 1 },
+  cardTop: { marginBottom: 8 },
+  status: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, flexShrink: 0 },
+  description: { backgroundColor: Colors.backgroundGray, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 10 },
+  details: { backgroundColor: Colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
 });

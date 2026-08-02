@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { StyleSheet } from "react-native";
+import { StyleSheet, useWindowDimensions } from "react-native";
 import { useTranslation } from "react-i18next";
-
 import {
   CodeField,
   Cursor,
@@ -13,70 +12,91 @@ import Button from "@/components/common/Button";
 import Colors from "@/constants/Colors";
 import View from "@/components/common/View";
 
-const CELL_COUNT = 4;
-export const isCompleteOtp = (value: string): boolean => /^\d{4}$/.test(value);
-const COUNT_DOWN = 10;
+const CELL_COUNT = 6;
+const COUNT_DOWN = 60;
+
+export const isCompleteOtp = (value: string): boolean => /^\d{6}$/.test(value);
+export const otpCellWidth = (screenWidth: number): number =>
+  Math.min(44, Math.max(30, Math.floor((screenWidth - 104) / CELL_COUNT)));
 
 interface PhoneVerificationComponentProps {
-  validate: (isValid: boolean) => void; // Callback function to handle validation
-  isValid: boolean; // Validation state
-  phoneNumber: string; // User's phone number
+  validate: (isValid: boolean, code: string) => void | Promise<void>;
+  isValid: boolean;
+  phoneNumber: string;
+  onResend?: () => void | Promise<void>;
+  error?: string | null;
+  startWithCooldown?: boolean;
+  showResend?: boolean;
 }
 
 const PhoneVerificationComponent: React.FC<PhoneVerificationComponentProps> = ({
   validate,
-  isValid,
   phoneNumber,
+  onResend,
+  error,
+  startWithCooldown = true,
+  showResend = true,
 }) => {
   const { t } = useTranslation();
-
+  const { width: screenWidth } = useWindowDimensions();
   const [value, setValue] = useState("");
-  const [timeLeftCountDown, setTimeLeftCountDown] = useState(0);
-
+  const [timeLeftCountDown, setTimeLeftCountDown] = useState(
+    startWithCooldown ? COUNT_DOWN : 0,
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const ref = useBlurOnFulfill({ value, cellCount: CELL_COUNT });
-  const [props, getCellOnLayoutHandler] = useClearByFocusCell({
-    value,
-    setValue,
-  });
+  const [fieldProps, getCellOnLayoutHandler] = useClearByFocusCell({ value, setValue });
+
+  useEffect(() => {
+    if (timeLeftCountDown === 0) return;
+    const timer = setTimeout(
+      () => setTimeLeftCountDown((previous) => previous - 1),
+      1000,
+    );
+    return () => clearTimeout(timer);
+  }, [timeLeftCountDown]);
 
   const validateNumber = async () => {
-    validate(isCompleteOtp(value));
+    const complete = isCompleteOtp(value);
+    setActionError(null);
+    if (!complete) {
+      setActionError(t("auth.otp.incomplete"));
+      await validate(false, value);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await validate(true, value);
+    } catch {
+      setActionError(t("auth.error.generic"));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resendVerificationCode = async () => {
-    if (timeLeftCountDown === 0) {
-      startCountDown();
-      // Logic to send a verification code
+    if (timeLeftCountDown > 0 || isResending) return;
+    setActionError(null);
+    setIsResending(true);
+    try {
+      await onResend?.();
+      setTimeLeftCountDown(COUNT_DOWN);
+    } catch {
+      setActionError(t("auth.error.generic"));
+    } finally {
+      setIsResending(false);
     }
   };
-
-  const startCountDown = () => {
-    setTimeLeftCountDown(COUNT_DOWN);
-  };
-  useEffect(() => {
-    let timer: NodeJS.Timeout | undefined; // Declare timer as NodeJS.Timeout or undefined
-
-    if (timeLeftCountDown > 0) {
-      timer = setInterval(() => setTimeLeftCountDown((prev) => prev - 1), 1000);
-    }
-
-    return () => {
-      if (timer) {
-        clearInterval(timer);
-      }
-    };
-  }, [timeLeftCountDown]);
-
-  useEffect(() => {
-    setTimeLeftCountDown(COUNT_DOWN);
-  }, []);
 
   return (
     <View style={styles.container}>
-      <Text type="loginSubTitle">Vérification SMS</Text>
+      <Text type="loginSubTitle">auth.otp.title</Text>
       <View style={styles.messageContainer}>
         <Text type="loginDefault" translate={false}>
-          {t("Un message d'identification a été envoyé au {{phone}}", {
+          {t("auth.otp.sent", {
             phone: phoneNumber,
           })}
         </Text>
@@ -84,7 +104,7 @@ const PhoneVerificationComponent: React.FC<PhoneVerificationComponentProps> = ({
 
       <CodeField
         ref={ref}
-        {...props}
+        {...fieldProps}
         value={value}
         onChangeText={setValue}
         cellCount={CELL_COUNT}
@@ -94,50 +114,65 @@ const PhoneVerificationComponent: React.FC<PhoneVerificationComponentProps> = ({
         renderCell={({ index, symbol, isFocused }) => (
           <Text
             key={index}
-            style={[styles.cell, isFocused && styles.focusCell]}
+            style={[
+              styles.cell,
+              { width: otpCellWidth(screenWidth) },
+              isFocused && styles.focusCell,
+            ]}
             onLayout={getCellOnLayoutHandler(index)}
           >
             {symbol || (isFocused ? <Cursor /> : null)}
           </Text>
         )}
       />
-      <View style={styles.resendLinkContainer}>
-        <Text type="loginDefault">Vous n'avez pas reçu le code ?</Text>
 
+      {showResend ? <View style={styles.resendLinkContainer}>
+        <Text type="loginDefault">auth.otp.notReceived</Text>
         <Button
           outline
           variant="orange"
           title={
             timeLeftCountDown
-              ? `${timeLeftCountDown} ${t("sec")}`
-              : "Renvoyez-le maintenant"
+              ? t("auth.otp.seconds", { count: timeLeftCountDown })
+              : isResending
+                ? t("auth.otp.resending")
+                : t("auth.otp.resend")
           }
           style={styles.resendLink}
-          onPress={resendVerificationCode}
+          onPress={() => void resendVerificationCode()}
+          disabled={timeLeftCountDown > 0 || isResending}
+          accessibilityState={{ busy: isResending }}
         />
-      </View>
+      </View> : null}
 
-      <Button title="Vérifier" onPress={validateNumber} />
+      {error || actionError ? (
+        <Text style={styles.error} accessibilityRole="alert">
+          {error ?? actionError}
+        </Text>
+      ) : null}
+      <Button
+        title={isSubmitting ? t("auth.otp.verifying") : t("auth.otp.verify")}
+        onPress={() => void validateNumber()}
+        disabled={!isCompleteOtp(value) || isSubmitting}
+        accessibilityState={{ busy: isSubmitting }}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    // marginTop: 40,
-  },
+  container: {},
   messageContainer: {
     marginVertical: 20,
   },
   codeFieldRoot: {
-    // marginTop: 20,
     marginHorizontal: 5,
+    justifyContent: "space-between",
   },
   cell: {
-    width: 66,
-    height: 66,
-    lineHeight: 56,
-    fontSize: 32,
+    height: 56,
+    lineHeight: 48,
+    fontSize: 26,
     borderWidth: 2,
     backgroundColor: Colors.backgroundGray,
     color: Colors.grayDark,
@@ -149,16 +184,17 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   resendLinkContainer: {
-    // flexDirection: "row",
-    // justifyContent: "center",
-    // alignItems: "center",
-    // marginBottom: 40,
     marginTop: 30,
     marginBottom: 20,
   },
   resendLink: {
     borderWidth: 0,
     paddingVertical: 0,
+  },
+  error: {
+    color: Colors.errorInbackgroundBrand,
+    marginBottom: 12,
+    textAlign: "center",
   },
 });
 
