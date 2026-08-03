@@ -10,7 +10,6 @@ import {
   Platform,
   Modal,
   TextInput,
-  ScrollView, // Import ScrollView
 } from "react-native";
 import { Text } from "./Text"; // Ensure you have this Text component
 import Colors from "@/constants/Colors";
@@ -94,6 +93,7 @@ const PickerInput: React.FC<PickerInputProps> = ({
   const textColor = colorMap[variant].textColor;
   const placeholderColor = placeholderColorProp ?? colorMap[variant].placeholderColor;
   const chevronColor = chevronColorProp ?? textColor;
+  const { t, i18n } = useTranslation();
 
   const renderItem = ({ item }: { item: Item }) => (
     <TouchableOpacity
@@ -103,7 +103,7 @@ const PickerInput: React.FC<PickerInputProps> = ({
         setModalVisible(false);
       }}
       accessibilityRole="button"
-      accessibilityLabel={item.title}
+      accessibilityLabel={t(item.title)}
       accessibilityState={{ selected: selectedItem?.id === item.id }}
     >
       <Text style={styles.itemText}>{item.title}</Text>
@@ -114,7 +114,6 @@ const PickerInput: React.FC<PickerInputProps> = ({
   const filteredItems = items.filter((item) =>
     item.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  const { t, i18n } = useTranslation(); // Initialize useTranslation
 
   return (
     <>
@@ -126,7 +125,7 @@ const PickerInput: React.FC<PickerInputProps> = ({
         }}
         disabled={items.length === 0}
         accessibilityRole="button"
-        accessibilityLabel={label || selectedItem?.title || placeholder}
+        accessibilityLabel={t(label || selectedItem?.title || placeholder)}
         accessibilityState={{
           disabled: items.length === 0,
           expanded: modalVisible,
@@ -203,16 +202,14 @@ const PickerInput: React.FC<PickerInputProps> = ({
                 />
               )}
             </View>
-            <ScrollView style={styles.modalBody}>
-              <FlatList
-                data={filteredItems}
-                keyExtractor={(item) => item.id.toString()}
-                numColumns={numberOfColumns}
-                renderItem={renderItem}
-                showsVerticalScrollIndicator={false} // Hide scroll indicator if needed
-                scrollEnabled={filteredItems.length > 5} // Enable scrolling only if there are more than 5 items
-              />
-            </ScrollView>
+            <FlatList
+              style={styles.modalBody}
+              data={filteredItems}
+              keyExtractor={(item) => item.id.toString()}
+              numColumns={numberOfColumns}
+              renderItem={renderItem}
+              showsVerticalScrollIndicator={false}
+            />
             <View style={styles.modalFooter}>
               <Button title={t("Fermer")} onPress={() => setModalVisible(false)} />
             </View>

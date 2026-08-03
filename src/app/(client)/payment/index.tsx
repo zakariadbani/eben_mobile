@@ -89,6 +89,10 @@ export default function CheckoutScreen() {
     router.push('/(client)/settings/addresses' as Href);
   }, [router]);
 
+  const handleEditProfile = useCallback(() => {
+    router.push('/(client)/settings/profile' as Href);
+  }, [router]);
+
   const hasItems = (basket?.items?.length ?? 0) > 0;
   const canSubmit = hasItems && selectedAddressId !== null && selectedPaymentMethod === 'cod' && !placing;
 
@@ -133,17 +137,27 @@ export default function CheckoutScreen() {
   return (
     <View style={styles.container} flex>
       <Screen scrollable whatsapp={false}>
-        <View style={styles.infoHeader} flexDirection="row" alignItems="center" gap={10}>
-          <Text type="text" bold style={styles.infoTitle}>{t('checkout.yourInformation')}</Text>
-          <View style={styles.flex1} />
-          <Button title={t('settings.modify')} isLink variant="brand" onPress={handleAddAddress} fit />
+        <View style={styles.infoHeader}>
+          <View flexDirection="row" alignItems="center" gap={10}>
+            <Text type="text" bold style={styles.infoTitle}>{t('checkout.yourInformation')}</Text>
+            <View style={styles.flex1} />
+            <Button title={t('settings.modify')} isLink variant="brand" onPress={handleEditProfile} fit />
+          </View>
+          {profile ? (
+            <View style={styles.infoSummary} gap={4}>
+              <Text type="label" semiBold translate={false}>{profile.name}</Text>
+              <Text type="small" color={Colors.grayMidDark} translate={false}>{profile.phone}</Text>
+              {profile.email ? (
+                <Text type="small" color={Colors.grayMidDark} translate={false}>{profile.email}</Text>
+              ) : null}
+            </View>
+          ) : null}
         </View>
         <ClientCheckoutForm
           addresses={addresses}
           selectedAddressId={selectedAddressId}
           onSelectAddress={setSelectedAddressId}
           onAddAddress={handleAddAddress}
-          profile={profile}
           selectedPaymentMethod={selectedPaymentMethod}
           onSelectPaymentMethod={handlePaymentMethod}
         />
@@ -193,6 +207,7 @@ const styles = StyleSheet.create({
   centered: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   infoHeader: { paddingHorizontal: 16, paddingVertical: 24, borderBottomWidth: 1, borderBottomColor: Colors.backgroundGray },
   infoTitle: { fontSize: 26, lineHeight: 34 },
+  infoSummary: { marginTop: 12 },
   flex1: { flex: 1 },
   notice: { marginHorizontal: 16, marginTop: 14 },
   ctaBar: { backgroundColor: Colors.white, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: Colors.backgroundGray },

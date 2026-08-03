@@ -20,6 +20,7 @@ import RequestSuccessScreen from "../requests/success";
 import RequestDetailScreen from "../requests/[requestId]";
 import OfferDetailScreen from "../requests/[requestId]/offers/[offerId]";
 import ArchivedOffersScreen from "../settings/archived-offers";
+import WhatsappBtn from "@/components/common/WhatsappBtn";
 import type { Basket } from "@/interfaces/Basket";
 
 const mockPush = jest.fn();
@@ -221,6 +222,25 @@ it("routes an empty garage to the existing add-car flow without creating a reque
   expect(mockCreateRequest).not.toHaveBeenCalled();
 });
 
+it("shows request status separately from a pending countdown", async () => {
+  mockGetRequests.mockResolvedValueOnce({
+    success: true,
+    data: [
+      { id: 1, reference: "REQ-1", status: "offers_received", expiresDisplay: "1h 30min", createdAt: "2026-08-01" },
+      { id: 2, reference: "REQ-2", status: "pending", expiresDisplay: "45min", createdAt: "2026-08-01" },
+    ],
+    pagination: { ...pagination, total: 2 },
+  });
+
+  const screen = render(<RequestListScreen />);
+
+  expect(await screen.findByText(i18n.t("requestFlow.requestStatus.offers_received"))).toBeTruthy();
+  expect(screen.getByText(i18n.t("requestFlow.requestStatus.pending"))).toBeTruthy();
+  expect(screen.getByText(i18n.t("home.expiresIn", { value: "45min" }))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("home.expiresIn", { value: "1h 30min" }))).toBeNull();
+  expect(screen.UNSAFE_queryAllByType(WhatsappBtn)).toHaveLength(0);
+});
+
 it("shows live request empty state and retries a failed list read", async () => {
   mockGetRequests.mockRejectedValueOnce(new Error("offline"));
   const screen = render(<RequestListScreen />);
@@ -228,6 +248,8 @@ it("shows live request empty state and retries a failed list read", async () => 
   const retry = await screen.findByRole("button", { name: i18n.t("requestFlow.retry") });
   fireEvent.press(retry);
   expect(await screen.findByText(i18n.t("requestFlow.requestsEmpty"))).toBeTruthy();
+  expect(screen.getByText(i18n.t("requestFlow.requestsEmptyBody"))).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: i18n.t("requestFlow.create") })).toHaveLength(2);
   expect(mockGetRequests).toHaveBeenCalledTimes(2);
 });
 
@@ -241,6 +263,7 @@ it("keeps unvalidated offer counts from enabling the request offers action", asy
 
   const button = await screen.findByRole("button", { name: i18n.t("requestFlow.waitingOffers") });
   expect(button.props.accessibilityState.disabled).toBe(true);
+  expect(screen.UNSAFE_queryAllByType(WhatsappBtn)).toHaveLength(0);
 });
 
 it("shows only closed requests in archived offers", async () => {
@@ -300,6 +323,11 @@ it("loads request success from the owned server request and rejects forged route
 
   expect(await valid.findByText(/REQ-73/)).toBeTruthy();
   expect(valid.queryByText(/FORGED/)).toBeNull();
+  fireEvent.press(valid.getByRole("button", { name: i18n.t("requestFlow.viewRequest") }));
+  expect(mockReplace).toHaveBeenCalledWith({
+    pathname: "/(client)/requests/[requestId]",
+    params: { requestId: "73" },
+  });
   valid.unmount();
 
   mockParams = { requestId: "invalid", reference: "FORGED" };

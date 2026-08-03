@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { StyleSheet } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import Screen from "@/components/common/Screen";
 import View from "@/components/common/View";
 import PhoneVerificationComponent from "@/components/screens/shared/PhoneVerificationComponent";
 import Colors from "@/constants/Colors";
 import { Role, useSession } from "@/context/AuthContext";
+import { getClientReturnTo } from "@/constants/clientReturnTo";
 
 function formatPhone(value: string | null): string {
   if (!value) return "";
@@ -16,6 +17,7 @@ function formatPhone(value: string | null): string {
 
 export default function RegistrationVerificationScreen() {
   const router = useRouter();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const {
     pendingRegistrationPhone,
     pendingRegistrationOtpSent,
@@ -39,7 +41,10 @@ export default function RegistrationVerificationScreen() {
     try {
       const role = await verifyRegistration(code);
       if (role === Role.CLIENT) {
-        router.push("/(auth)/register/car-selection");
+        router.push({
+          pathname: "/(auth)/register/car-selection",
+          params: { returnTo: String(getClientReturnTo(returnTo)) },
+        });
       }
     } catch {
       setIsValid(false);

@@ -26,7 +26,7 @@ const GoBack: React.FC<GoBackProps> = ({
   buttonProps,
 }) => {
   const router = useRouter();
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
 
   const goBack = () => {
     router.back();
@@ -38,7 +38,8 @@ const GoBack: React.FC<GoBackProps> = ({
       rightIcon={i18n.language === "ar" ? "arrowright" : "arrowleft"}
       iconTypeName="AntDesign"
       style={StyleSheet.flatten([styles.button, style])}
-      iconColor={iconColor} // Use provided iconColor or default
+      iconColor={iconColor}
+      accessibilityLabel={t("accessibility.back")}
       onPress={buttonProps?.onPress || goBack} // Use custom onPress if provided
       {...buttonProps} // Spread any additional button props
     />

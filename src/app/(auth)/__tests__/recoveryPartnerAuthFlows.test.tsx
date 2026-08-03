@@ -1,5 +1,6 @@
 import React from "react";
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 import {
   AuthRoleMismatchError,
   Role,
@@ -14,6 +15,7 @@ import PartnerForgotPasswordScreen from "../prestataire/forgot-password";
 import PartnerForgotPasswordVerificationScreen from "../prestataire/forgot-password/verification";
 import PartnerForgotPasswordNewPasswordScreen from "../prestataire/forgot-password/new-password";
 import PartnerWaitlistScreen from "../prestataire/waitlist";
+import PartnerWelcomeScreen from "../prestataire/welcome";
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
@@ -171,7 +173,7 @@ it("awaits Prestataire login and navigates only after a successful role match", 
 
   await waitFor(() =>
     expect(mockLogin).toHaveBeenCalledWith(
-      "0600000101",
+      "+212600000101",
       "password123",
       Role.PRESTATAIRE,
     ),
@@ -221,12 +223,60 @@ it("shows typed Prestataire role mismatch and generic login errors", async () =>
   expect(mockReplace).not.toHaveBeenCalled();
 });
 
+
+
+it.each(["fr", "ar"])(
+  "keeps Prestataire onboarding focused on sign-in in %s",
+  async (language) => {
+    await i18n.changeLanguage(language);
+    const screen = render(<PartnerWelcomeScreen />);
+
+    expect(
+      StyleSheet.flatten(screen.getByTestId("partner-welcome-back").props.style),
+    ).toMatchObject(language === "ar" ? { right: 8 } : { left: 8 });
+    expect(screen.queryByText(i18n.t("Acheteur"))).toBeNull();
+    expect(screen.queryByText(i18n.t("Vendeur"))).toBeNull();
+    expect(
+      screen.queryByRole("button", {
+        name: i18n.t("S'inscrire sur la liste d'attente"),
+      }),
+    ).toBeNull();
+    expect(
+      screen.queryByText(i18n.t("Voir la version de démonstration")),
+    ).toBeNull();
+    expect(screen.queryByText(i18n.t("Conditions et nos accords."))).toBeNull();
+
+    fireEvent.press(
+      screen.getByRole("button", { name: i18n.t("Connectez-vous") }),
+    );
+    expect(mockPush).toHaveBeenCalledWith("/(auth)/prestataire/sign-in");
+  },
+);
+
+it.each(["fr", "ar"])(
+  "keeps Prestataire sign-in focused on login and password recovery in %s",
+  async (language) => {
+    await i18n.changeLanguage(language);
+    const screen = render(<PrestataireSignInScreen />);
+
+    expect(screen.queryByText(i18n.t("auth.login.noAccount"))).toBeNull();
+    expect(
+      screen.queryByText(i18n.t("auth.prestataire.login.joinWaitlist")),
+    ).toBeNull();
+    fireEvent.press(
+      screen.getByRole("button", { name: i18n.t("auth.login.forgotPassword") }),
+    );
+    expect(mockPush).toHaveBeenCalledWith(
+      "/(auth)/prestataire/forgot-password",
+    );
+  },
+);
 it("runs Client password recovery without putting secrets in route params", async () => {
   mockedUseSession.mockReturnValue(sessionValue());
   const start = render(<ForgotPasswordScreen />);
   submitPhone(start);
   await waitFor(() =>
-    expect(mockStartPasswordReset).toHaveBeenCalledWith("0600000101"),
+    expect(mockStartPasswordReset).toHaveBeenCalledWith("+212600000101"),
   );
   expect(mockPush).toHaveBeenCalledWith("/(auth)/forgot-password/verification");
   expect(JSON.stringify(mockPush.mock.calls)).not.toContain("0600000101");
@@ -262,10 +312,12 @@ it("runs Client password recovery without putting secrets in route params", asyn
   ).toBe(true);
 });
 
-it("preserves the Prestataire recovery route family", async () => {
+it("normalizes a local Moroccan phone while preserving the Prestataire recovery route family", async () => {
   const start = render(<PartnerForgotPasswordScreen />);
   submitPhone(start);
-  await waitFor(() => expect(mockStartPasswordReset).toHaveBeenCalled());
+  await waitFor(() =>
+    expect(mockStartPasswordReset).toHaveBeenCalledWith("+212600000101"),
+  );
   expect(mockPush).toHaveBeenCalledWith(
     "/(auth)/prestataire/forgot-password/verification",
   );

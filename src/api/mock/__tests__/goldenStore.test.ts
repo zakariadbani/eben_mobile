@@ -19,14 +19,18 @@ import {
 } from '@/api/resources/basket';
 import { getOrder, placeOrder } from '@/api/resources/orders';
 import {
+  confirmWithdrawal,
   getOfferShipment,
   getPrestataireIncomingRequests,
   getPrestataireOffer,
   getPrestataireOffers,
+  getPrestataireWallet,
+  getWithdrawals,
+  requestWithdrawal,
   shipOffer,
   submitOffer,
 } from '@/api/resources/prestataire';
-import { resetMockStore } from '../goldenStore';
+import { getMockState, handleGoldenRequest, resetMockStore } from '../goldenStore';
 
 describe('mock golden path', () => {
   beforeEach(resetMockStore);
@@ -68,6 +72,7 @@ describe('mock golden path', () => {
     const selectedIds = partnerOffers.map(({ id }) => id).sort((a, b) => a - b);
     const basket = await getBasket();
     expect(basket.data.items?.map(({ offerId }) => offerId).sort((a, b) => a - b)).toEqual(selectedIds);
+    expect(basket.data).toMatchObject({ subtotal: 268.24, taxAmount: 53.65, total: 321.89 });
     await expect(shipOffer(selectedIds[0]!, { trackingNumber: 'TOO-EARLY' }))
       .rejects.toThrow('Confirmed order item not found');
 
@@ -88,6 +93,47 @@ describe('mock golden path', () => {
     expect((await getOfferShipment(selectedIds[1]!)).data?.trackingNumber).toBe('TRACK-2');
   });
 
+  it('refreshes seeded request expiries and category images', async () => {
+    const request = await getRequest(1);
+
+    expect(new Date(request.data.expiresAt!).getTime()).toBeGreaterThan(Date.now());
+    expect(request.data.items?.every(({ categoryImage }) => categoryImage != null)).toBe(true);
+    expect((await getOffers(1)).data[0]).toEqual(expect.objectContaining({
+      categoryTitle: 'Plaquettes de frein avant',
+      categoryImage: expect.anything(),
+    }));
+  });
+  it('enriches created request items from canonical categories', async () => {
+    const created = await createRequest({
+      vehicleId: 1,
+      items: [{ categoryId: 100, quantity: 1, condition: 'occasion' }],
+    });
+
+    expect((await getRequest(created.data.id)).data.items?.[0]).toEqual(expect.objectContaining({
+      categoryTitle: 'Plaquettes de frein avant',
+      categoryTitleAr: expect.any(String),
+      categoryImage: expect.anything(),
+    }));
+  });
+
+  it('persists vehicle and address mutations through their route-aware endpoints', () => {
+    const vehicle = handleGoldenRequest('POST', '/vehicles', { brandId: 1, modelId: 1, year: 2024 });
+    expect(handleGoldenRequest('GET', '/vehicles')).toMatchObject({ data: expect.arrayContaining([expect.objectContaining({ id: (vehicle as { data: { id: number } }).data.id })]) });
+    const address = handleGoldenRequest('POST', '/addresses', { addressLine1: '1 Rue Test', city: 'Rabat' });
+    const addressId = (address as { data: { id: number } }).data.id;
+    expect(handleGoldenRequest('GET', `/addresses/${addressId}`)).toMatchObject({ data: expect.objectContaining({ city: 'Rabat' }) });
+  });
+  it('supports filtered tyre search, cancellation, and product reviews', () => {
+    expect(handleGoldenRequest('GET', '/pneumatics?brand=Michelin')).toMatchObject({
+      data: [expect.objectContaining({ brand: 'Michelin' })],
+    });
+    const pendingOrder = getMockState().orders.find((order) => order.status === 'pending');
+    expect(pendingOrder).toBeDefined();
+    expect(handleGoldenRequest('POST', `/orders/${pendingOrder!.id}/cancel`, {}))
+      .toMatchObject({ data: { id: pendingOrder!.id, status: 'cancelled' } });
+    expect(handleGoldenRequest('POST', '/products/1001/reviews', { rating: 5, title: 'Très bien' }))
+      .toMatchObject({ data: { reviewableId: 1001, rating: 5, title: 'Très bien' } });
+  });
   it('validates request identifiers and quantities at the store boundary', async () => {
     const validItem = { categoryId: 100, quantity: 1, condition: 'occasion' as const };
     await expect(createRequest({ vehicleId: 0, items: [validItem] })).rejects.toThrow('Invalid request payload');
@@ -147,5 +193,30 @@ describe('mock golden path', () => {
     expect((await removeBasketItem(item.id)).data.items?.some(({ id }) => id === item.id)).toBe(false);
     await expect(addToBasket(999999, 1)).rejects.toThrow('not found');
     await expect(getRequest(999999)).rejects.toThrow('not found');
+  });
+
+  it('persists and confirms an owned withdrawal with boundary validation', async () => {
+    const wallet = await getPrestataireWallet();
+
+    await expect(requestWithdrawal(0, 'virement')).rejects.toThrow('Invalid withdrawal amount');
+    await expect(requestWithdrawal(wallet.data.balance + 0.01, 'virement'))
+      .rejects.toThrow('Withdrawal amount exceeds balance');
+
+    const requested = await requestWithdrawal(1000, 'virement');
+    expect(requested.data).toMatchObject({
+      requiresVerification: true,
+      withdrawal: { amount: 1000, method: 'virement', status: 'awaiting_verification' },
+    });
+    expect((await getWithdrawals()).data[0]).toMatchObject({
+      id: requested.data.withdrawal.id,
+      status: 'awaiting_verification',
+    });
+
+    await expect(confirmWithdrawal(requested.data.withdrawal.id, '12345'))
+      .rejects.toThrow('Invalid withdrawal verification code');
+    expect((await confirmWithdrawal(requested.data.withdrawal.id, '123456')).data.status)
+      .toBe('pending');
+    await expect(confirmWithdrawal(requested.data.withdrawal.id, '123456'))
+      .rejects.toThrow('Withdrawal cannot be confirmed');
   });
 });

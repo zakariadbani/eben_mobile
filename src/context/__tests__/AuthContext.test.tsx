@@ -580,6 +580,18 @@ describe('AuthContext', () => {
     },
   );
 
+  it('clears a persisted mock session before any live profile request', async () => {
+    const restored = { ...authSession(), source: 'mock' as const };
+    mockedSecureStore.getItemAsync.mockResolvedValue(JSON.stringify(restored));
+
+    const { result } = renderSession();
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.session).toBeNull();
+    expect(apiClient.getToken()).toBeNull();
+    expect(mockedGetProfile).not.toHaveBeenCalled();
+    expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledWith('session');
+  });
   it('retains a valid restored session after a transient profile network failure', async () => {
     const restored = authSession();
     mockedSecureStore.getItemAsync.mockResolvedValue(JSON.stringify(restored));

@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { StyleSheet } from "react-native";
 import type { FormikHelpers } from "formik";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import View from "@/components/common/View";
 import Screen from "@/components/common/Screen";
@@ -13,20 +13,14 @@ import ClientRegisterForm, {
 import Colors from "@/constants/Colors";
 import { ApiClientError } from "@/api/types";
 import { useSession } from "@/context/AuthContext";
+import { normalizeMoroccanPhone } from "@/helpers/phoneHelper";
+import { getClientReturnTo } from "@/constants/clientReturnTo";
 
 interface PendingRegistration {
   values: RegisterFormValues;
   helpers: FormikHelpers<RegisterFormValues>;
   phone: string;
   displayPhone: string;
-}
-
-function normalizePhone(value: string): string {
-  const digits = value.replace(/\D/g, "");
-  if (/^06\d{8}$/.test(digits)) return `+212${digits.slice(1)}`;
-  if (/^2126\d{8}$/.test(digits)) return `+${digits}`;
-  if (/^6\d{8}$/.test(digits)) return `+212${digits}`;
-  return value.trim();
 }
 
 function formatPhone(value: string): string {
@@ -36,6 +30,7 @@ function formatPhone(value: string): string {
 
 export default function ClientRegisterScreen() {
   const router = useRouter();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { registerClient } = useSession();
   const { t } = useTranslation();
   const [pending, setPending] = useState<PendingRegistration | null>(null);
@@ -48,7 +43,7 @@ export default function ClientRegisterScreen() {
     helpers: FormikHelpers<RegisterFormValues>,
   ) => {
     setError(null);
-    const phone = normalizePhone(values.phone);
+    const phone = normalizeMoroccanPhone(values.phone);
     if (!/^\+2126\d{8}$/.test(phone)) {
       helpers.setFieldTouched("phone", true, false);
       helpers.setFieldError("phone", t("auth.register.phoneInvalid"));
@@ -89,7 +84,10 @@ export default function ClientRegisterScreen() {
         ...(email ? { email } : {}),
       });
       setPending(null);
-      router.push("/(auth)/register/verification");
+      router.push({
+        pathname: "/(auth)/register/verification",
+        params: { returnTo: String(getClientReturnTo(returnTo)) },
+      });
     } catch (registrationError) {
       if (registrationError instanceof ApiClientError) {
         mapFieldErrors(registrationError, pending.helpers);

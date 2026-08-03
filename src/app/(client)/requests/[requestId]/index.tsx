@@ -44,10 +44,10 @@ export default function RequestDetailScreen() {
     if (request) navigation.setOptions({ title: t("requestFlow.requestReference", { reference: request.reference }) });
   }, [navigation, request, t]);
 
-  if (state === "loading") return <Screen><View flex style={styles.centered}><ActivityIndicator color={Colors.primary} /></View></Screen>;
+  if (state === "loading") return <Screen whatsapp={false}><View flex style={styles.centered}><ActivityIndicator color={Colors.primary} /></View></Screen>;
   if (state === "error" || !request) {
     return (
-      <Screen padding>
+      <Screen padding whatsapp={false}>
         <View flex style={styles.centered} gap={12}>
           <Text accessibilityRole="alert">{requestId === null ? "requestFlow.invalidRoute" : "requestFlow.requestNotFound"}</Text>
           {requestId !== null ? <Button title="requestFlow.retry" onPress={() => void load()} /> : null}
@@ -59,7 +59,7 @@ export default function RequestDetailScreen() {
 
   const hasOffers = request.offersCount > 0;
   return (
-    <Screen>
+    <Screen whatsapp={false}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text type="headerTitle" semiBold>{t("requestFlow.requestReference", { reference: request.reference })}</Text>
         {request.expiresAt ? (

@@ -7,8 +7,8 @@
 
 import type { PrestataireDashboardStats, RecentOfferSummary } from '@/interfaces/PrestataireDashboard';
 import type { Offer } from '@/interfaces/Offer';
-import type { Request, RequestItem, RequestSummary } from '@/interfaces/Request';
-import type { Order, OrderItem } from '@/interfaces/Order';
+import type { Request, RequestItem } from '@/interfaces/Request';
+import type { PrestataireOrder, PrestataireOrderItem } from '@/interfaces/Order';
 import type { PrestataireProfile } from '@/interfaces/User';
 import type { PrestataireCompany } from '@/interfaces/PrestataireCompany';
 import type { PrestataireWallet, BalanceTransaction, Withdrawal } from '@/interfaces/Wallet';
@@ -236,17 +236,6 @@ export const mockPrestataireIncomingRequests: Request[] = [
   },
 ];
 
-/** Summary list for the incoming requests inbox. */
-export const mockPrestataireIncomingRequestSummaries: RequestSummary[] = mockPrestataireIncomingRequests.map(
-  (r) => ({
-    id: r.id,
-    reference: r.reference,
-    status: r.status,
-    expiresDisplay: null,
-    createdAt: r.createdAt,
-  }),
-);
-
 // ── Prestataire's own offers (across statuses) ────────────────────────────────
 
 /**
@@ -389,132 +378,158 @@ export const mockPrestataireOffers: Offer[] = [
 // These are the confirmed orders that contain items sold by this prestataire.
 // partner shows priceFerrailleur (priceBc) as their net revenue per item.
 
-const mockPartnerOrderItems: OrderItem[] = [
+const mockPartnerOrderItems: PrestataireOrderItem[] = [
   {
     id: 301,
     orderId: 201,
     offerId: 103,
+    productId: null,
     categoryId: 101,
     quantity: 2,
-    unitPrice: 190.80,   // priceClient snapshot
-    totalPrice: 381.60,
+    netAmount: 338.40,
     status: 'confirmed',
     createdAt: '2024-10-08T14:00:00Z',
     updatedAt: '2024-10-08T14:00:00Z',
     categoryTitle: 'Flexible de frein avant',
     categoryTitleAr: 'خرطوم الفرامل الأمامي',
+    purchaseOrder: {
+      id: 401,
+      reference: 'BC-20241008-401',
+      orderItemId: 301,
+      amount: 338.40,
+      trackingNumber: null,
+      carrier: null,
+      shippingNotes: null,
+      status: 'sent',
+      sentAt: '2024-10-08T15:00:00Z',
+      shippedAt: null,
+      createdAt: '2024-10-08T15:00:00Z',
+      updatedAt: '2024-10-08T15:00:00Z',
+    },
   },
   {
     id: 302,
     orderId: 201,
     offerId: 104,
+    productId: null,
     categoryId: 102,
     quantity: 1,
-    unitPrice: 339.20,
-    totalPrice: 339.20,
+    netAmount: 300.80,
     status: 'confirmed',
     createdAt: '2024-10-08T14:00:00Z',
     updatedAt: '2024-10-08T14:00:00Z',
     categoryTitle: 'Disque de frein avant',
     categoryTitleAr: 'قرص الفرامل الأمامي',
+    purchaseOrder: {
+      id: 402,
+      reference: 'BC-20241008-402',
+      orderItemId: 302,
+      amount: 300.80,
+      trackingNumber: null,
+      carrier: null,
+      shippingNotes: null,
+      status: 'sent',
+      sentAt: '2024-10-08T15:00:00Z',
+      shippedAt: null,
+      createdAt: '2024-10-08T15:00:00Z',
+      updatedAt: '2024-10-08T15:00:00Z',
+    },
   },
   {
     id: 303,
     orderId: 202,
     offerId: 106,
+    productId: null,
     categoryId: 103,
     quantity: 1,
-    unitPrice: 2836.55,
-    totalPrice: 2836.55,
+    netAmount: 2515.43,
     status: 'shipped',
     createdAt: '2024-10-05T10:00:00Z',
     updatedAt: '2024-10-05T16:00:00Z',
     categoryTitle: 'Kit de distribution',
     categoryTitleAr: 'طقم التوزيع',
+    purchaseOrder: {
+      id: 403,
+      reference: 'BC-20241005-403',
+      orderItemId: 303,
+      amount: 2515.43,
+      trackingNumber: 'AM2024100512',
+      carrier: 'Amana',
+      shippingNotes: null,
+      status: 'shipped',
+      sentAt: '2024-10-05T10:30:00Z',
+      shippedAt: '2024-10-05T16:00:00Z',
+      createdAt: '2024-10-05T10:30:00Z',
+      updatedAt: '2024-10-05T16:00:00Z',
+    },
   },
   {
     id: 304,
     orderId: 203,
     offerId: 103,
+    productId: null,
     categoryId: 101,
     quantity: 1,
-    unitPrice: 190.80,
-    totalPrice: 190.80,
+    netAmount: 169.20,
     status: 'delivered',
     createdAt: '2024-09-20T09:00:00Z',
     updatedAt: '2024-09-25T11:00:00Z',
     categoryTitle: 'Flexible de frein avant',
     categoryTitleAr: 'خرطوم الفرامل الأمامي',
+    purchaseOrder: {
+      id: 404,
+      reference: 'BC-20240920-404',
+      orderItemId: 304,
+      amount: 169.20,
+      trackingNumber: 'AM2024092011',
+      carrier: 'Amana',
+      shippingNotes: null,
+      status: 'received',
+      sentAt: '2024-09-20T10:00:00Z',
+      shippedAt: '2024-09-20T15:00:00Z',
+      createdAt: '2024-09-20T10:00:00Z',
+      updatedAt: '2024-09-25T11:00:00Z',
+    },
   },
 ];
 
-/** Orders belonging to (or containing items from) this prestataire. */
-export const mockPartnerOrders: Order[] = [
-  // ── accepted (confirmed, not yet shipped) ───────────────────────────────
+/** Orders containing only lines owned by this Prestataire. */
+export const mockPartnerOrders: PrestataireOrder[] = [
   {
     id: 201,
     reference: 'CMD-20241008-201',
-    userId: 6,
-    addressId: 3,
-    couponId: null,
-    subtotal: 720.80,
-    discountAmount: 0,
-    shippingFee: 30.00,
-    taxAmount: 0,
-    total: 750.80,
+    netTotal: 639.20,
     status: 'confirmed',
-    paymentMethod: 'cod',
-    paymentStatus: 'pending',
+    fulfillmentStatus: 'sent',
     notes: null,
-    confirmedBy: 2,
     confirmedAt: '2024-10-08T15:00:00Z',
     createdAt: '2024-10-08T14:00:00Z',
     updatedAt: '2024-10-08T15:00:00Z',
-    items: mockPartnerOrderItems.filter((i) => i.orderId === 201),
+    items: mockPartnerOrderItems.filter((item) => item.orderId === 201),
   },
-  // ── shipped ──────────────────────────────────────────────────────────────
   {
     id: 202,
     reference: 'CMD-20241005-202',
-    userId: 7,
-    addressId: 4,
-    couponId: null,
-    subtotal: 2836.55,
-    discountAmount: 0,
-    shippingFee: 30.00,
-    taxAmount: 0,
-    total: 2866.55,
+    netTotal: 2515.43,
     status: 'shipped',
-    paymentMethod: 'virement',
-    paymentStatus: 'completed',
+    fulfillmentStatus: 'shipped',
     notes: 'Amana — AM2024100512',
-    confirmedBy: 2,
     confirmedAt: '2024-10-05T10:30:00Z',
     createdAt: '2024-10-05T10:00:00Z',
     updatedAt: '2024-10-05T16:00:00Z',
-    items: mockPartnerOrderItems.filter((i) => i.orderId === 202),
+    items: mockPartnerOrderItems.filter((item) => item.orderId === 202),
   },
-  // ── delivered ────────────────────────────────────────────────────────────
   {
     id: 203,
     reference: 'CMD-20240920-203',
-    userId: 5,
-    addressId: 2,
-    couponId: null,
-    subtotal: 190.80,
-    discountAmount: 0,
-    shippingFee: 30.00,
-    taxAmount: 0,
-    total: 220.80,
+    netTotal: 169.20,
     status: 'delivered',
-    paymentMethod: 'cod',
-    paymentStatus: 'completed',
+    fulfillmentStatus: 'received',
     notes: null,
-    confirmedBy: 2,
     confirmedAt: '2024-09-20T10:00:00Z',
     createdAt: '2024-09-20T09:00:00Z',
     updatedAt: '2024-09-25T11:00:00Z',
-    items: mockPartnerOrderItems.filter((i) => i.orderId === 203),
+    items: mockPartnerOrderItems.filter((item) => item.orderId === 203),
   },
 ];
 

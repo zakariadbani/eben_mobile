@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Image, StyleSheet } from "react-native";
 import type { FormikHelpers } from "formik";
 import { useTranslation } from "react-i18next";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import View from "@/components/common/View";
 import Screen from "@/components/common/Screen";
 import Colors from "@/constants/Colors";
@@ -10,6 +10,8 @@ import { Text } from "@/components/common/Text";
 import LoginForm from "@/components/screens/shared/LoginForm";
 import Button from "@/components/common/Button";
 import { ApiClientError } from "@/api/types";
+import { clientAuthHref, getClientReturnTo } from '@/constants/clientReturnTo';
+import { normalizeMoroccanPhone } from "@/helpers/phoneHelper";
 import {
   AuthRoleMismatchError,
   Role,
@@ -22,16 +24,10 @@ interface LoginFormValues {
   rememberMe: boolean;
 }
 
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (/^2126\d{8}$/.test(digits)) return `+${digits}`;
-  if (/^6\d{8}$/.test(digits)) return `+212${digits}`;
-  return digits;
-}
-
 const ClientLoginScreen = () => {
   const router = useRouter();
   const { login } = useSession();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
 
@@ -42,11 +38,11 @@ const ClientLoginScreen = () => {
     setError(null);
     try {
       const role = await login(
-        normalizePhone(values.phone),
+        normalizeMoroccanPhone(values.phone),
         values.password,
         Role.CLIENT,
       );
-      if (role === Role.CLIENT) router.replace("/(client)");
+      if (role === Role.CLIENT) router.replace(getClientReturnTo(returnTo));
     } catch (loginError) {
       setError(
         t(
@@ -87,7 +83,11 @@ const ClientLoginScreen = () => {
             outline
             variant="primary"
             style={styles.signUpLink}
-            navigateTo="/(auth)/ClientRegisterScreen"
+            onPress={() =>
+              router.push(
+                clientAuthHref("/(auth)/ClientRegisterScreen", String(getClientReturnTo(returnTo))),
+              )
+            }
           >
             <Text style={styles.signUpLinkText}>auth.login.signUp</Text>
           </Button>

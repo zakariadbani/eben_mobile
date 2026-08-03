@@ -14,6 +14,7 @@ import GoBack from "@/components/common/GoBack";
 import { Text } from "@/components/common/Text";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { useSession } from "@/context/AuthContext";
+import { clientAuthHref } from "@/constants/clientReturnTo";
 
 // Minimal type alias so tabBarIcon/tabBarLabel callbacks are typed without
 // depending on @react-navigation/bottom-tabs .d.ts (which is absent in this
@@ -447,6 +448,7 @@ export default function ClientLayout() {
         options={{
           title: t("Détails"),
           tabBarButton: () => null,
+          header: backHeader,
         }}
       />
 
@@ -496,6 +498,7 @@ export default function ClientLayout() {
         name="products/[productId]/index"
         options={{
           title: t("productDetail.title"),
+          header: backHeader,
           tabBarButton: () => null,
         }}
       />
@@ -503,6 +506,7 @@ export default function ClientLayout() {
         name="products/[productId]/reviews"
         options={{
           title: t("reviews.screenTitle"),
+          header: backHeader,
           tabBarButton: () => null,
         }}
       />
@@ -510,6 +514,7 @@ export default function ClientLayout() {
         name="products/[productId]/review"
         options={{
           title: t("review.screenTitle"),
+          header: backHeader,
           tabBarButton: () => null,
         }}
       />
@@ -619,14 +624,14 @@ export default function ClientLayout() {
           outline: true,
           onPress: () => {
             setGuestAuthVisible(false);
-            router.push("/(auth)/ClientRegisterScreen" as Href);
+            router.push(clientAuthHref("/(auth)/ClientRegisterScreen", "/(client)/settings"));
           },
         }}
         primaryButton={{
           title: t("guestAuth.signIn"),
           onPress: () => {
             setGuestAuthVisible(false);
-            router.push("/(auth)/ClientLoginScreen" as Href);
+            router.push(clientAuthHref("/(auth)/ClientLoginScreen", "/(client)/settings"));
           },
         }}
       >

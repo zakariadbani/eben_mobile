@@ -252,6 +252,16 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
       next[index] = { ...next[index]!, ...patch };
       return next;
     });
+    setLineErrors((prev) => {
+      const currentErrors = prev[index];
+      if (!currentErrors) return prev;
+      const nextLineErrors = { ...currentErrors };
+      for (const field of Object.keys(patch) as OfferLineField[]) delete nextLineErrors[field];
+      const next = { ...prev };
+      if (Object.keys(nextLineErrors).length === 0) delete next[index];
+      else next[index] = nextLineErrors;
+      return next;
+    });
   };
 
   // ── Submit ─────────────────────────────────────────────────────────────────
@@ -310,7 +320,9 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
         setLineErrors(mapped);
         if (Object.keys(mapped).length === 0) setSubmitError(error.message);
       } else {
-        setSubmitError(t('partner.fill.errorSubmit'));
+        const message = t('partner.fill.errorSubmit');
+        setSubmitError(message);
+        Alert.alert(t('partner.fill.errorTitle'), message);
       }
     } finally {
       mutationLock.current = false;
@@ -584,7 +596,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                       </Text>
                       {item?.quantity ? (
                         <Text type="small" color={Colors.gray} translate={false}>
-                          {`� ${item.quantity}`}
+                          {`× ${item.quantity}`}
                         </Text>
                       ) : null}
                     </View>

@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   },
   picker: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0,
+    color: "transparent",
   },
   item: {},
   display: {

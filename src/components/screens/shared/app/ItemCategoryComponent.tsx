@@ -67,6 +67,9 @@ const ItemCategoryComponent: React.FC<ItemCategoryComponentProps> = ({
         type="label"
         semiBold
         center
+        numberOfLines={2}
+        adjustsFontSizeToFit
+        minimumFontScale={0.85}
         style={[styles.title, !uppercase && styles.titleNoTransform]}
       >
         {displayTitle}

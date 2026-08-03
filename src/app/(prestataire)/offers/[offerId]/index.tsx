@@ -270,7 +270,7 @@ export default function PrestataireOfferDetailScreen(): React.ReactElement {
           </View>
         ) : (
           <View style={styles.imagePlaceholder}>
-            <Image source={require('@/assets/img/freins.png')} style={styles.placeholderImage} resizeMode="contain" />
+            <Text color={Colors.grayMidDark}>requestFlow.noPhoto</Text>
           </View>
         )}
 

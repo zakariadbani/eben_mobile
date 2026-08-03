@@ -126,6 +126,7 @@ const allowedRoutes: Record<AllowedRole, string[]> = {
     "(prestataire)/profile/notifications",
     "(prestataire)/profile/language",
     "(prestataire)/profile/about",
+    "(prestataire)/profile/legal",
 
     // Legacy stub screen kept from original scaffold
     "(prestataire)/settings",
@@ -148,7 +149,6 @@ const allowedRoutes: Record<AllowedRole, string[]> = {
     "(auth)/loading",
     "(auth)/WelcomeRoleSelectionScreen",
     "(auth)/ClientAuthenticationOptionsScreen",
-    "(auth)/legal",
     "(auth)/ClientRegisterScreen",
     "(auth)/ClientLoginScreen",
     "(auth)/ForgotPasswordScreen",
@@ -165,7 +165,6 @@ const allowedRoutes: Record<AllowedRole, string[]> = {
     "(auth)/prestataire/loading",
     "(auth)/prestataire/language",
     "(auth)/prestataire/welcome",
-    "(auth)/prestataire/waitlist",
     "(auth)/prestataire/sign-in",
     "(auth)/prestataire/forgot-password/index",
     "(auth)/prestataire/forgot-password/verification",

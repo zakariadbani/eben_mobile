@@ -37,11 +37,11 @@ const PubPlacerDemandeBlockComponent: React.FC = () => {
         <View flexDirection="row" alignItems="center" gap={10} style={styles.headerRow}>
           <CustomIcon name="newRequest" size={40} />
           <Text type="titleTwo" bold style={styles.title}>
-            Mal9itich dakchi li bghiti ?
+            catalog.requestPromo.title
           </Text>
         </View>
         <Text type="text" style={styles.subtitle}>
-          Envoyez-nous un message avec la pièce de voiture que vous voulez, et nous l&apos;ajouterons pour vous.
+          catalog.requestPromo.body
         </Text>
         <Button
           title="Placer une demande"

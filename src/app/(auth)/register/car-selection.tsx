@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import type { Href } from "expo-router";
 import Screen from "@/components/common/Screen";
 import View from "@/components/common/View";
@@ -10,6 +10,7 @@ import Colors from "@/constants/Colors";
 import ClientAddCarForm from "@/components/screens/client/parking/ClientAddCarForm";
 import { Role, useSession } from "@/context/AuthContext";
 import type { Vehicle } from "@/interfaces/Vehicle";
+import { clientAuthHref, getClientReturnTo } from "@/constants/clientReturnTo";
 
 function vehicleLabel(vehicle: Vehicle): string {
   return [
@@ -22,12 +23,14 @@ function vehicleLabel(vehicle: Vehicle): string {
 
 const CarSelectionScreen = () => {
   const router = useRouter();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const destination = getClientReturnTo(returnTo);
   const { role } = useSession();
 
   const handleSuccess = (vehicle: Vehicle) => {
     router.push({
       pathname: "/(auth)/register/success",
-      params: { carLabel: vehicleLabel(vehicle) },
+      params: { carLabel: vehicleLabel(vehicle), returnTo: String(destination) },
     } as Href);
   };
 
@@ -41,14 +44,16 @@ const CarSelectionScreen = () => {
           <ClientAddCarForm
             onSuccess={handleSuccess}
             canSubmit={role === Role.CLIENT}
-            onAuthRequired={() => router.push("/(auth)/ClientLoginScreen" as Href)}
+            onAuthRequired={() =>
+              router.push(clientAuthHref("/(auth)/ClientLoginScreen", String(destination)))
+            }
           />
         </View>
         <Button
           title="auth.register.skipVehicle"
           variant="secondary"
           style={styles.skipButton}
-          onPress={() => router.replace("/(client)")}
+          onPress={() => router.replace(destination)}
         />
       </View>
     </Screen>

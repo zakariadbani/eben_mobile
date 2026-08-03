@@ -89,7 +89,7 @@ const ItemBasketComponent: React.FC<ItemBasketComponentProps> = ({
   const formattedPrice = `${item.unitPrice.toLocaleString("fr-MA", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
-  })} dhs`;
+  })} Dhs`;
 
   return (
     <View style={[styles.container, style]}>
@@ -111,7 +111,7 @@ const ItemBasketComponent: React.FC<ItemBasketComponentProps> = ({
         <View flex gap={2} style={styles.infoCol}>
           {displayCategory ? (
             <Text type="small" color={Colors.gray}>
-              {isArabic ? t("Category") : "Category:"} {displayCategory}
+              {t("home.category", { value: displayCategory })}
             </Text>
           ) : null}
 

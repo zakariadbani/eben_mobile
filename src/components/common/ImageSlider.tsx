@@ -1,19 +1,38 @@
-import React from "react";
-import { StyleSheet, ScrollView, Image, View, Dimensions } from "react-native";
+import React, { useState } from "react";
+import { StyleSheet, ScrollView, Image, View, LayoutChangeEvent } from "react-native";
+import { useTranslation } from "react-i18next";
 import { Text } from "./Text";
-const { width: screenWidth } = Dimensions.get("window"); // Get the width of the screen
 
 interface ImageSliderProps {
   images: string[]; // Array of image URLs
 }
 
 const ImageSlider: React.FC<ImageSliderProps> = ({ images }) => {
+  const { t } = useTranslation();
+  const [pageWidth, setPageWidth] = useState(0);
+  const handleLayout = ({ nativeEvent }: LayoutChangeEvent) => {
+    setPageWidth(nativeEvent.layout.width);
+  };
+
   return (
-    <ScrollView horizontal pagingEnabled style={styles.sliderContainer}>
+    <ScrollView
+      horizontal
+      pagingEnabled
+      testID="image-slider"
+      onLayout={handleLayout}
+      style={styles.sliderContainer}
+    >
       {images.map((image, index) => (
-        <View key={index} style={styles.imageContainer}>
-          <Image source={{ uri: image }} style={styles.image} />
-          {/* Counter in the bottom-right corner */}
+        <View
+          key={`${image}-${index}`}
+          testID={`image-slide-${index}`}
+          style={[styles.imageContainer, pageWidth ? { width: pageWidth } : undefined]}
+        >
+          <Image
+            source={{ uri: image }}
+            style={styles.image}
+            accessibilityLabel={`${t("requestFlow.images")} ${index + 1}/${images.length}`}
+          />
           <View style={styles.counterContainer}>
             <Text type="loginDefault">
               {index + 1}/{images.length}
@@ -27,12 +46,10 @@ const ImageSlider: React.FC<ImageSliderProps> = ({ images }) => {
 
 const styles = StyleSheet.create({
   sliderContainer: {
-    // width: "100%",
-    width: screenWidth,
+    width: "100%",
     height: 220, // Adjust height as needed
   },
   imageContainer: {
-    width: screenWidth,
     height: "100%", // Take full height of the slider
     justifyContent: "center",
     alignItems: "center",

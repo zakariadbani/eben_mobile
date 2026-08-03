@@ -147,7 +147,7 @@ interface OrderCardProps {
 }
 
 const OrderCard: React.FC<OrderCardProps> = ({ order, onPress }) => {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
   const cfg = ORDER_STATUS_CONFIG[order.status] ?? ORDER_STATUS_CONFIG.pending;
 
@@ -159,7 +159,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onPress }) => {
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75} style={styles.card}>
       {/* Details link — top-right of card */}
-      <View flexDirection="row" alignItems="flex-start" gap={12}>
+      <View flexDirection="row" alignItems="flex-start" gap={12} style={isAr ? styles.rowRtl : undefined}>
         {/* Status-specific icon */}
         <View style={styles.iconWrapper}>
           <Icon name={cfg.icon} size={32} iconColor={cfg.color} type="Feather" />
@@ -168,21 +168,18 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onPress }) => {
         {/* Info column */}
         <View flex gap={4}>
           {/* Ref row + Details link */}
-          <View flexDirection="row" alignItems="center" justifyContent="space-between">
+          <View flexDirection="row" alignItems="center" justifyContent="space-between" style={isAr ? styles.rowRtl : undefined}>
             <View flexDirection="row" alignItems="center" gap={6}>
-              <Text type="small" color={Colors.gray} translate={false}>
-                {isAr ? 'المرجع:' : 'Ref:'}
-              </Text>
               <Text type="small" semiBold color={Colors.brand} translate={false}>
-                {order.reference}
+                {t('settings.orders.reference', { reference: order.reference })}
               </Text>
             </View>
             {/* Details → link */}
             <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.detailsLink}>
               <Text type="small" semiBold color={Colors.brand} translate={false}>
-                {isAr ? 'التفاصيل' : 'Details'}
+                {t('settings.orders.details')}
               </Text>
-              <Icon name="arrow-right" size={14} iconColor={Colors.brand} type="Feather" />
+              <Icon name={isAr ? "arrow-left" : "arrow-right"} size={14} iconColor={Colors.brand} type="Feather" />
             </TouchableOpacity>
           </View>
 
@@ -197,7 +194,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onPress }) => {
           </Text>
 
           {/* Status badge + CTA row */}
-          <View flexDirection="row" alignItems="center" justifyContent="space-between">
+          <View flexDirection="row" alignItems="center" justifyContent="space-between" style={isAr ? styles.rowRtl : undefined}>
             <View style={[styles.statusBadge, { backgroundColor: cfg.background }]}>
               <Text type="small" color={cfg.color} translate={false}>
                 {isAr ? cfg.labelAr : cfg.labelFr}
@@ -234,15 +231,24 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onSortAsc,
   onSortDesc,
   onFilter,
-}) => (
+}) => {
+  const { t, i18n } = useTranslation();
+  const isAr = i18n.language === 'ar';
+  return (
   <View
     flexDirection="row"
     alignItems="center"
     justifyContent="space-between"
-    style={styles.toolbar}
+    style={[styles.toolbar, isAr && styles.rowRtl]}
   >
     {/* Month + chevron */}
-    <TouchableOpacity onPress={onMonthPress} activeOpacity={0.75} style={styles.monthBtn}>
+    <TouchableOpacity
+      onPress={onMonthPress}
+      activeOpacity={0.75}
+      style={styles.monthBtn}
+      accessibilityRole="button"
+      accessibilityLabel={monthLabel}
+    >
       <Text type="label" semiBold color={Colors.brand} translate={false}>
         {monthLabel}
       </Text>
@@ -251,7 +257,14 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
     {/* Sort + filter icons */}
     <View flexDirection="row" alignItems="center" gap={16}>
-      <TouchableOpacity onPress={onSortAsc} activeOpacity={0.7}>
+      <TouchableOpacity
+        onPress={onSortAsc}
+        activeOpacity={0.7}
+        style={styles.toolbarIconBtn}
+        accessibilityRole="button"
+        accessibilityLabel={t('partner.offers.sortAscending')}
+        accessibilityState={{ selected: sortDir === 'asc' }}
+      >
         <Icon
           name="arrow-up"
           size={20}
@@ -259,7 +272,14 @@ const Toolbar: React.FC<ToolbarProps> = ({
           type="Feather"
         />
       </TouchableOpacity>
-      <TouchableOpacity onPress={onSortDesc} activeOpacity={0.7}>
+      <TouchableOpacity
+        onPress={onSortDesc}
+        activeOpacity={0.7}
+        style={styles.toolbarIconBtn}
+        accessibilityRole="button"
+        accessibilityLabel={t('partner.offers.sortDescending')}
+        accessibilityState={{ selected: sortDir === 'desc' }}
+      >
         <Icon
           name="arrow-down"
           size={20}
@@ -267,12 +287,19 @@ const Toolbar: React.FC<ToolbarProps> = ({
           type="Feather"
         />
       </TouchableOpacity>
-      <TouchableOpacity onPress={onFilter} activeOpacity={0.7}>
+      <TouchableOpacity
+        onPress={onFilter}
+        activeOpacity={0.7}
+        style={styles.toolbarIconBtn}
+        accessibilityRole="button"
+        accessibilityLabel={t('partner.offers.filter.title')}
+      >
         <Icon name="filter" size={20} iconColor={Colors.gray} type="Feather" />
       </TouchableOpacity>
     </View>
   </View>
-);
+  );
+};
 
 // ── Screen ───────────────────────────────────────────────────────────────────
 
@@ -544,6 +571,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  toolbarIconBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowRtl: {
+    flexDirection: 'row-reverse',
   },
   listContent: {
     flexGrow: 1,

@@ -98,11 +98,14 @@ jest.mock("@/components/common/forms", () => {
         children,
         React.createElement(Button, { title: "submit-form", onPress: () => onSubmit(mockFormValues) }),
       ),
-    FormPicker: ({ name, items, handleChange }: {
+    FormPicker: ({ name, items, handleChange, ...props }: {
       name: string;
       items: { id: number; title: string }[];
       handleChange?: (item: { id: number; title: string }, name: string) => void;
+      label?: string;
+      placeholder?: string;
     }) => React.createElement(View, {
+      ...props,
       testID: `picker-${name}`,
       items,
       onValueChange: (item: { id: number; title: string }) => handleChange?.(item, name),
@@ -330,6 +333,34 @@ it("ignores a stale slower model response after a newer brand selection", async 
   expect(screen.getByTestId("picker-modelId").props.items).toEqual([{ id: 22, title: "A4 LIVE" }]);
 });
 
+it("shows the newest vehicle years first", async () => {
+  mockGetCarYears.mockResolvedValueOnce({
+    success: true,
+    data: [{ id: 2020, title: "2020" }, { id: 2024, title: "2024" }, { id: 2022, title: "2022" }],
+  });
+  const screen = render(<ClientAddCarForm onSuccess={jest.fn()} />);
+
+  expect((await screen.findByTestId("picker-year")).props.items).toEqual([
+    { id: 2024, title: "2024" },
+    { id: 2022, title: "2022" },
+    { id: 2020, title: "2020" },
+  ]);
+});
+
+it("announces add-car fields in Arabic instead of French", async () => {
+  await i18n.changeLanguage("ar");
+  const screen = render(<ClientAddCarForm onSuccess={jest.fn()} />);
+  const brand = await screen.findByTestId("picker-brandId");
+
+  expect(brand.props.label).toBe(i18n.t("addCar.labelMarque"));
+  expect(brand.props.placeholder).toBe(i18n.t("addCar.chooseBrand"));
+  expect(screen.getByTestId("picker-modelId").props.label).toBe(i18n.t("addCar.labelModele"));
+  expect(screen.getByTestId("picker-modelId").props.placeholder).toBe(i18n.t("addCar.chooseModel"));
+  expect(screen.getByTestId("picker-year").props.label).toBe(i18n.t("addCar.labelAnnee"));
+  expect(screen.getByTestId("picker-motorizationId").props.label).toBe(i18n.t("addCar.labelMotorisation"));
+});
+
+
 it("persists once and reconciles the exact returned Vehicle", async () => {
   let resolveAdd!: (value: ApiResponse<Vehicle>) => void;
   mockAddVehicle.mockReturnValueOnce(
@@ -370,19 +401,34 @@ it("shows catalog API errors and retries without falling back to fixtures", asyn
   expect(mockGetBrands).toHaveBeenCalledTimes(2);
 });
 
-it("blocks registration vehicle creation without an active Client session and skip adds no route params", async () => {
+it("blocks registration vehicle creation without an active Client session and keeps the protected destination", async () => {
+  mockParams = { returnTo: "/(client)/products/1001" };
   mockedUseSession.mockReturnValue({ role: "guest" } as ReturnType<typeof useSession>);
   const screen = render(<CarSelectionScreen />);
   fireEvent.press(await screen.findByRole("button", { name: "submit-form" }));
   expect(mockAddVehicle).not.toHaveBeenCalled();
-  expect(mockPush).toHaveBeenCalledWith("/(auth)/ClientLoginScreen");
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: "/(auth)/ClientLoginScreen",
+    params: { returnTo: "/(client)/products/1001" },
+  });
 
   fireEvent.press(screen.getByRole("button", { name: "Passer cette étape" }));
-  expect(mockReplace).toHaveBeenCalledWith("/(client)");
+  expect(mockReplace).toHaveBeenCalledWith("/(client)/products/1001");
   expect(JSON.stringify(mockReplace.mock.calls)).not.toContain("vehicleId");
   expect(JSON.stringify(mockReplace.mock.calls)).not.toContain("carLabel");
 });
 
+it("passes the protected destination through vehicle onboarding success", async () => {
+  mockParams = { returnTo: "/(client)/products/1001" };
+  const screen = render(<CarSelectionScreen />);
+
+  fireEvent.press(await screen.findByRole("button", { name: "submit-form" }));
+
+  await waitFor(() => expect(mockPush).toHaveBeenCalledWith({
+    pathname: "/(auth)/register/success",
+    params: { carLabel: "BMW X5 LIVE 2022", returnTo: "/(client)/products/1001" },
+  }));
+});
 it("uses the exact backend Vehicle in the add-car success state", async () => {
   const screen = render(<AddCarScreen />);
   fireEvent.press(await screen.findByRole("button", { name: "submit-form" }));

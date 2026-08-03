@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   },
   stepNode: {
     alignItems: "center",
-    minWidth: 48,
+    width: 72,
   },
   circle: {
     width: 28,
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.borderLight,
   },
   stepLabel: {
-    maxWidth: 56,
+    maxWidth: 72,
   },
   labelCompleted: {
     color: Colors.greenDark,

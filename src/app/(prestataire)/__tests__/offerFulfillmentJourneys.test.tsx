@@ -1,5 +1,6 @@
 import React from "react";
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { Alert } from "react-native";
 
 import i18n from "@/localization/i18n";
 import { ApiClientError } from "@/api/types";
@@ -271,8 +272,35 @@ it("requires a positive raw price and at least one image for every offer line", 
   expect(await screen.findAllByText(i18n.t("requestFlow.noPhoto"))).toHaveLength(2);
   expect(mockUploadLocalImages).not.toHaveBeenCalled();
   expect(mockSubmitOffer).not.toHaveBeenCalled();
+
+  mockNextImageUris = ["file:///a.jpg", "file:///b.jpg"];
+  const addButtons = screen.getAllByRole("button", { name: i18n.t("requestFlow.addImage") });
+  fireEvent.press(addButtons[0]);
+  fireEvent.press(addButtons[1]);
+  expect(screen.queryAllByText(i18n.t("requestFlow.noPhoto"))).toHaveLength(0);
 });
 
+it("surfaces a generic upload failure immediately", async () => {
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+  mockNextImageUris = ["file:///a.jpg", "file:///b.jpg"];
+  mockUploadLocalImages.mockRejectedValueOnce(new Error("upload failed"));
+  const screen = render(<OfferFillScreen />);
+  const addButtons = await screen.findAllByRole("button", { name: i18n.t("requestFlow.addImage") });
+  fireEvent.press(addButtons[0]);
+  fireEvent.press(addButtons[1]);
+  const priceInputs = screen.getAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"));
+  fireEvent.changeText(priceInputs[0], "250");
+  fireEvent.changeText(priceInputs[1], "300");
+
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.ctaSend") }));
+
+  await waitFor(() => expect(alert).toHaveBeenCalledWith(
+    i18n.t("partner.fill.errorTitle"),
+    i18n.t("partner.fill.errorSubmit"),
+  ));
+  expect(mockSubmitOffer).not.toHaveBeenCalled();
+  alert.mockRestore();
+});
 it("uploads multi-line local images in order, submits raw prices only, and retries 422 without re-uploading", async () => {
   mockNextImageUris = ["file:///a.jpg", "content://picker/b.png"];
   mockSubmitOffer
@@ -367,6 +395,14 @@ it.each(["0", "-1", "9007199254740992", "abc"])("rejects invalid request id %s w
   expect(mockGetOffer).not.toHaveBeenCalled();
 });
 
+it("labels an offer with no seller photo instead of showing a different part", async () => {
+  mockParams = { offerId: "401" };
+  mockGetOffer.mockResolvedValueOnce({ success: true, data: { ...offer, images: [] } });
+  const screen = render(<OfferDetailScreen />);
+
+  expect(await screen.findByText(i18n.t("requestFlow.noPhoto"))).toBeTruthy();
+  expect(screen.queryByTestId("image-slider")).toBeNull();
+});
 it("rejects an unsafe offer detail id without an API call", async () => {
   mockParams = { offerId: "9007199254740992" };
   const screen = render(<OfferDetailScreen />);

@@ -41,22 +41,22 @@ import type { PrestataireWallet, BalanceTransaction } from '@/interfaces/Wallet'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatAmount(amount: number): string {
-  return amount.toLocaleString('fr-MA', {
+function formatAmount(amount: number, locale: string): string {
+  return amount.toLocaleString(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 }
 
-function formatShortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-MA', {
+function formatShortDate(iso: string, locale: string): string {
+  return new Date(iso).toLocaleDateString(locale, {
     day: '2-digit',
     month: 'short',
   });
 }
 
-function formatLongDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-MA', {
+function formatLongDate(iso: string, locale: string): string {
+  return new Date(iso).toLocaleDateString(locale, {
     day: '2-digit',
     month: 'long',
     year: 'numeric',
@@ -68,10 +68,11 @@ function formatLongDate(iso: string): string {
 interface TransactionRowProps {
   item: BalanceTransaction;
   isArabic: boolean;
+  locale: string;
   processing?: boolean;
 }
 
-function TransactionRow({ item, isArabic, processing = false }: TransactionRowProps): React.ReactElement {
+function TransactionRow({ item, isArabic, locale, processing = false }: TransactionRowProps): React.ReactElement {
   const isCredit = item.type === 'credit';
   const sign = isCredit ? '+' : '-';
   const amountColor = isCredit ? Colors.greenDark : Colors.red;
@@ -87,7 +88,7 @@ function TransactionRow({ item, isArabic, processing = false }: TransactionRowPr
       {/* Date */}
       <View style={styles.txDate}>
         <Text type="small" color={Colors.grayMidDark} translate={false}>
-          {formatShortDate(item.createdAt)}
+          {formatShortDate(item.createdAt, locale)}
         </Text>
       </View>
 
@@ -115,7 +116,7 @@ function TransactionRow({ item, isArabic, processing = false }: TransactionRowPr
       ) : null}
       <View style={styles.txAmount}>
         <Text type="label" semiBold color={amountColor} translate={false}>
-          {`${sign}${formatAmount(item.amount)} dhs`}
+          {`${sign}${formatAmount(item.amount, locale)} dhs`}
         </Text>
       </View>
     </View>
@@ -127,6 +128,7 @@ function TransactionRow({ item, isArabic, processing = false }: TransactionRowPr
 export default function PrestataireWalletScreen(): React.ReactElement {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
+  const locale = isArabic ? 'ar-MA' : 'fr-MA';
   const router = useRouter();
   const { state } = useLocalSearchParams<{ state?: string }>();
 
@@ -185,8 +187,13 @@ export default function PrestataireWalletScreen(): React.ReactElement {
     return (
       <Screen whatsapp={false}>
         <View style={styles.headerBar} flexDirection="row" alignItems="center">
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Icon name="arrow-left" type="Feather" size={22} iconColor={Colors.brand} />
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('accessibility.back')}
+          >
+            <Icon name={isArabic ? 'arrow-right' : 'arrow-left'} type="Feather" size={22} iconColor={Colors.brand} />
           </TouchableOpacity>
           <Text type="headerTitle" semiBold style={styles.headerTitle}>
             {t('partner.wallet.title')}
@@ -220,13 +227,23 @@ export default function PrestataireWalletScreen(): React.ReactElement {
     <Screen whatsapp={false} scrollable={false} avoidKeyboard={false}>
       {/* ── Header bar ────────────────────────────────────── */}
       <View style={styles.headerBar} flexDirection="row" alignItems="center">
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel={t('accessibility.back')}
+        >
           <Icon name={isArabic ? 'arrow-right' : 'arrow-left'} type="Feather" size={22} iconColor={Colors.brand} />
         </TouchableOpacity>
         <Text type="headerTitle" semiBold style={styles.headerTitle}>
           {t('partner.wallet.title')}
         </Text>
-        <TouchableOpacity style={styles.bellBtn} onPress={() => router.push('/(prestataire)/profile/notifications' as never)}>
+        <TouchableOpacity
+          style={styles.bellBtn}
+          onPress={() => router.push('/(prestataire)/profile/notifications' as never)}
+          accessibilityRole="button"
+          accessibilityLabel={t('Notifications')}
+        >
           <Icon name="bell" type="Feather" size={22} iconColor={Colors.brand} />
         </TouchableOpacity>
       </View>
@@ -250,7 +267,7 @@ export default function PrestataireWalletScreen(): React.ReactElement {
                   </Text>
                 </View>
                 <Text type="title" bold color={Colors.brand} translate={false}>
-                  {`${formatAmount(wallet.balance)} Dhs`}
+                  {`${formatAmount(wallet.balance, locale)} Dhs`}
                 </Text>
               </View>
 
@@ -292,7 +309,12 @@ export default function PrestataireWalletScreen(): React.ReactElement {
                 returnKeyType="search"
               />
               {search.length > 0 && (
-                <TouchableOpacity onPress={() => setSearch('')}>
+                <TouchableOpacity
+                  onPress={() => setSearch('')}
+                  style={styles.iconButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('partner.search.clear')}
+                >
                   <Icon name="x-circle" type="Feather" size={18} iconColor={Colors.gray} />
                 </TouchableOpacity>
               )}
@@ -308,13 +330,18 @@ export default function PrestataireWalletScreen(): React.ReactElement {
               <View flexDirection="row" alignItems="center" gap={4}>
                 <Text type="label" semiBold color={Colors.brand} translate={false}>
                   {sorted.length > 0
-                    ? formatLongDate(sorted[0]!.createdAt)
+                    ? formatLongDate(sorted[0]!.createdAt, locale)
                     : '—'}
                 </Text>
-                <Icon name="chevron-down" type="Feather" size={16} iconColor={Colors.brand} />
               </View>
               <View flexDirection="row" alignItems="center" gap={8}>
-                <TouchableOpacity onPress={() => setSortAsc(false)}>
+                <TouchableOpacity
+                  onPress={() => setSortAsc(false)}
+                  style={styles.iconButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('partner.offers.sortDescending')}
+                  accessibilityState={{ selected: !sortAsc }}
+                >
                   <Icon
                     name="arrow-up"
                     type="Feather"
@@ -322,7 +349,13 @@ export default function PrestataireWalletScreen(): React.ReactElement {
                     iconColor={!sortAsc ? Colors.brand : Colors.gray}
                   />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setSortAsc(true)}>
+                <TouchableOpacity
+                  onPress={() => setSortAsc(true)}
+                  style={styles.iconButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('partner.offers.sortAscending')}
+                  accessibilityState={{ selected: sortAsc }}
+                >
                   <Icon
                     name="arrow-down"
                     type="Feather"
@@ -338,7 +371,7 @@ export default function PrestataireWalletScreen(): React.ReactElement {
         data={sorted}
         keyExtractor={(item) => `tx-${item.id}`}
         renderItem={({ item, index }) => (
-          <TransactionRow item={item} isArabic={isArabic} processing={state === 'processing' && index === 0} />
+          <TransactionRow item={item} isArabic={isArabic} locale={locale} processing={state === 'processing' && index === 0} />
         )}
         ListEmptyComponent={
           <View style={styles.emptyWrap} alignItems="center">
@@ -364,7 +397,10 @@ const styles = StyleSheet.create({
     minHeight: 56,
   },
   backBtn: {
-    padding: 4,
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 8,
   },
   headerTitle: {
@@ -372,7 +408,16 @@ const styles = StyleSheet.create({
     color: Colors.brand,
   },
   bellBtn: {
-    padding: 4,
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconButton: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // List

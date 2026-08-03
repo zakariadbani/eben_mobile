@@ -17,7 +17,6 @@
  *
  * Wired into navigation from:
  *   - results.tsx (product card onPress)
- *   - ItemProductCardComponent.tsx (home carousel card onPress)
  */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -40,6 +39,7 @@ import Button from "@/components/common/Button";
 import CustomModal from "@/components/common/CustomModal";
 import Icon from "@/components/common/Icon";
 import Colors from "@/constants/Colors";
+import { clientAuthHref } from '@/constants/clientReturnTo';
 
 import { getProduct, addToBasket, addToWishlist, getWishlist, removeWishlistItem } from "@/api";
 import { Role, useSession } from "@/context/AuthContext";
@@ -97,30 +97,35 @@ interface StarRatingProps {
   rating: number;
   reviewsCount: number;
   onPress: () => void;
+  isArabic: boolean;
 }
 
-const StarRating: React.FC<StarRatingProps> = ({ rating, reviewsCount, onPress }) => {
+const StarRating: React.FC<StarRatingProps> = ({ rating, reviewsCount, onPress, isArabic }) => {
   const stars = Array.from({ length: 5 }, (_, i) => {
     const filled = i + 1 <= Math.floor(rating);
     const half = !filled && i < rating && rating - Math.floor(rating) >= 0.25;
-    return filled ? "★" : half ? "⯨" : "☆";
+    return filled ? "star" : half ? "star-half-full" : "star-o";
   });
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.ratingRow}>
       <View flexDirection="row" alignItems="center" gap={4}>
         <View flexDirection="row" gap={1}>
-          {stars.map((s, i) => (
-            <Text key={i} style={styles.star} translate={false}>
-              {s}
-            </Text>
+          {stars.map((name, i) => (
+            <Icon
+              key={i}
+              name={name}
+              size={18}
+              iconColor={Colors.orange}
+              type="FontAwesome"
+            />
           ))}
         </View>
         <Text type="small" color={Colors.gray} translate={false}>
           {`${rating.toFixed(1)}/5 (${reviewsCount})`}
         </Text>
         <Icon
-          name="chevron-right"
+          name={isArabic ? "chevron-left" : "chevron-right"}
           size={12}
           iconColor={Colors.gray}
           type="FontAwesome5"
@@ -235,7 +240,7 @@ const ProductDetailScreen: React.FC = () => {
   const handleAddToBasket = useCallback(async () => {
     if (!product || basketMutation.current) return;
     if (role !== Role.CLIENT) {
-      router.push("/(auth)/ClientLoginScreen" as Href);
+      router.push(clientAuthHref("/(auth)/ClientLoginScreen", `/(client)/products/${productId}`));
       return;
     }
     basketMutation.current = true;
@@ -252,12 +257,12 @@ const ProductDetailScreen: React.FC = () => {
       setAddToBasketLoading(false);
       basketMutation.current = false;
     }
-  }, [product, qty, role, router, t]);
+  }, [product, productId, qty, role, router, t]);
 
   const handleWishlist = useCallback(async () => {
     if (!product || wishlistMutation.current) return;
     if (role !== Role.CLIENT) {
-      router.push("/(auth)/ClientLoginScreen" as Href);
+      router.push(clientAuthHref("/(auth)/ClientLoginScreen", `/(client)/products/${productId}`));
       return;
     }
     wishlistMutation.current = true;
@@ -281,15 +286,15 @@ const ProductDetailScreen: React.FC = () => {
       setWishlistLoading(false);
       wishlistMutation.current = false;
     }
-  }, [product, wishlistItemId, role, router, t]);
+  }, [product, productId, wishlistItemId, role, router, t]);
 
   const openPurchase = useCallback(() => {
     if (role !== Role.CLIENT) {
-      router.push("/(auth)/ClientLoginScreen" as Href);
+      router.push(clientAuthHref("/(auth)/ClientLoginScreen", `/(client)/products/${productId}`));
       return;
     }
     setShowPurchaseModal(true);
-  }, [role, router]);
+  }, [productId, role, router]);
 
   const handleReviewsPress = useCallback(() => {
     router.push({
@@ -312,7 +317,7 @@ const ProductDetailScreen: React.FC = () => {
 
   if (loadState === "loading") {
     return (
-      <Screen>
+      <Screen whatsapp={false}>
         <View flex style={styles.centered}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
@@ -322,7 +327,7 @@ const ProductDetailScreen: React.FC = () => {
 
   if (loadState === "error" || !product) {
     return (
-      <Screen padding>
+      <Screen padding whatsapp={false}>
         <View flex style={styles.centered}>
           <Text type="default" color={Colors.gray} accessibilityRole="alert">
             {t("auth.error.generic")}
@@ -349,7 +354,7 @@ const ProductDetailScreen: React.FC = () => {
   const activePrice = hasPromo ? product.promoPrice! : product.price;
 
   return (
-    <Screen>
+    <Screen whatsapp={false}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -357,16 +362,24 @@ const ProductDetailScreen: React.FC = () => {
       >
         {/* ── Gallery ─────────────────────────────────────────── */}
         <View style={styles.gallery}>
-          <Image
-            source={product.images[0] ? { uri: product.images[0] } : require("@/assets/img/freins.png")}
-            style={styles.galleryImage}
-            resizeMode="contain"
-          />
-          <View style={styles.galleryCounter}>
-            <Text type="small" color={Colors.white} translate={false}>
-              {`1/${Math.max(product.images.length, 1)}`}
+          {product.images.length > 0 ? (
+            <>
+              <Image
+                source={{ uri: product.images[0] }}
+                style={styles.galleryImage}
+                resizeMode="contain"
+              />
+              <View style={styles.galleryCounter}>
+                <Text type="small" color={Colors.white} translate={false}>
+                  {`1/${product.images.length}`}
+                </Text>
+              </View>
+            </>
+          ) : (
+            <Text type="small" color={Colors.gray}>
+              {t("requestFlow.noPhoto")}
             </Text>
-          </View>
+          )}
         </View>
 
         {/* ── Content card ───────────────────────────────────── */}
@@ -449,7 +462,7 @@ const ProductDetailScreen: React.FC = () => {
           )}
 
           {/* ── Occasion: état info ──────────────────────────── */}
-          {isOccasion && (
+          {isOccasion && product.images.length > 0 && (
             <View style={styles.occasionInfoRow}>
               <Icon name="info-circle" size={14} iconColor={Colors.orange} type="FontAwesome5" />
               <Text type="small" color={Colors.orange} style={styles.occasionInfoText}>
@@ -474,6 +487,7 @@ const ProductDetailScreen: React.FC = () => {
                 rating={product.rating}
                 reviewsCount={product.reviewsCount}
                 onPress={handleReviewsPress}
+                isArabic={isArabic}
               />
             </View>
           )}
@@ -507,12 +521,14 @@ const ProductDetailScreen: React.FC = () => {
               <View style={styles.sectionDivider} />
               <ExpandableSection title={t("Information Occasion")} initiallyExpanded={requestedState === "extra-info"}>
                 <View gap={6}>
-                  <View flexDirection="row" alignItems="center" gap={8}>
-                    <Icon name="exclamation-triangle" size={13} iconColor={Colors.orange} type="FontAwesome5" />
-                    <Text type="small" color={Colors.grayMidDark} style={styles.flex1}>
-                      {t("Vérifiez les photos avant de confirmer votre achat.")}
-                    </Text>
-                  </View>
+                  {product.images.length > 0 && (
+                    <View flexDirection="row" alignItems="center" gap={8}>
+                      <Icon name="exclamation-triangle" size={13} iconColor={Colors.orange} type="FontAwesome5" />
+                      <Text type="small" color={Colors.grayMidDark} style={styles.flex1}>
+                        {t("Vérifiez les photos avant de confirmer votre achat.")}
+                      </Text>
+                    </View>
+                  )}
                   <View flexDirection="row" alignItems="center" gap={8}>
                     <Icon name="undo" size={13} iconColor={Colors.blue} type="FontAwesome5" />
                     <Text type="small" color={Colors.grayMidDark} style={styles.flex1}>
@@ -564,17 +580,11 @@ const ProductDetailScreen: React.FC = () => {
           <QtyStepper value={qty} onChange={setQty} />
           <View style={styles.addBtnWrapper}>
             <Button
-              title={
-                addToBasketLoading
-                  ? t("Ajout...")
-                  : isOccasion
-                  ? t("occasion.addToList")
-                  : t("Ajouter au panier")
-              }
+              title={addToBasketLoading ? t("Ajout...") : t("Ajouter au panier")}
               variant="primary"
               onPress={openPurchase}
               style={styles.addBtn}
-              rightIcon={isOccasion ? undefined : "shopping-cart"}
+              rightIcon="shopping-cart"
               iconTypeName="FontAwesome5"
               sizeIcon={16}
             />
@@ -584,9 +594,9 @@ const ProductDetailScreen: React.FC = () => {
 
       <CustomModal
         visible={showPurchaseModal}
-        title={isOccasion ? t("Ajouter à la liste") : t("Ajouter au panier")}
+        title={t("Ajouter au panier")}
         primaryButton={{
-          title: addToBasketLoading ? t("Ajout...") : isOccasion ? t("occasion.addToList") : t("Acheter"),
+          title: addToBasketLoading ? t("Ajout...") : t("Confirm"),
           onPress: () => void handleAddToBasket(),
           variant: "primary",
         }}
@@ -612,9 +622,9 @@ const ProductDetailScreen: React.FC = () => {
       {/* ── Success modal ────────────────────────────────────── */}
       <CustomModal
         visible={showSuccessModal}
-        title={isOccasion ? t("Ajouté à la liste !") : t("Ajouté au panier !")}
+        title={t("Ajouté au panier !")}
         primaryButton={{
-          title: isOccasion ? t("Ma liste") : t("Voir le panier"),
+          title: t("Voir le panier"),
           variant: "brand",
           onPress: handleSuccessGoToCart,
         }}
@@ -639,7 +649,12 @@ const ProductDetailScreen: React.FC = () => {
               </Text>
               {basketAfterAdd ? (
                 <Text testID="product-basket-total" type="small" color={Colors.gray} translate={false}>
-                  {`${basketAfterAdd.total.toLocaleString("fr-MA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Dhs`}
+                  {t("commerce.success.total", {
+                    value: basketAfterAdd.total.toLocaleString("fr-MA", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }),
+                  })}
                 </Text>
               ) : null}
             </>

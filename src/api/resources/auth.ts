@@ -4,6 +4,8 @@ import type { AuthUser } from '@/interfaces/User';
 
 export interface AuthSession {
   token: string;
+  /** Durable marker used to prevent simulator credentials reaching a live API. */
+  source?: 'mock';
   user: AuthUser;
   /** Local-only durable marker used while a changed phone awaits public OTP verification. */
   pendingPhoneVerification?: string;

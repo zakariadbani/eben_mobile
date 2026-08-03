@@ -96,7 +96,7 @@ export default function ClientAddCarForm({
         getMotorizations(),
       ]);
       setBrands(brandsRes.data.map((b) => ({ id: b.id, title: b.name })));
-      setYears(yearsRes.data.map((y) => ({ id: y.id, title: y.title })));
+      setYears([...yearsRes.data].sort((a, b) => b.id - a.id).map((y) => ({ id: y.id, title: y.title })));
       setMotorizations(motorizationsRes.data.map((m) => ({ id: m.id, title: m.name })));
       setCatalogState('ready');
     } catch {
@@ -187,8 +187,8 @@ export default function ClientAddCarForm({
         <ClearModelOnBrandChange brandId={selectedBrandId} />
         <FormPicker
           name="brandId"
-          label="Marque"
-          placeholder="Choisir la marque"
+          label={t('addCar.labelMarque')}
+          placeholder={t('addCar.chooseBrand')}
           items={brands}
           searchable
           handleChange={(item: PickerItem) => { void handleBrandChange(item); }}
@@ -211,23 +211,23 @@ export default function ClientAddCarForm({
 
         <FormPicker
           name="modelId"
-          label="Modele"
-          placeholder="Choisir le model"
+          label={t('addCar.labelModele')}
+          placeholder={t('addCar.chooseModel')}
           items={filteredModels}
           searchable
         />
 
         <FormPicker
           name="year"
-          label="Annee"
-          placeholder="Choisir l'annee"
+          label={t('addCar.labelAnnee')}
+          placeholder={t('addCar.chooseYear')}
           items={years}
         />
 
         <FormPicker
           name="motorizationId"
-          label="Motorisation"
-          placeholder="Choisir la motorisation"
+          label={t('addCar.labelMotorisation')}
+          placeholder={t('addCar.chooseMotorization')}
           items={motorizations}
         />
 

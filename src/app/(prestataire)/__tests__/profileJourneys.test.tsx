@@ -169,6 +169,7 @@ it('shows the live profile identity without unsupported local privacy toggles', 
   const screen = render(<ProfileScreen />);
   await screen.findByText(i18n.t('partner.profile.greeting', { name: 'Partner Live' }));
   expect(screen.queryByText(i18n.t('partner.profile.notifPush'))).toBeNull();
+  expect(screen.getByRole('button', { name: i18n.t('partner.notifications.title') })).toBeTruthy();
   expect(screen.queryByText(i18n.t('partner.profile.doNotTrack'))).toBeNull();
 });
 
@@ -203,6 +204,8 @@ it('renders live offer history in Arabic without prototype query overrides', asy
   await screen.findByText(/OFF-LIVE-9/);
   expect(mockGetHistory).toHaveBeenCalledTimes(1);
   expect(screen.getByText(i18n.t('partner.offer.statusPending'))).toBeTruthy();
+  fireEvent.changeText(screen.getByPlaceholderText(i18n.t('partner.history.searchPlaceholder')), 'OFF');
+  expect(screen.getByRole('button', { name: i18n.t('partner.search.clear') })).toBeTruthy();
   expect(screen.getByText(i18n.t('partner.offersHistory.prixNet'))).toBeTruthy();
 });
 

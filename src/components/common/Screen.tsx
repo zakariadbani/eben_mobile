@@ -68,7 +68,7 @@ export const Screen: React.FC<ScreenProps> = ({
       >
         {whatsapp && <WhatsappBtn />}
         {scrollable ? (
-          <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+          <ScrollView contentContainerStyle={[styles.scrollContent, whatsapp && styles.whatsappInset]}>
             {children}
           </ScrollView>
         ) : (
@@ -91,6 +91,8 @@ const styles = StyleSheet.create({
   padding: {
     padding: 16, // Standard padding, adjust as needed
   },
+  scrollContent: { flexGrow: 1 },
+  whatsappInset: { paddingBottom: 78 },
 });
 
 export default Screen;

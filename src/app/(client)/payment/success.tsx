@@ -4,8 +4,7 @@
  * Figma: "Basket-Checkout-experience_Experience-success"
  *
  * Navigated to from the checkout via router.replace so Back skips the
- * checkout form. Also rendered as the success state from the inline
- * ClientCheckoutModalSuccess modal (which covers the same Figma frame).
+ * checkout form.
  *
  * Route query carries only the placed order ID. All displayed values are
  * reloaded from the authenticated order endpoint.
@@ -188,8 +187,8 @@ export default function OrderSuccessScreen() {
         {/* ── Télécharger la facture ────────────────────────────────── */}
         <TouchableOpacity activeOpacity={0.7} style={styles.invoiceRow} disabled accessibilityRole="button" accessibilityLabel={t('commerce.success.invoice')} accessibilityState={{ disabled: true }}>
           <View flexDirection="row" alignItems="center" gap={10}>
-            <CustomIcon name="printer" size={24} tintColor={Colors.brand} />
-            <Text type="label" bold style={styles.invoiceLink}>
+            <CustomIcon name="printer" size={24} tintColor={Colors.gray} />
+            <Text type="label" semiBold color={Colors.gray}>
               {t('commerce.success.invoice')}
             </Text>
           </View>

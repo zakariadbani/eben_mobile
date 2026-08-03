@@ -5,6 +5,7 @@ import ClientLayout from "../_layout";
 
 const mockPush = jest.fn();
 let mockSession: { username: string; role: string } | null = null;
+let mockScreenOptions: Record<string, { header?: unknown }> = {};
 let mockProfileListeners: {
   tabPress: (event: { preventDefault: () => void }) => void;
 };
@@ -18,11 +19,14 @@ jest.mock("expo-router", () => {
   Tabs.Screen = function MockTabsScreen({
     name,
     listeners,
+    options,
   }: {
     name: string;
     listeners?: typeof mockProfileListeners;
+    options?: { header?: unknown };
   }) {
     if (name === "settings/index" && listeners) mockProfileListeners = listeners;
+    mockScreenOptions[name] = options ?? {};
     return null;
   };
 
@@ -95,8 +99,17 @@ describe("Client Profile tab", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSession = null;
+    mockScreenOptions = {};
   });
 
+  it("shows a back header on pushed product screens", () => {
+    render(<ClientLayout />);
+
+    expect(mockScreenOptions["products/[productId]/index"]?.header).toEqual(expect.any(Function));
+    expect(mockScreenOptions["products/[productId]/reviews"]?.header).toEqual(expect.any(Function));
+    expect(mockScreenOptions["products/[productId]/review"]?.header).toEqual(expect.any(Function));
+    expect(mockScreenOptions["requests/[requestId]/offers/[offerId]/index"]?.header).toEqual(expect.any(Function));
+  });
   it("blocks guest navigation and opens the authentication modal", () => {
     const preventDefault = jest.fn();
     const screen = render(<ClientLayout />);
@@ -112,7 +125,7 @@ describe("Client Profile tab", () => {
 
     act(() => mockProfileListeners.tabPress({ preventDefault }));
     fireEvent.press(screen.getByText("guestAuth.signIn"));
-    expect(mockPush).toHaveBeenCalledWith("/(auth)/ClientLoginScreen");
+    expect(mockPush).toHaveBeenCalledWith({ pathname: "/(auth)/ClientLoginScreen", params: { returnTo: "/(client)/settings" } });
   });
 
   it("opens client registration from the guest modal", () => {
@@ -123,7 +136,7 @@ describe("Client Profile tab", () => {
     );
     fireEvent.press(screen.getByText("guestAuth.createAccount"));
 
-    expect(mockPush).toHaveBeenCalledWith("/(auth)/ClientRegisterScreen");
+    expect(mockPush).toHaveBeenCalledWith({ pathname: "/(auth)/ClientRegisterScreen", params: { returnTo: "/(client)/settings" } });
   });
 
   it("allows authenticated clients to open Profile", () => {

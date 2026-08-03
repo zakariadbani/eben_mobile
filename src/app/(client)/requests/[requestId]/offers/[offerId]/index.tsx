@@ -74,11 +74,11 @@ export default function OfferDetailScreen() {
   };
 
   if (state === "loading") {
-    return <Screen><View flex style={styles.centered}><ActivityIndicator color={Colors.primary} /></View></Screen>;
+    return <Screen whatsapp={false}><View flex style={styles.centered}><ActivityIndicator color={Colors.primary} /></View></Screen>;
   }
   if (state === "error" || !offer) {
     return (
-      <Screen padding>
+      <Screen padding whatsapp={false}>
         <View flex style={styles.centered} gap={12}>
           <Text accessibilityRole="alert">{offerId === null || requestId === null ? "requestFlow.invalidRoute" : "requestFlow.offerNotFound"}</Text>
           {offerId !== null && requestId !== null ? <Button title="requestFlow.retry" onPress={() => void load()} /> : null}
@@ -92,10 +92,10 @@ export default function OfferDetailScreen() {
   const canAccept = isAvailable && offer.status === "validated";
   const locale = i18n.language === "ar" ? "ar-MA" : "fr-MA";
   return (
-    <Screen>
+    <Screen whatsapp={false}>
       <ScrollView contentContainerStyle={styles.content}>
         {offer.images?.length ? <ImageSlider images={offer.images} /> : <Text center color={Colors.gray}>requestFlow.noPhoto</Text>}
-        <Text type="small" color={Colors.gray} style={styles.reference}>
+        <Text type="small" color={Colors.gray} style={styles.reference} translate={false}>
           {t("requestFlow.reference", { value: offer.reference })}
         </Text>
         <Text color={isAvailable ? Colors.greenDark : Colors.error}>

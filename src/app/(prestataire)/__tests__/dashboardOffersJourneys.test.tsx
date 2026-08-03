@@ -1,5 +1,5 @@
 import React from "react";
-import { FlatList, RefreshControl } from "react-native";
+import { FlatList, Image, RefreshControl, StyleSheet, TouchableOpacity } from "react-native";
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 
 import i18n from "@/localization/i18n";
@@ -7,6 +7,8 @@ import Dashboard from "../dashboard";
 import OverviewScreen from "../profile/overview";
 import PrestataireSearchScreen from "../search";
 import PrestataireOffersScreen from "../offers";
+import ItemIncomingRequestCard from "@/components/screens/prestataire/ItemIncomingRequestCard";
+import ItemPartnerOfferCard from "@/components/screens/prestataire/ItemPartnerOfferCard";
 
 const mockPush = jest.fn();
 const mockSetParams = jest.fn();
@@ -301,6 +303,17 @@ it("keeps dashboard stats visible when its offer feed fails and refreshes both r
   expect(mockGetIncoming).toHaveBeenCalledTimes(2);
 });
 
+it("does not present shared offer sections as empty while their feed is still loading", async () => {
+  const incoming = deferred<{ success: true; data: typeof requests; pagination: typeof pagination }>();
+  mockGetIncoming.mockReturnValueOnce(incoming.promise);
+  const screen = render(<Dashboard />);
+
+  await screen.findAllByText("106,00 Dhs");
+  expect(screen.queryByText(i18n.t("partner.dashboard.emptyOffers"))).toBeNull();
+
+  await act(async () => incoming.resolve({ success: true, data: requests, pagination }));
+  expect(await screen.findByText("Plaquettes live")).toBeTruthy();
+});
 it("sources dashboard open, sent, and active rows from their canonical live feeds", async () => {
   const screen = render(<Dashboard />);
 
@@ -349,7 +362,7 @@ it("filters fetched incoming requests locally and offer cards open returned offe
   fireEvent.press(incomingScreen.UNSAFE_getAllByProps({ accessibilityRole: "button" }).find(
     (node) => node.props.accessibilityLabel === i18n.t("partner.offers.filter.title"),
   )!);
-  fireEvent.press(incomingScreen.getByText(i18n.t("partner.offers.category.transmission")));
+  fireEvent.press(incomingScreen.getAllByText("Transmission live").at(-1)!);
   fireEvent.press(incomingScreen.getByText(i18n.t("partner.offers.filter.apply")));
   expect(incomingScreen.queryByText("Plaquettes live")).toBeNull();
   expect(incomingScreen.getByText("Transmission live")).toBeTruthy();
@@ -363,6 +376,52 @@ it("filters fetched incoming requests locally and offer cards open returned offe
   expect(mockPush).toHaveBeenCalledWith("/(prestataire)/offers/901");
 });
 
+it("passes bundled category images through and mirrors Prestataire cards in Arabic", async () => {
+  await i18n.changeLanguage("ar");
+  const localImage = 42 as unknown as string;
+  const incoming = render(
+    <ItemIncomingRequestCard
+      item={{ ...requests[0]!, items: [{ ...requests[0]!.items[0]!, categoryImage: localImage }] }}
+    />,
+  );
+
+  expect(incoming.UNSAFE_getByType(Image).props.source).toBe(localImage);
+  expect(StyleSheet.flatten(incoming.UNSAFE_getAllByType(TouchableOpacity)[0].props.style).flexDirection).toBe("row-reverse");
+  expect(StyleSheet.flatten(incoming.getByText("Plaquettes live AR").props.style).textAlign).toBe("right");
+  incoming.unmount();
+
+  const offer = render(
+    <ItemPartnerOfferCard item={{ ...sentOffer, categoryImage: localImage, shippingEligible: false }} />,
+  );
+  expect(offer.UNSAFE_getByType(Image).props.source).toBe(localImage);
+  expect(StyleSheet.flatten(offer.UNSAFE_getAllByType(TouchableOpacity)[0].props.style).flexDirection).toBe("row-reverse");
+});
+
+it("filters incoming requests by category id instead of localized title text", async () => {
+  mockGetIncoming.mockResolvedValue({
+    success: true,
+    data: requests.map((request, index) => ({
+      ...request,
+      items: request.items.map((item) => ({
+        ...item,
+        categoryTitle: index === 0 ? "Pièces d'arrêt" : "Boîte live",
+      })),
+    })),
+    pagination,
+  });
+  mockParams = { view: "incoming" };
+  const screen = render(<PrestataireOffersScreen />);
+  await screen.findByText("Pièces d'arrêt");
+
+  fireEvent.press(screen.getByLabelText(i18n.t("partner.offers.filter.title")));
+  const gearboxLabels = screen.getAllByText("Boîte live");
+  expect(gearboxLabels).toHaveLength(2);
+  fireEvent.press(gearboxLabels[1]);
+  fireEvent.press(screen.getByText(i18n.t("partner.offers.filter.apply")));
+
+  expect(screen.queryByText("Pièces d'arrêt")).toBeNull();
+  expect(screen.getByText("Boîte live")).toBeTruthy();
+});
 it.each(["accepted", "sent"] as const)("maps progress, rejected, and paid filters to fetched offers in the %s view", async (view) => {
   mockParams = { view };
   const screen = render(<PrestataireOffersScreen />);

@@ -20,6 +20,7 @@ import { Text } from "@/components/common/Text";
 import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
 import Colors from "@/constants/Colors";
 import { Role, useSession } from "@/context/AuthContext";
+import { clientAuthHref } from "@/constants/clientReturnTo";
 import type { Category } from "@/interfaces/Category";
 import type { Product } from "@/interfaces/Product";
 import type { RequestSummary } from "@/interfaces/Request";
@@ -48,8 +49,8 @@ const HomeScreen: React.FC = () => {
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
   const push = (href: Href) => router.push(href);
 
-  const requireClient = (href: Href) => {
-    push(role === Role.CLIENT ? href : "/(auth)/ClientLoginScreen");
+  const requireClient = (href: string) => {
+    push(role === Role.CLIENT ? href as Href : clientAuthHref("/(auth)/ClientLoginScreen", href));
   };
 
   const load = useCallback(async () => {

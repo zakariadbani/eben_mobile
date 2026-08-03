@@ -13,7 +13,8 @@
 
 import React, { useCallback } from "react";
 import { StyleSheet } from "react-native";
-import { useRouter, Href } from "expo-router";
+import { useRouter } from "expo-router";
+import { clientAuthHref } from "@/constants/clientReturnTo";
 
 import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
@@ -26,11 +27,11 @@ export default function LoginToSendScreen() {
   const router = useRouter();
 
   const handleSignIn = useCallback(() => {
-    router.push("/(auth)/ClientLoginScreen" as Href);
+    router.push(clientAuthHref("/(auth)/ClientLoginScreen", "/(client)/requests/CreateRequestScreen"));
   }, [router]);
 
   const handleRegister = useCallback(() => {
-    router.push("/(auth)/ClientRegisterScreen" as Href);
+    router.push(clientAuthHref("/(auth)/ClientRegisterScreen", "/(client)/requests/CreateRequestScreen"));
   }, [router]);
 
   return (

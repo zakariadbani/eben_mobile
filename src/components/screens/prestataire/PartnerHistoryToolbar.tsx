@@ -35,7 +35,13 @@ export default function PartnerHistoryToolbar({
           style={[styles.input, isArabic && styles.inputRtl]}
         />
         {query.length > 0 && (
-          <TouchableOpacity onPress={() => onQueryChange("")}>
+          <TouchableOpacity
+            style={styles.clearButton}
+            onPress={() => onQueryChange("")}
+            accessibilityRole="button"
+            accessibilityLabel={t("partner.search.clear")}
+            hitSlop={8}
+          >
             <Icon name="x-circle" type="Feather" size={20} iconColor={Colors.brand} />
           </TouchableOpacity>
         )}
@@ -82,6 +88,12 @@ const styles = StyleSheet.create({
   inputRtl: {
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  clearButton: {
+    minWidth: 48,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
   },
   controls: {
     flexDirection: "row",

@@ -11,6 +11,7 @@ import { Text } from '@/components/common/Text';
 import Colors from '@/constants/Colors';
 import Image from '@/components/common/Image';
 import type { Vehicle } from '@/interfaces/Vehicle';
+import { useTranslation } from 'react-i18next';
 
 interface ItemCarComponentProps {
   vehicle: Vehicle;
@@ -18,6 +19,7 @@ interface ItemCarComponentProps {
 }
 
 export default function ItemCarComponent({ vehicle, onRemove }: ItemCarComponentProps) {
+  const { t } = useTranslation();
   const label = [
     vehicle.brandName ?? '',
     vehicle.modelName ?? '',
@@ -37,13 +39,15 @@ export default function ItemCarComponent({ vehicle, onRemove }: ItemCarComponent
             style={styles.image}
           />
         ) : (
-          <View style={[styles.image, styles.imagePlaceholder]} />
+          <View style={[styles.image, styles.imagePlaceholder]} alignItems="center">
+            <Image source={require("@/assets/images/icons/car.png")} style={styles.placeholderIcon} />
+          </View>
         )}
       </View>
 
       {/* Label */}
       <View style={styles.labelContainer}>
-        <Text type="label" numberOfLines={2} ellipsizeMode="tail">
+        <Text type="label" numberOfLines={2} ellipsizeMode="tail" translate={false}>
           {label}
         </Text>
       </View>
@@ -53,6 +57,8 @@ export default function ItemCarComponent({ vehicle, onRemove }: ItemCarComponent
         onPress={() => onRemove(vehicle)}
         activeOpacity={0.7}
         style={styles.removeButton}
+        accessibilityRole="button"
+        accessibilityLabel={t("garage.removeCar")}
       >
         <View style={styles.removeIcon} alignItems="center">
           <Text type="label" bold color={Colors.red} style={styles.minus}>
@@ -86,9 +92,16 @@ const styles = StyleSheet.create({
   },
   imagePlaceholder: {
     backgroundColor: Colors.backgroundGray,
+    justifyContent: 'center',
+  },
+  placeholderIcon: {
+    width: 42,
+    height: 42,
+    resizeMode: 'contain',
   },
   labelContainer: {
     flex: 1,
+    paddingRight: 8,
   },
   removeButton: {
     marginLeft: 8,

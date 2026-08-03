@@ -139,15 +139,15 @@ const CartScreen: React.FC = () => {
         {mutationError ? <Text accessibilityRole="alert" color={Colors.error}>{mutationError}</Text> : null}
       </View>}
     </ScrollView>
-    <View style={styles.footer} gap={6}>
+    {!isEmpty ? <View style={styles.footer} gap={6}>
       <Summary label="Sous-total des articles TTC" value={basket?.subtotal ?? 0} testID="basket-subtotal" />
       <Summary label="Réduction" value={basket?.discountAmount ?? 0} testID="basket-discount" negative />
       <Summary label="Frais de livraison" value={basket?.shippingFee ?? 0} testID="basket-shipping" />
       <Summary label="TVA 20%" value={basket?.taxAmount ?? 0} testID="basket-tax" />
       <View style={styles.divider} />
       <Summary label="Total" value={basket?.total ?? 0} testID="basket-total" total />
-      <Button title="Caisse de sortie" onPress={() => router.push('/(client)/payment' as Href)} variant="primary" disabled={isEmpty} style={isEmpty ? styles.disabled : undefined} />
-    </View>
+      <Button title="Caisse de sortie" onPress={() => router.push('/(client)/payment' as Href)} variant="primary" />
+    </View> : null}
     <CustomModal visible={couponSuccess} variant="black" primaryButton={{ title: 'Fermer', variant: 'primary', onPress: () => setCouponSuccess(false) }}>
       <Text type="loginSubTitle" center>{t('Réduction appliquée')} : {formatPrice(couponDiscount)}</Text>
     </CustomModal>
@@ -169,7 +169,6 @@ const styles = StyleSheet.create({
   footer: { padding: 16, backgroundColor: Colors.white, borderTopWidth: 1, borderTopColor: Colors.backgroundGray },
   between: { justifyContent: 'space-between' },
   divider: { height: 1, backgroundColor: Colors.light },
-  disabled: { opacity: 0.5 },
 });
 
 export default CartScreen;

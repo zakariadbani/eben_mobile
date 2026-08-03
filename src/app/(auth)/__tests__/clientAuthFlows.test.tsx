@@ -9,6 +9,7 @@ import ClientLoginScreen from '../ClientLoginScreen';
 import ClientRegisterScreen from '../ClientRegisterScreen';
 import ClientAuthenticationOptionsScreen from '../ClientAuthenticationOptionsScreen';
 import RegistrationVerificationScreen from '../register/verification';
+import RegistrationSuccessScreen from '../register/success';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn().mockResolvedValue(null),
@@ -21,10 +22,11 @@ const mockLogin = jest.fn();
 const mockRegisterClient = jest.fn();
 const mockVerifyRegistration = jest.fn();
 const mockResendRegistrationOtp = jest.fn();
+let mockParams: Record<string, string | undefined> = {};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace, push: mockPush }),
-  useLocalSearchParams: () => ({ phone: '+212600000101' }),
+  useLocalSearchParams: () => mockParams,
 }));
 jest.mock('@/context/AuthContext', () => ({
   AuthRoleMismatchError: class AuthRoleMismatchError extends Error {},
@@ -53,10 +55,13 @@ jest.mock('@/components/screens/shared/PhoneVerificationComponent', () => {
   };
 });
 
+jest.mock('../register/car-selection', () => () => null);
+
 const mockedUseSession = useSession as jest.MockedFunction<typeof useSession>;
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  mockParams = { phone: '+212600000101' };
   await i18n.changeLanguage('fr');
   mockLogin.mockResolvedValue(Role.CLIENT);
   mockRegisterClient.mockResolvedValue(undefined);
@@ -95,7 +100,7 @@ it('awaits Client login and navigates only after success', async () => {
   fireEvent.changeText(screen.getByPlaceholderText('......'), 'password123');
   fireEvent.press(screen.getByRole('button', { name: i18n.t('auth.login.submit') }));
 
-  await waitFor(() => expect(mockLogin).toHaveBeenCalledWith('0600000101', 'password123', Role.CLIENT));
+  await waitFor(() => expect(mockLogin).toHaveBeenCalledWith('+212600000101', 'password123', Role.CLIENT));
   expect(mockReplace).not.toHaveBeenCalled();
   await waitFor(() => expect(
     screen.getByRole('button', { name: i18n.t('auth.login.submitting') }).props.accessibilityState,
@@ -105,6 +110,39 @@ it('awaits Client login and navigates only after success', async () => {
   await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/(client)'));
 });
 
+it('returns a signed-in Client to the protected product they requested', async () => {
+  mockParams = { returnTo: '/(client)/products/1001' };
+  const screen = render(<ClientLoginScreen />);
+
+  fireEvent.changeText(screen.getByPlaceholderText(i18n.t('auth.fields.phonePlaceholder')), '0600000101');
+  fireEvent.changeText(screen.getByPlaceholderText('......'), 'password123');
+  fireEvent.press(screen.getByRole('button', { name: i18n.t('auth.login.submit') }));
+
+  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/(client)/products/1001'));
+});
+
+it('rejects external return targets after Client login', async () => {
+  mockParams = { returnTo: 'https://evil.example/steal' };
+  const screen = render(<ClientLoginScreen />);
+
+  fireEvent.changeText(screen.getByPlaceholderText(i18n.t('auth.fields.phonePlaceholder')), '0600000101');
+  fireEvent.changeText(screen.getByPlaceholderText('......'), 'password123');
+  fireEvent.press(screen.getByRole('button', { name: i18n.t('auth.login.submit') }));
+
+  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/(client)'));
+});
+
+it('preserves a protected destination when a guest chooses sign up', () => {
+  mockParams = { returnTo: '/(client)/products/1001' };
+  const screen = render(<ClientLoginScreen />);
+
+  fireEvent.press(screen.getByRole('button', { name: i18n.t('auth.login.signUp') }));
+
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/(auth)/ClientRegisterScreen',
+    params: { returnTo: '/(client)/products/1001' },
+  });
+});
 it('keeps the Arabic recovery link and remember control from competing for full row width', async () => {
   await i18n.changeLanguage('ar');
   const screen = render(<ClientLoginScreen />);
@@ -134,6 +172,30 @@ it.each(['fr', 'ar'])('does not claim guest consent when legal documents are una
   expect(screen.queryByText(i18n.t("Si vous continuez en tant qu'invité, vous acceptez nos"))).toBeNull();
   expect(screen.queryByText(i18n.t('conditions et nos accords.'))).toBeNull();
 });
+
+it.each(['fr', 'ar'])('names the guest fallback honestly when a protected action cannot continue in %s', async (language) => {
+  await i18n.changeLanguage(language);
+  const screen = render(<ClientAuthenticationOptionsScreen />);
+
+  expect(screen.queryByRole('button', { name: i18n.t("Continuer en tant qu'invité") })).toBeNull();
+  expect(screen.getByRole('button', { name: i18n.t('Explorer les produits') })).toBeTruthy();
+});
+
+it.each([
+  [i18n.t('Connectez-vous'), '/(auth)/ClientLoginScreen'],
+  [i18n.t("S'inscrire"), '/(auth)/ClientRegisterScreen'],
+])('preserves a cold-open destination when choosing %s', (label, pathname) => {
+  mockParams = { returnTo: '/(client)/cart' };
+  const screen = render(<ClientAuthenticationOptionsScreen />);
+
+  fireEvent.press(screen.getByRole('button', { name: label }));
+
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname,
+    params: { returnTo: '/(client)/cart' },
+  });
+});
+
 
 it('shows a localized login error and does not navigate', async () => {
   mockLogin.mockRejectedValueOnce(new ApiClientError('Unauthenticated', 401));
@@ -172,6 +234,7 @@ it('shows the generic localized error for unexpected login failures', async () =
 });
 
 it('registers only after phone confirmation and sends the normalized backend payload', async () => {
+  mockParams = { returnTo: '/(client)/products/1001' };
   const screen = render(<ClientRegisterScreen />);
 
   fireEvent.changeText(screen.getByPlaceholderText(i18n.t('auth.fields.firstName')), '  Sara ');
@@ -190,7 +253,10 @@ it('registers only after phone confirmation and sends the normalized backend pay
     phone: '+212600000101',
     password: 'password123',
   }));
-  expect(mockPush).toHaveBeenCalledWith('/(auth)/register/verification');
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/(auth)/register/verification',
+    params: { returnTo: '/(client)/products/1001' },
+  });
   expect(JSON.stringify(mockPush.mock.calls)).not.toContain('+212600000101');
 });
 
@@ -236,15 +302,22 @@ it('submits registration once when phone confirmation is pressed twice', async (
   expect(mockRegisterClient).toHaveBeenCalledTimes(1);
 
   await act(async () => resolveRegistration());
-  await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/(auth)/register/verification'));
+  await waitFor(() => expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/(auth)/register/verification',
+    params: { returnTo: '/(client)' },
+  }));
 });
 
 it('submits and resends registration OTP through the live session operations', async () => {
+  mockParams = { returnTo: '/(client)/products/1001' };
   const screen = render(<RegistrationVerificationScreen />);
 
   fireEvent.press(screen.getByRole('button', { name: 'verify-code' }));
   await waitFor(() => expect(mockVerifyRegistration).toHaveBeenCalledWith('123456'));
-  expect(mockPush).toHaveBeenCalledWith('/(auth)/register/car-selection');
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/(auth)/register/car-selection',
+    params: { returnTo: '/(client)/products/1001' },
+  });
 
   fireEvent.press(screen.getByRole('button', { name: 'resend-code' }));
   await waitFor(() => expect(mockResendRegistrationOtp).toHaveBeenCalledTimes(1));
@@ -260,6 +333,14 @@ it('shows an initial OTP delivery failure and allows immediate resend', async ()
   expect(screen.getByText(i18n.t('auth.otp.initialSendError'))).toBeTruthy();
   fireEvent.press(screen.getByRole('button', { name: 'resend-code-immediate' }));
   await waitFor(() => expect(mockResendRegistrationOtp).toHaveBeenCalledTimes(1));
+});
+
+it('uses a continuation CTA when registration returns to a protected destination', () => {
+  mockParams = { returnTo: '/(client)/products/1001' };
+  const screen = render(<RegistrationSuccessScreen />);
+
+  fireEvent.press(screen.getByRole('button', { name: i18n.t('auth.register.confirmContinue') }));
+  expect(mockReplace).toHaveBeenCalledWith('/(client)/products/1001');
 });
 
 it('renders the Client login journey in Arabic', async () => {

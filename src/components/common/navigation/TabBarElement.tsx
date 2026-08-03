@@ -33,9 +33,9 @@ export function TabBarLabel({ label, focused = false }: TabBarLabelProps) {
       type="labelTwo"
       color={labelColor}
       translate={false}
-      numberOfLines={1}
+      numberOfLines={2}
       adjustsFontSizeToFit
-      minimumFontScale={0.75}
+      minimumFontScale={0.85}
       center
       style={styles.label}
     >
@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
   label: {
     width: "100%",
     fontSize: 11,
-    lineHeight: 14,
+    lineHeight: 12,
     textAlign: "center",
   },
 });

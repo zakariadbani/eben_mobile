@@ -120,7 +120,7 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
           )}
           {item.articleNumber != null && (
             <Text type="small" color={Colors.gray}>
-              {`N° Article: ${item.articleNumber}`}
+              {t("home.articleNumber", { value: item.articleNumber })}
             </Text>
           )}
           {showQty && (

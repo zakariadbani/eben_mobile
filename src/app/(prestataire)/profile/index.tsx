@@ -109,6 +109,8 @@ export default function PrestataireProfileScreen(): React.ReactElement {
           </Text>
         </View>
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={t('partner.notifications.title')}
           onPress={() => router.push('/(prestataire)/profile/notifications' as never)}
           style={styles.bellBtn}
           activeOpacity={0.7}
@@ -194,9 +196,14 @@ export default function PrestataireProfileScreen(): React.ReactElement {
             style={styles.logoutBtn}
             onPress={handleLogout}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('partner.profile.logoutTitle')}
           >
             <Icon name="power" size={28} iconColor={Colors.red} type="Feather" />
           </TouchableOpacity>
+          <Text type="small" color={Colors.red} style={styles.logoutLabel}>
+            {t('partner.profile.logoutTitle')}
+          </Text>
         </View>
 
         {/* ── Footer ── */}
@@ -273,6 +280,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.pink,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  logoutLabel: {
+    marginTop: 6,
   },
   footer: {
     paddingHorizontal: 16,

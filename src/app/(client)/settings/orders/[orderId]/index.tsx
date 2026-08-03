@@ -72,9 +72,6 @@ const OrderItemRow: React.FC<OrderItemRowProps> = ({ item, isAr }) => {
         <Text type="label" semiBold color={Colors.brand} translate={false}>
           {`${item.quantity}x ${title}`}
         </Text>
-        <Text type="small" color={Colors.gray} translate={false}>
-          {t('settings.orders.tracking', { id: item.offerId })}
-        </Text>
       </View>
       <Text type="label" semiBold color={Colors.brand} translate={false}>
         {item.totalPrice.toLocaleString(isAr ? 'ar-MA' : 'fr-MA', { minimumFractionDigits: 2 })} Dhs
@@ -270,8 +267,8 @@ const OrderDetailScreen: React.FC = () => {
                     {t('settings.orders.paymentDetails')}
                   </Text>
                 </View>
-                <TouchableOpacity style={styles.factureBadge} disabled accessibilityState={{ disabled: true }}>
-                  <Text type="small" color={Colors.brand}>
+                <TouchableOpacity style={styles.factureBadge} disabled accessibilityRole="button" accessibilityState={{ disabled: true }}>
+                  <Text type="small" color={Colors.gray}>
                     {t('settings.orders.invoice')}
                   </Text>
                 </TouchableOpacity>
@@ -348,7 +345,7 @@ const styles = StyleSheet.create({
   factureBadge: {
     backgroundColor: Colors.white,
     borderWidth: 1,
-    borderColor: Colors.brand,
+    borderColor: Colors.gray,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,

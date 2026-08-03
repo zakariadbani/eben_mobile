@@ -36,6 +36,7 @@ import Icon from "@/components/common/Icon";
 import { reportAbuse } from "@/api";
 import { ApiClientError } from "@/api/client";
 import { Role, useSession } from "@/context/AuthContext";
+import { clientAuthHref } from "@/constants/clientReturnTo";
 import Colors from "@/constants/Colors";
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -64,7 +65,10 @@ const ReportAbuseScreen: React.FC = () => {
   const handleSubmit = async () => {
     if (submittingRef.current) return;
     if (role !== Role.CLIENT) {
-      router.push("/(auth)/ClientLoginScreen");
+      router.push(clientAuthHref(
+        "/(auth)/ClientLoginScreen",
+        `/(client)/products/${productId}/report`,
+      ));
       return;
     }
     let valid = true;

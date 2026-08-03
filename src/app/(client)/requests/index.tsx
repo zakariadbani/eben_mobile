@@ -33,14 +33,14 @@ export default function RequestListScreen() {
   useEffect(() => { void load(); }, [load]);
 
   if (state === "loading") {
-    return <Screen><View flex style={styles.centered}><ActivityIndicator color={Colors.primary} /></View></Screen>;
+    return <Screen whatsapp={false}><View flex style={styles.centered}><ActivityIndicator color={Colors.primary} /></View></Screen>;
   }
   if (state === "error") {
-    return <Screen padding><View flex style={styles.centered} gap={12}><Text accessibilityRole="alert">requestFlow.loadError</Text><Button title="requestFlow.retry" onPress={() => void load()} /></View></Screen>;
+    return <Screen padding whatsapp={false}><View flex style={styles.centered} gap={12}><Text accessibilityRole="alert">requestFlow.loadError</Text><Button title="requestFlow.retry" onPress={() => void load()} /></View></Screen>;
   }
 
   return (
-    <Screen>
+    <Screen whatsapp={false}>
       <View style={styles.container}>
         <View flexDirection="row" alignItems="center" justifyContent="space-between" style={styles.header}>
           <Text type="headerTitle" semiBold>requestFlow.requestsTitle</Text>
@@ -51,7 +51,13 @@ export default function RequestListScreen() {
           keyExtractor={(item) => String(item.id)}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />}
           contentContainerStyle={requests.length === 0 ? styles.emptyList : styles.list}
-          ListEmptyComponent={<Text center color={Colors.gray}>requestFlow.requestsEmpty</Text>}
+          ListEmptyComponent={<View alignItems="center" gap={10}>
+            <Text center semiBold>requestFlow.requestsEmpty</Text>
+            <Text center color={Colors.gray}>requestFlow.requestsEmptyBody</Text>
+            <Button title="requestFlow.create" fit onPress={() =>
+              router.push("/(client)/requests/CreateRequestScreen" as Href)
+            } />
+          </View>}
           renderItem={({ item }) => (
             <TouchableOpacity
               accessibilityRole="button"
@@ -60,9 +66,14 @@ export default function RequestListScreen() {
               onPress={() => router.push((`/(client)/requests/${item.id}`) as Href)}
             >
               <Text semiBold>{t("requestFlow.requestReference", { reference: item.reference })}</Text>
-              <Text type="small" color={Colors.gray}>
-                {item.expiresDisplay ?? t(`requestFlow.requestStatus.${item.status}`)}
+              <Text type="small" color={Colors.gray} translate={false}>
+                {t(`requestFlow.requestStatus.${item.status}`)}
               </Text>
+              {item.status === "pending" && item.expiresDisplay ? (
+                <Text type="small" color={Colors.gray} translate={false}>
+                  {t("home.expiresIn", { value: item.expiresDisplay })}
+                </Text>
+              ) : null}
             </TouchableOpacity>
           )}
         />

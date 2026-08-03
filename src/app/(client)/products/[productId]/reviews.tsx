@@ -31,6 +31,7 @@ import RatingStars from "@/components/screens/shared/app/RatingStars";
 
 import { getReviews } from "@/api";
 import { Role, useSession } from "@/context/AuthContext";
+import { clientAuthHref } from "@/constants/clientReturnTo";
 import type { Review } from "@/interfaces/Review";
 import Colors from "@/constants/Colors";
 
@@ -81,7 +82,10 @@ const ReviewsScreen: React.FC = () => {
 
   const handleLeaveReview = () => {
     if (role !== Role.CLIENT) {
-      router.push("/(auth)/ClientLoginScreen" as Href);
+      router.push(clientAuthHref(
+        "/(auth)/ClientLoginScreen",
+        `/(client)/products/${numericProductId}/reviews`,
+      ));
       return;
     }
     router.push({

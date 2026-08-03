@@ -1,5 +1,5 @@
 import { useFonts } from "expo-font";
-import { Stack, useRouter, useSegments, Href } from "expo-router";
+import { Stack, useGlobalSearchParams, usePathname, useRouter, useSegments, Href } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { View, ActivityIndicator } from "react-native";
@@ -14,6 +14,7 @@ import {
   type AuthenticatedRole,
 } from "@/constants/routesPermission";
 import { ConfirmationProvider } from "@/context/ConfirmationContext";
+import { getClientReturnTo } from "@/constants/clientReturnTo";
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
@@ -91,6 +92,8 @@ const StackLayout = () => {
   const { session, isLoading, role, pendingPhoneChangeVerificationPhone } = useSession();
   const segments = useSegments();
   const router = useRouter();
+  const pathname = usePathname();
+  const { returnTo } = useGlobalSearchParams<{ returnTo?: string | string[] }>();
 
   useEffect(() => {
     if (isLoading) {
@@ -108,7 +111,16 @@ const StackLayout = () => {
       if (canAccessRoute(currentRoute)) {
         return;
       }
-      router.replace(getUnauthenticatedRedirect(currentRoute) as Href);
+      const redirect = getUnauthenticatedRedirect(currentRoute);
+      if (currentRoute.startsWith("(client)")) {
+        const requestedPath = pathname.startsWith("/(client)")
+          ? pathname
+          : pathname === "/" ? "/(client)" : `/(client)${pathname}`;
+        router.replace({
+          pathname: redirect,
+          params: { returnTo: String(getClientReturnTo(requestedPath)) },
+        } as Href);
+      } else router.replace(redirect as Href);
       return;
     }
 
@@ -122,7 +134,9 @@ const StackLayout = () => {
       !currentRoute.startsWith("(auth)/register/") &&
       !isRecoveryRoute
     ) {
-      router.replace((role === "prestataire" ? "/(prestataire)/dashboard" : "/(client)") as Href);
+      router.replace(
+        role === "prestataire" ? "/(prestataire)/dashboard" : getClientReturnTo(returnTo),
+      );
       return;
     }
 
@@ -135,7 +149,7 @@ const StackLayout = () => {
         router.replace("/(prestataire)/dashboard");
       }
     }
-  }, [session, isLoading, segments, role, router, pendingPhoneChangeVerificationPhone]);
+  }, [session, isLoading, segments, pathname, role, router, pendingPhoneChangeVerificationPhone, returnTo]);
 
   // useEffect(() => {
   //   // Check the current language direction and set RTL if needed

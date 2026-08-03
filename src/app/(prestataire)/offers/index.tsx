@@ -100,22 +100,26 @@ export default function PrestataireOffersScreen(): React.ReactElement {
     return [...filtered].sort((a, b) => sortAsc ? a.id - b.id : b.id - a.id);
   }, [accepted, active, offers, selectedFilter, sent, sortAsc, view]);
 
+  const incomingCategoryOptions = useMemo(() => {
+    const labels = new Map<number, string>();
+    incoming.forEach((request) => request.items?.forEach((item) => {
+      const label = isArabic
+        ? item.categoryTitleAr ?? item.categoryTitle
+        : item.categoryTitle ?? item.categoryTitleAr;
+      if (label && !labels.has(item.categoryId)) labels.set(item.categoryId, label);
+    }));
+    return Array.from(labels, ([categoryId, label]) => ({ key: `category:${categoryId}`, label }));
+  }, [incoming, isArabic]);
+
   const visibleIncoming = useMemo(() => {
-    const filterLabel = selectedFilter === "transmission"
-      ? t("partner.offers.category.transmission")
-      : selectedFilter === "brakes"
-        ? t("partner.offers.category.brakes")
-        : null;
-    const normalizedFilter = filterLabel?.toLocaleLowerCase(i18n.language);
-    const filtered = normalizedFilter
-      ? incoming.filter((request) => request.items?.some((item) =>
-          [item.categoryTitle, item.categoryTitleAr]
-            .filter((title): title is string => Boolean(title))
-            .some((title) => title.toLocaleLowerCase(i18n.language).includes(normalizedFilter)),
-        ))
+    const categoryId = selectedFilter.startsWith("category:")
+      ? Number(selectedFilter.slice("category:".length))
+      : null;
+    const filtered = categoryId !== null && Number.isInteger(categoryId)
+      ? incoming.filter((request) => request.items?.some((item) => item.categoryId === categoryId))
       : incoming;
     return [...filtered].sort((a, b) => sortAsc ? a.id - b.id : b.id - a.id);
-  }, [i18n.language, incoming, selectedFilter, sortAsc, t]);
+  }, [incoming, selectedFilter, sortAsc]);
 
   const renderHeader = (title: string, onBack: () => void) => (
     <View style={styles.header} flexDirection="row" alignItems="center">
@@ -265,11 +269,7 @@ export default function PrestataireOffersScreen(): React.ReactElement {
   );
 
   const filterOptions = view === "incoming"
-    ? [
-        { key: "all", label: t("partner.offers.filter.all") },
-        { key: "transmission", label: t("partner.offers.category.transmission") },
-        { key: "brakes", label: t("partner.offers.category.brakes") },
-      ]
+    ? [{ key: "all", label: t("partner.offers.filter.all") }, ...incomingCategoryOptions]
     : [
         { key: "progress", label: t("partner.offers.filter.progress") },
         { key: "paid", label: t("partner.offers.filter.payment") },
@@ -284,19 +284,19 @@ export default function PrestataireOffersScreen(): React.ReactElement {
         <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setFilterVisible(false)} />
         <View style={styles.sheet}>
           <View style={styles.sheetHandle} />
-          <Text type="titleTwo" semiBold style={styles.sheetTitle}>{t("partner.offers.filter.title")}</Text>
+          <Text type="titleTwo" semiBold style={[styles.sheetTitle, isArabic && styles.textRtl]}>{t("partner.offers.filter.title")}</Text>
           {filterOptions.map((option) => {
             const checked = selectedFilter === option.key;
             return (
-              <TouchableOpacity key={option.key} style={styles.filterRow} onPress={() => setSelectedFilter(option.key)}>
-                <Text type="text" flex>{option.label}</Text>
+              <TouchableOpacity key={option.key} style={[styles.filterRow, isArabic && styles.rowRtl]} onPress={() => setSelectedFilter(option.key)}>
+                <Text type="text" flex style={isArabic ? styles.textRtl : undefined}>{option.label}</Text>
                 <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
                   {checked ? <Icon name="check" type="Feather" size={17} iconColor={Colors.primary} /> : null}
                 </View>
               </TouchableOpacity>
             );
           })}
-          <View style={styles.sheetActions} flexDirection="row" gap={12}>
+          <View style={[styles.sheetActions, isArabic && styles.rowRtl]} flexDirection="row" gap={12}>
             <TouchableOpacity style={styles.resetButton} onPress={() => setSelectedFilter("all")}>
               <Text type="textTwo" semiBold center>{t("partner.offers.filter.reset")}</Text>
             </TouchableOpacity>
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
   header: { minHeight: 58, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: Colors.primary, shadowColor: Colors.black, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.14, shadowRadius: 3, elevation: 4 },
   headerButton: { width: 42, height: 42, alignItems: "center", justifyContent: "center" },
   headerTitle: { paddingHorizontal: 4 },
-  notificationDot: { position: "absolute", top: 7, right: 8, width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.red },
+  notificationDot: { position: "absolute", top: 7, end: 8, width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.red },
   hubContent: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 110 },
   menuCard: { minHeight: 82, borderWidth: 1, borderColor: Colors.primary, borderRadius: 6, paddingHorizontal: 14, marginBottom: 12, backgroundColor: Colors.white },
   smallButton: { backgroundColor: Colors.primary, borderRadius: 5, paddingHorizontal: 12, paddingVertical: 8 },
@@ -340,6 +340,8 @@ const styles = StyleSheet.create({
   sheetHandle: { width: 120, height: 5, borderRadius: 3, backgroundColor: Colors.grayDark, alignSelf: "center", marginBottom: 14 },
   sheetTitle: { marginBottom: 18 },
   filterRow: { minHeight: 54, flexDirection: "row", alignItems: "center", paddingVertical: 8 },
+  rowRtl: { flexDirection: "row-reverse" },
+  textRtl: { textAlign: "right" },
   checkbox: { width: 18, height: 18, borderRadius: 3, borderWidth: 1.5, borderColor: Colors.black, alignItems: "center", justifyContent: "center" },
   checkboxChecked: { backgroundColor: Colors.black },
   sheetActions: { marginTop: "auto", paddingTop: 14, borderTopWidth: 1, borderTopColor: Colors.backgroundGray },

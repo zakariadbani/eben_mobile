@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { StyleSheet } from "react-native";
+import { StyleSheet, View as RNView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 
@@ -58,7 +58,7 @@ export default function PrestataireWalletVerificationScreen(): React.ReactElemen
     <Screen whatsapp={false} scrollable={false} avoidKeyboard={false}>
       <CustomHeader title={t("partner.verification.screenTitle")} />
       <View flex style={styles.body} alignItems="center" justifyContent="center">
-        <View style={styles.card}>
+        <RNView style={styles.card} accessibilityLabel={t("partner.verification.screenTitle")}>
           {invalidRoute ? (
             <Text accessibilityRole="alert">requestFlow.invalidRoute</Text>
           ) : (
@@ -70,7 +70,7 @@ export default function PrestataireWalletVerificationScreen(): React.ReactElemen
               showResend={false}
             />
           )}
-        </View>
+        </RNView>
       </View>
     </Screen>
   );

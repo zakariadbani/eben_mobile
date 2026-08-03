@@ -4,12 +4,12 @@ import type { FormikHelpers } from "formik";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "expo-router";
 import { ApiClientError } from "@/api/types";
-import Button from "@/components/common/Button";
 import Screen from "@/components/common/Screen";
 import { Text } from "@/components/common/Text";
 import View from "@/components/common/View";
 import LoginForm from "@/components/screens/shared/LoginForm";
 import Colors from "@/constants/Colors";
+import { normalizeMoroccanPhone } from "@/helpers/phoneHelper";
 import {
   AuthRoleMismatchError,
   Role,
@@ -20,13 +20,6 @@ interface LoginFormValues {
   phone: string;
   password: string;
   rememberMe: boolean;
-}
-
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (/^2126\d{8}$/.test(digits)) return `+${digits}`;
-  if (/^6\d{8}$/.test(digits)) return `+212${digits}`;
-  return digits;
 }
 
 const PrestataireSignInScreen = () => {
@@ -42,7 +35,7 @@ const PrestataireSignInScreen = () => {
     setError(null);
     try {
       const role = await login(
-        normalizePhone(values.phone),
+        normalizeMoroccanPhone(values.phone),
         values.password,
         Role.PRESTATAIRE,
       );
@@ -86,19 +79,6 @@ const PrestataireSignInScreen = () => {
           />
         </View>
 
-        <View style={styles.waitlistRow}>
-          <Text>auth.login.noAccount</Text>
-          <Button
-            outline
-            variant="primary"
-            style={styles.waitlistLink}
-            navigateTo="/(auth)/prestataire/waitlist"
-          >
-            <Text style={styles.waitlistLinkText}>
-              auth.prestataire.login.joinWaitlist
-            </Text>
-          </Button>
-        </View>
       </View>
     </Screen>
   );
@@ -128,20 +108,6 @@ const styles = StyleSheet.create({
     color: Colors.errorInbackgroundBrand,
     marginBottom: 12,
     textAlign: "center",
-  },
-  waitlistRow: {
-    marginTop: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  waitlistLink: {
-    borderWidth: 0,
-    width: "auto",
-    paddingVertical: 0,
-    paddingHorizontal: 4,
-  },
-  waitlistLinkText: {
-    color: Colors.orange,
   },
 });
 

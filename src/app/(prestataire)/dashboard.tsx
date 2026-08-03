@@ -149,6 +149,14 @@ const Dashboard: React.FC = () => {
   const activeOfferRows = activeOffers.slice(0, 3).map(offerRow);
   const goToOffers = () => router.push("/(prestataire)/offers" as Href);
   const goToOffer = (offerId: number) => router.push(`/(prestataire)/offers/${offerId}` as Href);
+  const offerFeed = (rows: React.ReactElement[], showError = true) => {
+    if (offersLoading) return <ActivityIndicator color={Colors.primary} />;
+    if (offersError) { if (!showError) return null; return <View alignItems="center" gap={10}>
+      <Text color={Colors.grayMidDark}>{"partner.dashboard.offersLoadError"}</Text>
+      <Button title={t("partner.dashboard.retry")} fit onPress={() => { setOffersLoading(true); void loadOffers(); }} />
+    </View>; }
+    return rows.length ? rows : <Text color={Colors.grayMidDark}>{"partner.dashboard.emptyOffers"}</Text>;
+  };
 
   return (
     <ScrollView
@@ -165,9 +173,7 @@ const Dashboard: React.FC = () => {
 
       <View style={styles.section}>
         <SectionHeader title="partner.dashboard.openOffers" onPress={goToOffers} />
-        {incomingRows.length ? incomingRows.map((offer) => (
-          <PartnerOfferRow key={offer.offerId} item={offer} onPress={() => router.push(`/(prestataire)/offers/${offer.offerId}/fill` as Href)} />
-        )) : <Text color={Colors.grayMidDark}>{"partner.dashboard.emptyOffers"}</Text>}
+        {offerFeed(incomingRows.map((offer) => (<PartnerOfferRow key={offer.offerId} item={offer} onPress={() => router.push(`/(prestataire)/offers/${offer.offerId}/fill` as Href)} />)))}
         <View flexDirection="row" alignItems="flex-start" gap={10} style={styles.windowNotice}>
           <Icon name="info" type="Feather" size={20} iconColor={Colors.gray} />
           <Text type="label" color={Colors.innerText} flex>{"partner.dashboard.offerWindowNote"}</Text>
@@ -176,24 +182,12 @@ const Dashboard: React.FC = () => {
 
       <View style={styles.section}>
         <SectionHeader title="partner.dashboard.sentStatus" onPress={goToOffers} />
-        {sentOfferRows.map((offer) => (
-          <PartnerOfferRow key={`sent-${offer.offerId}`} item={offer} variant="sent" onPress={() => goToOffer(offer.offerId)} />
-        ))}
-        {!sentOfferRows.length ? <Text color={Colors.grayMidDark}>{"partner.dashboard.emptyOffers"}</Text> : null}
+        {offerFeed(sentOfferRows.map((offer) => (<PartnerOfferRow key={`sent-${offer.offerId}`} item={offer} variant="sent" onPress={() => goToOffer(offer.offerId)} />)), false)}
       </View>
 
       <View style={styles.section}>
         <SectionHeader title="partner.dashboard.activeOffers" onPress={goToOffers} />
-        {offersLoading ? (
-          <ActivityIndicator color={Colors.primary} />
-        ) : offersError ? (
-          <View alignItems="center" gap={10}>
-            <Text color={Colors.grayMidDark}>{"partner.dashboard.offersLoadError"}</Text>
-            <Button title={t("partner.dashboard.retry")} fit onPress={() => { setOffersLoading(true); void loadOffers(); }} />
-          </View>
-        ) : activeOfferRows.length ? activeOfferRows.map((offer) => (
-          <PartnerOfferRow key={`active-${offer.offerId}`} item={offer} variant="active" onPress={() => goToOffer(offer.offerId)} />
-        )) : <Text color={Colors.grayMidDark}>{"partner.dashboard.emptyOffers"}</Text>}
+        {offerFeed(activeOfferRows.map((offer) => (<PartnerOfferRow key={`active-${offer.offerId}`} item={offer} variant="active" onPress={() => goToOffer(offer.offerId)} />)), false)}
       </View>
 
       <View style={styles.section}>

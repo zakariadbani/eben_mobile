@@ -46,6 +46,13 @@ it('defaults API mode to live', () => {
   expect((require('../config') as typeof import('../config')).API_MODE).toBe('live');
 });
 
+it('forces live transport in production even when mocks are requested', () => {
+  const { resolveApiMode } = require('../config') as typeof import('../config');
+
+  expect(resolveApiMode(false, 'mock')).toBe('live');
+  expect(resolveApiMode(true, 'mock')).toBe('mock');
+});
+
 it('sends the Bearer token and returns the Laravel envelope', async () => {
   const { apiClient } = loadClient();
   apiClient.setToken('secret-token');
@@ -202,6 +209,34 @@ it('uses the mock registry only when mock mode is explicit', async () => {
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
+it('supports the Client home product queries in mock mode', async () => {
+  const { apiClient } = loadClient('mock');
+
+  await expect(
+    apiClient.get('/products?categoryId=100&condition=en_stock&featured=1&perPage=6'),
+  ).resolves.toMatchObject({ success: true, data: expect.any(Array) });
+  await expect(
+    apiClient.get('/products?categoryId=100&condition=occasion&sort=recent&perPage=6'),
+  ).resolves.toMatchObject({ success: true, data: expect.any(Array) });
+});
+it('supports Android auth recovery and Prestataire dashboard mock paths', async () => {
+  const { apiClient } = loadClient('mock');
+  const phone = '+212612345678';
+
+  await expect(apiClient.post('/auth/register', { role: 'client', name: 'Test Client', phone, password: 'password123' }))
+    .resolves.toMatchObject({ success: true, data: { user: { phone } } });
+  await apiClient.post('/auth/otp/send', { phone, purpose: 'register' });
+  await expect(apiClient.post('/auth/verify-phone', { phone, code: '123456' }))
+    .resolves.toMatchObject({ data: { verified: true } });
+  await apiClient.post('/auth/forgot-password', { phone });
+  await apiClient.post('/auth/otp/verify', { phone, purpose: 'password_reset', code: '123456' });
+  await expect(apiClient.post('/auth/reset-password', { phone, code: '123456', password: 'new-password123' }))
+    .resolves.toMatchObject({ data: { success: true } });
+  await expect(apiClient.get('/prestataire/dashboard/series?period=6m'))
+    .resolves.toMatchObject({ data: { period: '6m', buckets: [] } });
+  await expect(apiClient.post('/prestataire/notifications/read-all', {}))
+    .resolves.toMatchObject({ success: true, data: { updated: expect.any(Number) } });
+});
 it('fails unregistered mock calls instead of returning fallback data', async () => {
   const { apiClient, ApiClientError } = loadClient('mock');
 

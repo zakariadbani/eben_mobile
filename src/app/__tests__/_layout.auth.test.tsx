@@ -5,6 +5,10 @@ import RootLayout from '../_layout';
 
 const mockReplace = jest.fn();
 let mockSegments = ['(auth)'];
+let mockParams: { returnTo?: string | string[] } = {};
+let mockPathname = '/';
+let mockCanAccessRoute = true;
+let mockUnauthenticatedRedirect = '/(auth)';
 
 jest.mock('expo-font', () => ({ useFonts: () => [true, null] }));
 jest.mock('expo-splash-screen', () => ({
@@ -25,6 +29,8 @@ jest.mock('expo-router', () => {
     Stack,
     useRouter: () => ({ replace: mockReplace }),
     useSegments: () => mockSegments,
+    usePathname: () => mockPathname,
+    useGlobalSearchParams: () => mockParams,
   };
 });
 jest.mock('@/context/AuthContext', () => {
@@ -58,10 +64,9 @@ jest.mock('@/context/NotificationContext', () => ({
 jest.mock('@/context/ConfirmationContext', () => ({
   ConfirmationProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
-jest.mock('@/hooks/useColorScheme', () => ({ useColorScheme: () => 'light' }));
 jest.mock('@/constants/routesPermission', () => ({
-  canAccessRoute: () => true,
-  getUnauthenticatedRedirect: () => '/(auth)',
+  canAccessRoute: () => mockCanAccessRoute,
+  getUnauthenticatedRedirect: () => mockUnauthenticatedRedirect,
 }));
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'fr' } }),
@@ -71,6 +76,10 @@ jest.mock('@/localization/i18n', () => ({}));
 beforeEach(() => {
   jest.clearAllMocks();
   mockSegments = ['(auth)'];
+  mockParams = {};
+  mockPathname = '/';
+  mockCanAccessRoute = true;
+  mockUnauthenticatedRedirect = '/(auth)';
   const authMock = require('@/context/AuthContext') as {
     __setSessionLoading: (loading: boolean) => void;
     __setSessionValue: (value: Record<string, unknown>) => void;
@@ -97,6 +106,32 @@ it('keeps authenticated password recovery reachable and resumes pending phone ve
   await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/(client)/settings/profile/verify-phone'));
 });
 
+it('preserves the client return destination when login creates the session', async () => {
+  const authMock = require('@/context/AuthContext') as {
+    __setSessionValue: (value: Record<string, unknown>) => void;
+  };
+  authMock.__setSessionValue({ session: { token: 'token' }, role: 'client', pendingPhoneChangeVerificationPhone: null });
+  mockSegments = ['(auth)', 'ClientLoginScreen'];
+  mockParams = { returnTo: '/(client)/products/1001' };
+
+  render(<RootLayout />);
+
+  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/(client)/products/1001'));
+});
+
+it('carries a cold-open protected Client pathname into authentication', async () => {
+  mockSegments = ['(client)', 'cart', 'index'];
+  mockPathname = '/cart';
+  mockCanAccessRoute = false;
+  mockUnauthenticatedRedirect = '/(auth)/ClientAuthenticationOptionsScreen';
+
+  render(<RootLayout />);
+
+  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith({
+    pathname: '/(auth)/ClientAuthenticationOptionsScreen',
+    params: { returnTo: '/(client)/cart' },
+  }));
+});
 it('reads the restored session only below SessionProvider', () => {
   expect(() => render(<RootLayout />)).not.toThrow();
 });

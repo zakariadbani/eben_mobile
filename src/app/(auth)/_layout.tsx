@@ -97,10 +97,6 @@ export default function Layout() {
         name="prestataire/welcome"
         options={{ headerShown: false }}
       />
-      <Stack.Screen
-        name="prestataire/waitlist"
-        options={{ headerShown: false }}
-      />
 
       {/* Partner (Prestataire) sign-in */}
       <Stack.Screen

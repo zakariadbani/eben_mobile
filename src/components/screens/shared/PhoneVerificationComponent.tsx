@@ -106,6 +106,7 @@ const PhoneVerificationComponent: React.FC<PhoneVerificationComponentProps> = ({
         ref={ref}
         {...fieldProps}
         value={value}
+        accessibilityLabel={t("auth.otp.codeLabel")}
         onChangeText={setValue}
         cellCount={CELL_COUNT}
         rootStyle={styles.codeFieldRoot}

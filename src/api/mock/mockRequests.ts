@@ -7,7 +7,7 @@
  */
 
 import type { Request, RequestItem, RequestSummary } from '@/interfaces/Request';
-import type { Offer, OfferItem } from '@/interfaces/Offer';
+import type { Offer } from '@/interfaces/Offer';
 
 export const mockRequestItems: RequestItem[] = [
   {
@@ -80,13 +80,7 @@ export const mockRequests: Request[] = [
     createdAt: '2024-10-09T03:00:00Z',
     updatedAt: '2024-10-09T10:00:00Z',
     items: mockRequestItems.filter((ri) => ri.requestId === 1),
-    images: [
-      'https://picsum.photos/id/1071/1000/1500',
-      'https://picsum.photos/id/133/1000/1500',
-      'https://picsum.photos/id/111/1000/1500',
-      'https://picsum.photos/id/514/1000/1500',
-      'https://picsum.photos/id/655/1000/1500',
-    ],
+    images: [],
   },
   {
     id: 2,
@@ -154,7 +148,7 @@ export const mockOffers: Offer[] = [
     priceClient: 2676.50,  // × 1.06
     priceBc: 2373.50,      // × 0.94
     description: "Seul le côté avant de la voiture a été endommagé. Le moteur est toujours intact.",
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    audioUrl: null,
     availability: 'available',
     status: 'validated',
     adminNotes: null,
@@ -162,11 +156,7 @@ export const mockOffers: Offer[] = [
     validatedAt: '2024-10-09T12:00:00Z',
     createdAt: '2024-10-09T11:00:00Z',
     updatedAt: '2024-10-09T12:00:00Z',
-    images: [
-      'https://picsum.photos/id/514/1000/1500',
-      'https://picsum.photos/id/1071/1000/1500',
-      'https://picsum.photos/id/133/1000/1500',
-    ],
+    images: [],
   },
   {
     id: 2,
@@ -186,7 +176,7 @@ export const mockOffers: Offer[] = [
     validatedAt: null,
     createdAt: '2024-10-09T13:00:00Z',
     updatedAt: '2024-10-09T13:00:00Z',
-    images: ['https://picsum.photos/id/655/1000/1500'],
+    images: [],
   },
   {
     id: 3,
@@ -209,10 +199,3 @@ export const mockOffers: Offer[] = [
     images: [],
   },
 ];
-
-export const mockOfferItems: OfferItem[] = mockOffers.map((o) => ({
-  ...o,
-  categoryTitle: 'Plaquettes de frein avant',
-  categoryTitleAr: 'بطانات الفرامل الأمامية',
-  ferrailleurName: 'Auto Parts Maroc',
-}));

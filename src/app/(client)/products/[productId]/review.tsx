@@ -37,6 +37,7 @@ import RatingStars from "@/components/screens/shared/app/RatingStars";
 import { postReview } from "@/api";
 import { ApiClientError } from "@/api/client";
 import { Role, useSession } from "@/context/AuthContext";
+import { clientAuthHref } from "@/constants/clientReturnTo";
 import Colors from "@/constants/Colors";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -74,7 +75,10 @@ const LeaveReviewScreen: React.FC = () => {
   const handleSubmit = async () => {
     if (submittingRef.current) return;
     if (role !== Role.CLIENT) {
-      router.push("/(auth)/ClientLoginScreen");
+      router.push(clientAuthHref(
+        "/(auth)/ClientLoginScreen",
+        `/(client)/products/${productId}/review`,
+      ));
       return;
     }
     let valid = true;

@@ -12,8 +12,14 @@ export const API_BASE_URL: string =
 
 export type ApiMode = 'live' | 'mock';
 
-export const API_MODE: ApiMode =
-  process.env.EXPO_PUBLIC_API_MODE === 'mock' ? 'mock' : 'live';
+export function resolveApiMode(isDev: boolean, requested?: string): ApiMode {
+  return isDev && requested === 'mock' ? 'mock' : 'live';
+}
+
+export const API_MODE: ApiMode = resolveApiMode(
+  typeof __DEV__ !== 'undefined' && __DEV__,
+  process.env.EXPO_PUBLIC_API_MODE,
+);
 
 /** Default page size — matches backend conventions-backend.md §6.5 */
 export const DEFAULT_PAGE_SIZE = 20;

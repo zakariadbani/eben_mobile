@@ -1,5 +1,6 @@
 import React from "react";
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import LanguagePicker from "@/components/common/LanguagePicker";
 import i18n from "@/localization/i18n";
@@ -32,6 +33,7 @@ describe("LanguagePicker", () => {
 
     expect(getByText("Fran\u00e7ais")).toBeTruthy();
     expect(getByTestId("language-picker-chevron")).toBeTruthy();
+    expect(StyleSheet.flatten(getByTestId("language-picker").props.style).opacity).not.toBe(0);
   });
 
   it("updates and persists the selected language", async () => {

@@ -91,6 +91,7 @@ memory/
 
 # QA screenshots (local only)
 .qa/
+/artifacts/
 
 .planning/
 .custom-screenshot-replica/

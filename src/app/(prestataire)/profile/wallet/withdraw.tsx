@@ -6,7 +6,7 @@
  * Bottom-sheet style form (presented on top of wallet screen):
  *   • Title: "Veuillez sélectionner le montant que vous souhaitez retirer"
  *   • "Solde Courant: <amount> Dhs" (translate={false})
- *   • Amount input field  (label: "Montant (XX.XXX,XX)", placeholder: "10.000,00 DHS")
+ *   • Amount input field  (label: "Montant (XX.XXX,XX)", placeholder: "1.000,00 DHS")
  *   • Method picker  (label: "Méthode", placeholder: "Choisissez la méthode de retrait")
  *       items: virement (Virement bancaire), cheque (Chèque), cash (Espèces)
  *   • Sticky CTA "Envoyer la demande" → calls requestWithdrawal → if
@@ -64,6 +64,35 @@ function formatBalance(amount: number, locale: string): string {
   });
 }
 
+function parseWithdrawalAmount(value: string): number | null {
+  const compact = value
+    .trim()
+    .replace(/[\s\u00a0\u202f]/g, '')
+    .replace(/[\u0660-\u0669]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
+    .replace(/[\u06f0-\u06f9]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0))
+    .replace(/\u066b/g, ',')
+    .replace(/\u066c/g, '.');
+  if (!/^\d+(?:[.,]\d+)*$/.test(compact)) return null;
+
+  let normalized: string;
+  if (compact.includes(',')) {
+    if ((compact.match(/,/g) ?? []).length !== 1) return null;
+    const [integer, decimals] = compact.split(',');
+    if (!integer || !decimals || decimals.length > 2) return null;
+    if (!/^\d+$/.test(integer) && !/^\d{1,3}(?:\.\d{3})+$/.test(integer)) return null;
+    normalized = `${integer.replace(/\./g, '')}.${decimals}`;
+  } else {
+    const parts = compact.split('.');
+    if (parts.length === 1) normalized = compact;
+    else if (parts.length === 2 && parts[1]!.length <= 2) normalized = compact;
+    else if (/^\d{1,3}(?:\.\d{3})+$/.test(compact)) normalized = compact.replace(/\./g, '');
+    else return null;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed * 100) / 100 : null;
+}
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function PrestataireWithdrawScreen(): React.ReactElement {
@@ -76,6 +105,7 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
   // Wallet balance
   const [wallet, setWallet] = useState<PrestataireWallet | null>(null);
   const [walletLoading, setWalletLoading] = useState(true);
+  const [walletUnavailable, setWalletUnavailable] = useState(false);
 
   // Form state
   const [amount, setAmount] = useState('');
@@ -94,13 +124,17 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
 
   const fetchWallet = useCallback(async () => {
     setWalletLoading(true);
+    setWallet(null);
+    setWalletUnavailable(false);
     try {
       const res = await getPrestataireWallet();
       if (res.success && res.data && !Array.isArray(res.data)) {
         setWallet(res.data as PrestataireWallet);
+      } else {
+        setWalletUnavailable(true);
       }
     } catch {
-      // Non-fatal — balance shown as 0
+      setWalletUnavailable(true);
     } finally {
       setWalletLoading(false);
     }
@@ -112,15 +146,17 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
 
   // ── Validation ────────────────────────────────────────────────────────────────
 
-  const validate = (): boolean => {
+  const validate = (parsed: number | null): boolean => {
     let valid = true;
 
     // Amount
-    const parsed = parseFloat(amount.replace(/\s/g, '').replace(',', '.'));
-    if (!amount.trim() || isNaN(parsed) || parsed <= 0) {
+    if (parsed === null) {
       setAmountError(t('partner.withdraw.amountRequired'));
       valid = false;
-    } else if (wallet && parsed > wallet.balance) {
+    } else if (!wallet) {
+      setSubmitError(t('partner.withdraw.walletUnavailable'));
+      valid = false;
+    } else if (parsed > wallet.balance) {
       setAmountError(t('partner.withdraw.amountExceedsBalance'));
       valid = false;
     } else {
@@ -141,9 +177,8 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
   // ── Submit ────────────────────────────────────────────────────────────────────
 
   const handleSubmit = async () => {
-    if (submittingRef.current || !validate()) return;
-
-    const parsed = parseFloat(amount.replace(/\s/g, '').replace(',', '.'));
+    const parsed = parseWithdrawalAmount(amount);
+    if (submittingRef.current || !validate(parsed) || parsed === null) return;
 
     submittingRef.current = true;
     setSubmitting(true);
@@ -212,11 +247,18 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
             </Text>
 
             {/* Current balance */}
-            <Text type="text" semiBold color={Colors.brand} style={styles.balanceLine} translate={false}>
-              {walletLoading
-                ? '...'
-                : `${t('partner.withdraw.balanceLabel')} ${formatBalance(wallet?.balance ?? 0, locale)} Dhs`}
-            </Text>
+            {walletUnavailable ? (
+              <View style={styles.balanceLine}>
+                <Text accessibilityRole="alert" type="small" color={Colors.error}>
+                  {t('partner.withdraw.walletUnavailable')}
+                </Text>
+                <Button title={t('partner.withdraw.retry')} variant="white" outline fit onPress={fetchWallet} />
+              </View>
+            ) : (
+              <Text type="text" semiBold color={Colors.brand} style={styles.balanceLine} translate={false}>
+                {walletLoading ? '...' : `${t('partner.withdraw.balanceLabel')} ${formatBalance(wallet!.balance, locale)} Dhs`}
+              </Text>
+            )}
 
             {/* Amount input */}
             <View style={styles.fieldGroup}>
@@ -224,6 +266,7 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
                 {t('partner.withdraw.amountLabel')}
               </Text>
               <RNTextInput
+                accessibilityLabel={t('partner.withdraw.amountLabel')}
                 style={[
                   styles.input,
                   amountError ? styles.inputError : null,
@@ -240,7 +283,7 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
                 returnKeyType="next"
               />
               {amountError ? (
-                <Text type="small" color={Colors.error} style={styles.errorText}>
+                <Text accessibilityRole="alert" type="small" color={Colors.error} style={styles.errorText}>
                   {amountError}
                 </Text>
               ) : null}
@@ -260,6 +303,8 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
                 <Button
                   variant="white"
                   bordless
+                  accessibilityLabel={selectedMethodLabel ?? t('partner.withdraw.methodPlaceholder')}
+                  accessibilityState={{ expanded: methodOpen }}
                   onPress={() => setMethodOpen(!methodOpen)}
                   style={styles.pickerBtn}
                 >
@@ -281,7 +326,7 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
                 </Button>
               </View>
               {methodError ? (
-                <Text type="small" color={Colors.error} style={styles.errorText}>
+                <Text accessibilityRole="alert" type="small" color={Colors.error} style={styles.errorText}>
                   {methodError}
                 </Text>
               ) : null}
@@ -294,6 +339,7 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
                       key={item.id}
                       variant="white"
                       bordless
+                      accessibilityLabel={t(item.labelKey)}
                       style={[
                         styles.dropdownItem,
                         method === item.id ? styles.dropdownItemSelected : null,
@@ -319,7 +365,7 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
 
             {/* Submit error */}
             {submitError ? (
-              <Text type="small" color={Colors.error} style={styles.submitError}>
+              <Text accessibilityRole="alert" type="small" color={Colors.error} style={styles.submitError}>
                 {submitError}
               </Text>
             ) : null}
@@ -336,7 +382,7 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
             }
             variant="primary"
             onPress={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || walletLoading || !wallet}
             accessibilityState={{ busy: submitting }}
           />
         </View>

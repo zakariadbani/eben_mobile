@@ -7,16 +7,10 @@ import View from "@/components/common/View";
 import ForgotPasswordForm from "@/components/screens/shared/ForgotPasswordForm";
 import Colors from "@/constants/Colors";
 import { useSession } from "@/context/AuthContext";
+import { normalizeMoroccanPhone } from "@/helpers/phoneHelper";
 
 interface ForgotPasswordFormValues {
   phone: string;
-}
-
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (/^2126\d{8}$/.test(digits)) return `+${digits}`;
-  if (/^6\d{8}$/.test(digits)) return `+212${digits}`;
-  return digits;
 }
 
 const PartnerForgotPasswordScreen = () => {
@@ -28,7 +22,7 @@ const PartnerForgotPasswordScreen = () => {
   const handleSubmit = async (values: ForgotPasswordFormValues) => {
     setError(null);
     try {
-      await startPasswordReset(normalizePhone(values.phone));
+      await startPasswordReset(normalizeMoroccanPhone(values.phone));
       router.push("/(auth)/prestataire/forgot-password/verification");
     } catch {
       setError(t("auth.recovery.startError"));

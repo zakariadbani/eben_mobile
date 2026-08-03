@@ -99,15 +99,24 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onSortAsc,
   onSortDesc,
   onFilter,
-}) => (
+}) => {
+  const { t, i18n } = useTranslation();
+  const isAr = i18n.language === 'ar';
+  return (
   <View
     flexDirection="row"
     alignItems="center"
     justifyContent="space-between"
-    style={styles.toolbar}
+    style={[styles.toolbar, isAr && styles.rowRtl]}
   >
     {/* Month + chevron */}
-    <TouchableOpacity onPress={onMonthPress} activeOpacity={0.75} style={styles.monthBtn}>
+    <TouchableOpacity
+      onPress={onMonthPress}
+      activeOpacity={0.75}
+      style={styles.monthBtn}
+      accessibilityRole="button"
+      accessibilityLabel={monthLabel}
+    >
       <Text type="label" semiBold color={Colors.brand} translate={false}>
         {monthLabel}
       </Text>
@@ -116,7 +125,14 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
     {/* Sort + filter icons */}
     <View flexDirection="row" alignItems="center" gap={16}>
-      <TouchableOpacity onPress={onSortAsc} activeOpacity={0.7}>
+      <TouchableOpacity
+        onPress={onSortAsc}
+        activeOpacity={0.7}
+        style={styles.toolbarIconBtn}
+        accessibilityRole="button"
+        accessibilityLabel={t('partner.offers.sortAscending')}
+        accessibilityState={{ selected: sortDir === 'asc' }}
+      >
         <Icon
           name="arrow-up"
           size={20}
@@ -124,7 +140,14 @@ const Toolbar: React.FC<ToolbarProps> = ({
           type="Feather"
         />
       </TouchableOpacity>
-      <TouchableOpacity onPress={onSortDesc} activeOpacity={0.7}>
+      <TouchableOpacity
+        onPress={onSortDesc}
+        activeOpacity={0.7}
+        style={styles.toolbarIconBtn}
+        accessibilityRole="button"
+        accessibilityLabel={t('partner.offers.sortDescending')}
+        accessibilityState={{ selected: sortDir === 'desc' }}
+      >
         <Icon
           name="arrow-down"
           size={20}
@@ -132,12 +155,19 @@ const Toolbar: React.FC<ToolbarProps> = ({
           type="Feather"
         />
       </TouchableOpacity>
-      <TouchableOpacity onPress={onFilter} activeOpacity={0.7}>
+      <TouchableOpacity
+        onPress={onFilter}
+        activeOpacity={0.7}
+        style={styles.toolbarIconBtn}
+        accessibilityRole="button"
+        accessibilityLabel={t('partner.offers.filter.title')}
+      >
         <Icon name="filter" size={20} iconColor={Colors.gray} type="Feather" />
       </TouchableOpacity>
     </View>
   </View>
-);
+  );
+};
 
 // ── Offer card ───────────────────────────────────────────────────────────────
 
@@ -147,13 +177,13 @@ interface ArchivedOfferCardProps {
 }
 
 const ArchivedOfferCard: React.FC<ArchivedOfferCardProps> = ({ request, onPress }) => {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const isAr = i18n.language === 'ar';
   const cfg = getStatusConfig(request.status, isAr);
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75} style={styles.card}>
-      <View flexDirection="row" alignItems="center" gap={12}>
+      <View flexDirection="row" alignItems="center" gap={12} style={isAr ? styles.rowRtl : undefined}>
         {/* Icon */}
         <View style={styles.iconWrapper}>
           <CustomIcon name={cfg.isReady ? 'orders' : 'liste'} size={36} />
@@ -161,7 +191,7 @@ const ArchivedOfferCard: React.FC<ArchivedOfferCardProps> = ({ request, onPress 
 
         {/* Info */}
         <View flex gap={4}>
-          <View flexDirection="row" alignItems="center" gap={6}>
+          <View flexDirection="row" alignItems="center" gap={6} style={isAr ? styles.rowRtl : undefined}>
             <Text type="small" color={Colors.gray} translate={false}>
               {isAr ? 'المرجع:' : 'Ref:'}
             </Text>
@@ -181,7 +211,7 @@ const ArchivedOfferCard: React.FC<ArchivedOfferCardProps> = ({ request, onPress 
             </Text>
           ) : (
             <Text type="small" color={Colors.gray}>
-              {isAr ? 'هذه الأوفر مغلقة' : 'Cette offre a été fermée'}
+              {t('Cette offre a été fermée')}
             </Text>
           )}
 
@@ -205,7 +235,7 @@ const ArchivedOfferCard: React.FC<ArchivedOfferCardProps> = ({ request, onPress 
           <Button
             title={isAr ? 'تحقق من الأسعار' : 'Vérifier les prix'}
             variant="primary"
-            rightIcon="arrow-right"
+            rightIcon={isAr ? "arrow-left" : "arrow-right"}
             iconType="standard"
             iconTypeName="Feather"
             sizeIcon={14}
@@ -214,11 +244,11 @@ const ArchivedOfferCard: React.FC<ArchivedOfferCardProps> = ({ request, onPress 
             onPress={onPress}
           />
         ) : cfg.isClosed ? (
-          <TouchableOpacity onPress={onPress} style={styles.detailsBtn} activeOpacity={0.8}>
+          <TouchableOpacity onPress={onPress} style={[styles.detailsBtn, isAr && styles.rowRtl]} activeOpacity={0.8}>
             <Text type="small" semiBold color={Colors.grayMidDark} translate={false}>
               {isAr ? 'التفاصيل' : 'Détails'}
             </Text>
-            <Icon name="arrow-right" size={12} iconColor={Colors.grayMidDark} type="Feather" />
+            <Icon name={isAr ? "arrow-left" : "arrow-right"} size={12} iconColor={Colors.grayMidDark} type="Feather" />
           </TouchableOpacity>
         ) : (
           <View style={[styles.closedBadge, { backgroundColor: cfg.background }]}>
@@ -490,6 +520,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  toolbarIconBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowRtl: {
+    flexDirection: 'row-reverse',
   },
   listContent: {
     flexGrow: 1,

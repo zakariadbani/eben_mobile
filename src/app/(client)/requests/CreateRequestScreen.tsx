@@ -197,16 +197,16 @@ export default function CreateRequestScreen() {
   };
 
   if (loadState === "loading" || storageLoading) {
-    return <Screen><View flex style={styles.centered}><ActivityIndicator color={Colors.primary} /></View></Screen>;
+    return <Screen whatsapp={false}><View flex style={styles.centered}><ActivityIndicator color={Colors.primary} /></View></Screen>;
   }
 
   if (loadState === "error") {
-    return <Screen padding><View flex style={styles.centered}><Text accessibilityRole="alert">requestFlow.loadError</Text><Button title="requestFlow.retry" onPress={() => void load()} /></View></Screen>;
+    return <Screen padding whatsapp={false}><View flex style={styles.centered}><Text accessibilityRole="alert">requestFlow.loadError</Text><Button title="requestFlow.retry" onPress={() => void load()} /></View></Screen>;
   }
 
   if (vehicles.length === 0) {
     return (
-      <Screen padding>
+      <Screen padding whatsapp={false}>
         <View flex style={styles.centered} gap={12}>
           <Text center>requestFlow.emptyGarage</Text>
           <Button title="requestFlow.addVehicle" onPress={() => router.push("/(client)/search/add-car" as Href)} />
@@ -219,7 +219,7 @@ export default function CreateRequestScreen() {
   const choices = step === 0 ? level1 : step === 1 ? level2 : level3;
   return (
     <View style={styles.root}>
-      <Screen padding scrollable>
+      <Screen padding scrollable whatsapp={false}>
         <View flexDirection="row" alignItems="center" gap={8}>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel={t("requestFlow.back")} onPress={() => {
             if (step === 2) setStep(1);

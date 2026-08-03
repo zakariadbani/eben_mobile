@@ -22,6 +22,11 @@ import CategoryDrillScreen from "../categories/[categoryId]";
 import CategoryResultsScreen from "../categories/results";
 import ProductDetailScreen from "../products/[productId]";
 import ReviewsScreen from "../products/[productId]/reviews";
+import WhatsappBtn from "@/components/common/WhatsappBtn";
+import ItemCategoryComponent from "@/components/screens/shared/app/ItemCategoryComponent";
+import ItemBasketComponent from "@/components/screens/shared/app/ItemBasketComponent";
+import ClientCheckoutForm from "@/components/screens/client/checkout/ClientCheckoutForm";
+import { mockAddresses } from "@/api/mock/mockOrders";
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn().mockResolvedValue(null),
@@ -206,6 +211,96 @@ it.each([
     mockParams = { categoryId: "12", condition: "occasion" };
     return <CategoryResultsScreen />;
   }],
+  ["product detail", () => {
+    mockParams = { productId: "91" };
+    return <ProductDetailScreen />;
+  }],
+])("keeps floating support off the %s primary action area", async (_name, screenFactory) => {
+  const screen = render(screenFactory());
+  await screen.findAllByText(/Freins|Plaquettes live/);
+
+  expect(screen.UNSAFE_queryAllByType(WhatsappBtn)).toHaveLength(0);
+});
+
+it("shows every saved address by its saved label", () => {
+  const screen = render(
+    <ClientCheckoutForm
+      addresses={mockAddresses}
+      selectedAddressId={mockAddresses[0]!.id}
+      onSelectAddress={jest.fn()}
+      onAddAddress={jest.fn()}
+      selectedPaymentMethod="cod"
+      onSelectPaymentMethod={jest.fn()}
+    />,
+  );
+
+  for (const address of mockAddresses) {
+    expect(screen.getByText(address.label!)).toBeTruthy();
+  }
+});
+
+it("shows only payment methods users can currently select", () => {
+  const screen = render(
+    <ClientCheckoutForm
+      addresses={[]}
+      selectedAddressId={null}
+      onSelectAddress={jest.fn()}
+      onAddAddress={jest.fn()}
+      selectedPaymentMethod="cod"
+      onSelectPaymentMethod={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByText(i18n.t("Paiement à la livraison"))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("Payer avec Cash Plus"))).toBeNull();
+  expect(screen.queryByText(i18n.t("Virement bancaire"))).toBeNull();
+  expect(screen.queryByText(i18n.t("checkout.paymentDetails"))).toBeNull();
+});
+it("localizes basket category labels and price units", () => {
+  const screen = render(
+    <ItemBasketComponent
+      item={{
+        id: 1,
+        title: "Plaquettes",
+        categoryLabel: "Freins",
+        unitPrice: 99.5,
+        quantity: 1,
+      }}
+      onIncrement={jest.fn()}
+      onDecrement={jest.fn()}
+      onRemove={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByText(i18n.t("home.category", { value: "Freins" }))).toBeTruthy();
+  expect(screen.getByText("99,5 Dhs")).toBeTruthy();
+});
+it("keeps long category labels readable within two lines", () => {
+  const screen = render(<ItemCategoryComponent item={{
+    id: 99,
+    title: "TRANSMISSION",
+    title_ar: "TRANSMISSION AR",
+  }} />);
+
+  expect(screen.getByText("TRANSMISSION").props.numberOfLines).toBe(2);
+});
+
+it("uses localized formal copy for the request promo", async () => {
+  const screen = render(<CategoriesListScreen />);
+
+  expect(await screen.findByText(i18n.t("catalog.requestPromo.title"), { includeHiddenElements: true })).toBeTruthy();
+  expect(screen.getByText(i18n.t("catalog.requestPromo.body"), { includeHiddenElements: true })).toBeTruthy();
+});
+it.each([
+  ["category list", () => <CategoriesListScreen />],
+  ["category drill-down", () => {
+    mockParams = { categoryId: "10", condition: "occasion" };
+    return <CategoryDrillScreen />;
+  }],
+  ["category results", () => {
+    mockParams = { categoryId: "12", condition: "occasion" };
+    return <CategoryResultsScreen />;
+  }],
 ])("gates the %s request banner for guests without creating a request", async (_name, screenFactory) => {
   const screen = render(screenFactory());
   const nestedSharedAction = await screen.findByText(
@@ -215,7 +310,14 @@ it.each([
 
   fireEvent.press(nestedSharedAction);
 
-  expect(mockPush).toHaveBeenCalledWith("/(auth)/ClientLoginScreen");
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: "/(auth)/ClientLoginScreen",
+    params: {
+      returnTo: _name === "category drill-down"
+        ? "/(client)/requests/CreateRequestScreen?categoryId=10&condition=occasion"
+        : "/(client)/requests/CreateRequestScreen",
+    },
+  });
   expect(createRequest).not.toHaveBeenCalled();
 });
 
@@ -227,6 +329,24 @@ it("rejects an invalid category route id before loading the category tree", asyn
   expect(mockGetCategoryTree).not.toHaveBeenCalled();
 });
 
+it("labels results with the selected category instead of the first product", async () => {
+  mockParams = { categoryId: "12", condition: "en_stock" };
+  const screen = render(<CategoryResultsScreen />);
+
+  expect(await screen.findByText("Plaquettes")).toBeTruthy();
+  expect(mockGetCategoryTree).toHaveBeenCalledTimes(1);
+});
+it("opens product details when the result card is pressed", async () => {
+  mockParams = { categoryId: "12", condition: "en_stock" };
+  const screen = render(<CategoryResultsScreen />);
+
+  fireEvent.press(await screen.findByText("Plaquettes live"));
+
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: "/(client)/products/[productId]",
+    params: { productId: "91" },
+  });
+});
 it("loads category results from the centralized products resource", async () => {
   mockParams = { categoryId: "12", condition: "en_stock", searchQuery: "plaquettes" };
   const screen = render(<CategoryResultsScreen />);
@@ -237,6 +357,12 @@ it("loads category results from the centralized products resource", async () => 
 });
 
 it("maps validated tyre query filters to the live pneumatic search", async () => {
+  await i18n.changeLanguage("ar");
+  mockSearchAllPneumatics.mockResolvedValueOnce({
+    success: true,
+    data: [{ id: 1, brand: "Michelin", model: "Primacy 4", width: 205, aspectRatio: 55, diameter: 16, loadIndex: 91, speedRating: "H", season: "summer", vehicleType: "4x4", price: 980, stockQuantity: 8, image: null, status: true }],
+    pagination,
+  });
   mockParams = {
     type: "pneumatiques",
     largeurId: "205",
@@ -247,7 +373,7 @@ it("maps validated tyre query filters to the live pneumatic search", async () =>
     indiceVitesseId: "1",
     vehicleType: "4x4",
   };
-  render(<CategoryResultsScreen />);
+  const screen = render(<CategoryResultsScreen />);
 
   await waitFor(() => expect(mockSearchAllPneumatics).toHaveBeenCalledWith({
     width: 205,
@@ -259,6 +385,7 @@ it("maps validated tyre query filters to the live pneumatic search", async () =>
     vehicleType: "4x4",
   }));
   expect(mockGetProductsByCategory).not.toHaveBeenCalled();
+  expect(await screen.findByText("\u0631\u0642\u0645 \u0627\u0644\u0642\u0637\u0639\u0629: 205/55 R16")).toBeTruthy();
 });
 
 it("rejects invalid result query ids before making a public request", async () => {
@@ -286,6 +413,41 @@ it("does not fetch an invalid product id and retries a failed valid detail read"
   expect(mockGetProduct).toHaveBeenCalledTimes(2);
 });
 
+it("uses a supported icon for half-star ratings", async () => {
+  mockParams = { productId: "91" };
+  mockGetProduct.mockResolvedValueOnce({
+    success: true,
+    data: { ...product, rating: 3.5, reviewsCount: 2 },
+  });
+  const screen = render(<ProductDetailScreen />);
+
+  await screen.findByText("Plaquettes live");
+  expect(screen.queryByText("⯨")).toBeNull();
+});
+it("uses cart language for occasion products so it is distinct from the wishlist", async () => {
+  mockParams = { productId: "91" };
+  mockGetProduct.mockResolvedValueOnce({
+    success: true,
+    data: { ...product, condition: "occasion" },
+  });
+  const screen = render(<ProductDetailScreen />);
+
+  expect(await screen.findByRole("button", { name: i18n.t("Ajouter au panier") })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: i18n.t("occasion.addToList") })).toBeNull();
+});
+it("shows an honest empty-media state without photo-specific occasion guidance", async () => {
+  mockParams = { productId: "91", state: "extra-info" };
+  mockGetProduct.mockResolvedValueOnce({
+    success: true,
+    data: { ...product, condition: "occasion", images: [] },
+  });
+  const screen = render(<ProductDetailScreen />);
+
+  expect(await screen.findByText(i18n.t("requestFlow.noPhoto"))).toBeTruthy();
+  expect(screen.queryByText("1/1")).toBeNull();
+  expect(screen.queryByText(i18n.t("Pièce d'occasion — état conforme à la photo"))).toBeNull();
+  expect(screen.queryByText(i18n.t("Vérifiez les photos avant de confirmer votre achat."))).toBeNull();
+});
 it("routes guest basket and wishlist actions to Client login without protected calls", async () => {
   mockParams = { productId: "91" };
   const screen = render(<ProductDetailScreen />);
@@ -294,7 +456,10 @@ it("routes guest basket and wishlist actions to Client login without protected c
   fireEvent.press(screen.getByLabelText("Ajouter à la liste"));
   fireEvent.press(screen.getByRole("button", { name: i18n.t("Ajouter au panier") }));
 
-  expect(mockPush).toHaveBeenCalledWith("/(auth)/ClientLoginScreen");
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: "/(auth)/ClientLoginScreen",
+    params: { returnTo: "/(client)/products/91" },
+  });
   expect(addToWishlist).not.toHaveBeenCalled();
   expect(addToBasket).not.toHaveBeenCalled();
 });
@@ -310,7 +475,10 @@ it("validates review ids and gates leave-review for guests", async () => {
   const valid = render(<ReviewsScreen />);
   const leaveReviewButtons = await valid.findAllByRole("button", { name: i18n.t("reviews.leaveReview") });
   fireEvent.press(leaveReviewButtons[0]);
-  expect(mockPush).toHaveBeenCalledWith("/(auth)/ClientLoginScreen");
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: "/(auth)/ClientLoginScreen",
+    params: { returnTo: "/(client)/products/91/reviews" },
+  });
 });
 
 it("allows a Client detail mutation to call the protected resource", async () => {

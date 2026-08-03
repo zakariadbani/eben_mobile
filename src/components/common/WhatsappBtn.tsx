@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
 import { Linking, StyleSheet, ViewStyle } from "react-native";
 import Button from "@/components/common/Button"; // Adjust the import path as necessary
 import Colors from "@/constants/Colors"; // Adjust the import path as necessary
@@ -9,6 +10,7 @@ interface WhatsappBtnProps {
 }
 
 const WhatsappBtn: React.FC<WhatsappBtnProps> = ({ style, onPress }) => {
+  const { t } = useTranslation();
   const WhatsappBtnEvent = () => {
     void Linking.openURL("https://wa.me/212600000000");
   };
@@ -19,6 +21,7 @@ const WhatsappBtn: React.FC<WhatsappBtnProps> = ({ style, onPress }) => {
       sizeIcon={40}
       iconType="custom"
       rightIcon="whatsapp"
+      accessibilityLabel={t('accessibility.whatsapp')}
       style={StyleSheet.flatten([styles.button, style])}
       iconColor={Colors.brand} // Use provided iconColor or default
       onPress={onPress || WhatsappBtnEvent} // Use custom onPress if provided

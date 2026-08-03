@@ -6,6 +6,7 @@ import Screen from "@/components/common/Screen";
 import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
 import Button from "@/components/common/Button";
+import Icon from "@/components/common/Icon";
 import Colors from "@/constants/Colors";
 import { getOffers } from "@/api/resources/requests";
 import type { ClientOfferItem } from "@/interfaces/Offer";
@@ -24,7 +25,8 @@ export default function OffersListScreen() {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [offers, setOffers] = useState<ClientOfferItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const locale = i18n.language === "ar" ? "ar-MA" : "fr-MA";
+  const isArabic = i18n.language === "ar";
+  const locale = isArabic ? "ar-MA" : "fr-MA";
 
   const load = useCallback(async (refresh = false) => {
     if (requestId === null) { setState("error"); return; }
@@ -42,13 +44,13 @@ export default function OffersListScreen() {
 
   useEffect(() => { void load(); }, [load]);
 
-  if (state === "loading") return <Screen><View flex style={styles.centered}><ActivityIndicator color={Colors.primary} /></View></Screen>;
+  if (state === "loading") return <Screen whatsapp={false}><View flex style={styles.centered}><ActivityIndicator color={Colors.primary} /></View></Screen>;
   if (state === "error") {
-    return <Screen padding><View flex style={styles.centered} gap={12}><Text accessibilityRole="alert">{requestId === null ? "requestFlow.invalidRoute" : "requestFlow.loadError"}</Text>{requestId !== null ? <Button title="requestFlow.retry" onPress={() => void load()} /> : null}</View></Screen>;
+    return <Screen padding whatsapp={false}><View flex style={styles.centered} gap={12}><Text accessibilityRole="alert">{requestId === null ? "requestFlow.invalidRoute" : "requestFlow.loadError"}</Text>{requestId !== null ? <Button title="requestFlow.retry" onPress={() => void load()} /> : null}</View></Screen>;
   }
 
   return (
-    <Screen>
+    <Screen whatsapp={false}>
       <View style={styles.container}>
         <Text type="headerTitle" semiBold style={styles.title}>requestFlow.offersTitle</Text>
         <FlatList
@@ -69,9 +71,20 @@ export default function OffersListScreen() {
                   params: { requestId: String(requestId), offerId: String(item.id) },
                 } as Href)}
               >
-                {title ? <Text semiBold translate={false}>{title}</Text> : null}
-                <Text type="small" color={Colors.gray}>{t("requestFlow.reference", { value: item.reference })}</Text>
-                <Text type="subTitle" bold translate={false}>{`${item.priceClient.toLocaleString(locale)} Dhs`}</Text>
+                <View style={[styles.offerRow, isArabic && styles.offerRowRtl]}>
+                  <View flex gap={4}>
+                    {title ? <Text semiBold translate={false}>{title}</Text> : null}
+                    <Text type="small" color={Colors.gray} translate={false}>{t("requestFlow.reference", { value: item.reference })}</Text>
+                    <Text type="small" color={Colors.gray}>requestFlow.clientPrice</Text>
+                    <Text type="subTitle" bold translate={false}>{`${item.priceClient.toLocaleString(locale)} Dhs`}</Text>
+                  </View>
+                  <Icon
+                    name={isArabic ? "chevron-left" : "chevron-right"}
+                    type="Feather"
+                    size={20}
+                    iconColor={Colors.gray}
+                  />
+                </View>
               </TouchableOpacity>
             );
           }}
@@ -88,4 +101,6 @@ const styles = StyleSheet.create({
   list: { paddingBottom: 24 },
   emptyList: { flexGrow: 1, justifyContent: "center" },
   card: { padding: 14, marginBottom: 10, borderRadius: 8, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderLight, gap: 4 },
+  offerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  offerRowRtl: { flexDirection: "row-reverse" },
 });

@@ -189,6 +189,16 @@ it('reloads the canonical basket when the cart regains focus', async () => {
   expect(apiGetBasket).toHaveBeenCalledTimes(2);
 });
 
+it('shows only the recovery action when the basket is empty', async () => {
+  apiGetBasket.mockResolvedValueOnce({ success: true, data: { ...basket, items: [] } });
+  const screen = render(<CartScreen />);
+
+  expect(await screen.findByText('Votre panier est vide')).toBeTruthy();
+  expect(screen.queryByTestId('basket-total')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Caisse de sortie' })).toBeNull();
+});
+
+
 it('reloads the canonical basket after a valid coupon instead of deriving totals locally', async () => {
   apiGetBasket.mockResolvedValueOnce({ success: true, data: basket }).mockResolvedValueOnce({ success: true, data: changedBasket });
   const screen = render(<CartScreen />);
@@ -200,6 +210,14 @@ it('reloads the canonical basket after a valid coupon instead of deriving totals
   expect(await screen.findByText('186,66 Dhs')).toBeTruthy();
 });
 
+it('shows the checkout profile summary and opens the profile editor', async () => {
+  const screen = render(<CheckoutScreen />);
+
+  expect(await screen.findByText('Client Test')).toBeTruthy();
+  expect(screen.getByText('0612345678')).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: i18n.t('settings.modify') }));
+  expect(mockPush).toHaveBeenCalledWith('/(client)/settings/profile');
+});
 it('submits COD once with a visible server-default address and routes only the order identity', async () => {
   const nonDefault = (id: number): Address => ({ ...address, id, isDefault: false, label: `Address ${id}` });
   mockGetAddresses.mockResolvedValueOnce({
@@ -280,7 +298,7 @@ it('posts a consented abuse report once and reconciles its confirmation envelope
   expect(apiReportAbuse).toHaveBeenCalledWith(71, 'other', 'Annonce incorrecte', 'client@example.test', true);
 });
 
-it('toggles the returned wishlist item ID and displays the returned basket total', async () => {
+it('toggles the returned wishlist item ID and labels the returned basket total', async () => {
   mockParams = { productId: '71' };
   const screen = render(<ProductDetailScreen />);
   await screen.findByText('Plaquettes live');
@@ -291,9 +309,9 @@ it('toggles the returned wishlist item ID and displays the returned basket total
   await waitFor(() => expect(apiRemoveWishlistItem).toHaveBeenCalledWith(91));
 
   fireEvent.press(screen.getByRole('button', { name: i18n.t('Ajouter au panier') }));
-  fireEvent.press(screen.getByRole('button', { name: i18n.t('Acheter') }));
+  fireEvent.press(screen.getByRole('button', { name: i18n.t('Confirm') }));
   await waitFor(() => expect(apiAddToBasket).toHaveBeenCalledWith(71, 1));
-  expect(await screen.findByText('126,66 Dhs')).toBeTruthy();
+  expect(await screen.findByText(i18n.t('commerce.success.total', { value: '126,66' }))).toBeTruthy();
 });
 
 it('uses Arabic success copy and routes order history to the live settings collection', async () => {

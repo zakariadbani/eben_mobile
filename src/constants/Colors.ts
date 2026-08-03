@@ -38,33 +38,3 @@ export default {
   primary300: "#2C64EF",         // Primary/300 — blue accent (buttons, links, active tabs)
   innerText: "#84899F",          // Inner text — secondary label / icon colour
 };
-
-const tintColorLight = "#0a7ea4";
-const tintColorDark = "#fff";
-const primary = "#FFD600";
-export const Colors = {
-  light: {
-    text: "#11181C",
-    background: "#fff",
-    tint: tintColorLight,
-    icon: "#687076",
-    tabIconDefault: "#687076",
-    tabIconSelected: tintColorLight,
-    //custom
-    primary: primary,
-    textBrand: "#000100",
-    // textDark: "##323232",
-    textLight: "#EFF2F6",
-    // textWhite: "#FCFCFC",
-  },
-  dark: {
-    text: "#ECEDEE",
-    background: "#151718",
-    tint: tintColorDark,
-    icon: "#9BA1A6",
-    tabIconDefault: "#9BA1A6",
-    tabIconSelected: tintColorDark,
-    primary: primary,
-    textBrand: "#000100",
-  },
-};

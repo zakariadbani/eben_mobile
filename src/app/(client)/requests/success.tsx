@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import type { Href } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import { getRequest } from "@/api/resources/requests";
@@ -19,6 +20,7 @@ function positiveId(value: string | undefined): number | null {
 
 export default function RequestSuccessScreen() {
   const { t, i18n } = useTranslation();
+  const router = useRouter();
   const { requestId: rawRequestId } = useLocalSearchParams<{ requestId?: string }>();
   const requestId = positiveId(rawRequestId);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -70,6 +72,14 @@ export default function RequestSuccessScreen() {
               <Text type="loginDefault" center translate={false} style={styles.body}>
                 {`${t("Votre liste a été envoyée à nos partenaires, vous obtiendrez un prix dans 2 heures.")}${deadlineTime ? ` (${deadlineTime})` : ""}.\n${t("Votre référence de demande :")}\n${request.reference}`}
               </Text>
+              <Button
+                title="requestFlow.viewRequest"
+                style={styles.cta}
+                onPress={() => router.replace({
+                  pathname: "/(client)/requests/[requestId]",
+                  params: { requestId: String(request.id) },
+                } as Href)}
+              />
             </>
           ) : null}
         </View>
@@ -98,4 +108,5 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 22, marginBottom: 6 },
   title: { fontSize: 20, marginBottom: 12 },
   body: { fontSize: 15, lineHeight: 20 },
+  cta: { marginTop: 18, width: "100%" },
 });

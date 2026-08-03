@@ -35,21 +35,24 @@ export default function ItemIncomingRequestCard({ item, onPress, styleContainer 
     ? firstItem?.categoryTitleAr ?? firstItem?.categoryTitle ?? t("partner.offers.unknownPart")
     : firstItem?.categoryTitle ?? t("partner.offers.unknownPart");
   const expiry = formatExpiry(item.expiresAt);
+  const imageSource = typeof firstItem?.categoryImage === "string"
+    ? { uri: firstItem.categoryImage }
+    : firstItem?.categoryImage || require("@/assets/img/freins.png");
   const handlePress = () => onPress ? onPress() : router.push(`/(prestataire)/offers/${item.id}/fill`);
 
   return (
-    <TouchableOpacity style={[styles.card, styleContainer]} activeOpacity={0.78} onPress={handlePress}>
+    <TouchableOpacity style={[styles.card, isArabic && styles.cardRtl, styleContainer]} activeOpacity={0.78} onPress={handlePress}>
       <Image
-        source={firstItem?.categoryImage ? { uri: firstItem.categoryImage } : require("@/assets/img/freins.png")}
+        source={imageSource}
         style={styles.image}
         resizeMode="contain"
       />
       <View flex style={styles.content}>
-        <Text type="label" color={Colors.gray} translate={false}>{`${t("partner.offers.card.ref")} ${item.reference}`}</Text>
-        <Text type="labelTwo" semiBold numberOfLines={2} translate={false}>{title}</Text>
-        <View flexDirection="row" alignItems="center" gap={7} style={styles.expiry}>
+        <Text type="label" color={Colors.gray} translate={false} style={isArabic ? styles.textRtl : undefined}>{`${t("partner.offers.card.ref")} ${item.reference}`}</Text>
+        <Text type="labelTwo" semiBold numberOfLines={2} translate={false} style={isArabic ? styles.textRtl : undefined}>{title}</Text>
+        <View flexDirection="row" alignItems="center" gap={7} style={[styles.expiry, isArabic && styles.rowRtl]}>
           <Icon name="clock" type="Feather" size={20} iconColor={expiry.color} />
-          <Text type="labelTwo" semiBold color={expiry.color} translate={false}>
+          <Text type="labelTwo" semiBold color={expiry.color} translate={false} style={isArabic ? styles.textRtl : undefined}>
             {`${expiry.label} ${t("partner.offers.card.restante")}`}
           </Text>
         </View>
@@ -63,8 +66,11 @@ export default function ItemIncomingRequestCard({ item, onPress, styleContainer 
 
 const styles = StyleSheet.create({
   card: { minHeight: 106, marginBottom: 12, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 7, backgroundColor: Colors.white, flexDirection: "row", alignItems: "center", shadowColor: Colors.gray, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.17, shadowRadius: 7, elevation: 4 },
+  cardRtl: { flexDirection: "row-reverse" },
   image: { width: 61, height: 61, marginEnd: 12 },
   content: { minWidth: 0 },
   expiry: { marginTop: 10 },
+  rowRtl: { flexDirection: "row-reverse" },
+  textRtl: { textAlign: "right" },
   button: { alignSelf: "flex-end", marginStart: 8, marginBottom: 1, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 4, backgroundColor: Colors.primary },
 });

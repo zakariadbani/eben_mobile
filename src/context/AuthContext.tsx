@@ -8,6 +8,8 @@ import {
   type PropsWithChildren,
 } from 'react';
 import { apiClient } from '@/api/client';
+import { API_MODE } from '@/api/config';
+import { getMockAuthSession } from '@/api/mock/mockAuth';
 import { ApiClientError } from '@/api/types';
 import {
   forgotPassword,
@@ -86,6 +88,7 @@ function isValidSession(value: unknown): value is AuthSession {
   const session = value as Partial<AuthSession>;
   const user = session.user;
   return (
+    (session.source === undefined || session.source === 'mock') &&
     typeof session.token === 'string' &&
     session.token.length > 0 &&
     user !== null &&
@@ -244,6 +247,12 @@ export function SessionProvider({ children }: PropsWithChildren) {
         return;
       }
 
+      if (restored.source === 'mock' && API_MODE !== 'mock') {
+        await clearSession();
+        if (!cancelled) setRestoreLoading(false);
+        return;
+      }
+
       if (!isValidSession(restored)) {
         await clearSession();
         if (!cancelled) setRestoreLoading(false);
@@ -292,9 +301,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
       expectedRole?: Role,
     ): Promise<Role> => {
       const operationEpoch = beginIdentityOperation();
-      const response = await loginRequest({ phone, password });
+      const mockSession = getMockAuthSession(expectedRole);
+      const nextSession = mockSession ?? (await loginRequest({ phone, password })).data;
       assertCurrentAuthOperation(operationEpoch, authEpoch.current);
-      const nextSession = response.data;
       const serverRole = isValidSession(nextSession)
         ? roleFor(nextSession)
         : null;

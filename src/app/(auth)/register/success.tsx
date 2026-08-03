@@ -7,11 +7,13 @@ import { Text } from "@/components/common/Text";
 import Button from "@/components/common/Button";
 import Colors from "@/constants/Colors";
 import CarSelectionScreen from "./car-selection";
+import { getClientReturnTo } from "@/constants/clientReturnTo";
 
 export default function RegistrationSuccessScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { carLabel } = useLocalSearchParams<{ carLabel?: string }>();
+  const { carLabel, returnTo } = useLocalSearchParams<{ carLabel?: string; returnTo?: string }>();
+  const destination = getClientReturnTo(returnTo);
   const savedCarLabel = typeof carLabel === "string" ? carLabel.trim() : "";
 
   return (
@@ -28,8 +30,8 @@ export default function RegistrationSuccessScreen() {
               : t("auth.register.completeBody")}
           </Text>
           <Button
-            title={t("auth.register.goHome")}
-            onPress={() => router.replace("/(client)")}
+            title={destination === "/(client)" ? t("auth.register.goHome") : t("auth.register.confirmContinue")}
+            onPress={() => router.replace(destination)}
           />
         </View>
       </View>

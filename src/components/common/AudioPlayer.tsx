@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { StyleSheet } from "react-native";
 import { Audio, AVPlaybackStatus } from "expo-av";
+import { useTranslation } from "react-i18next";
 import { Text } from "@/components/common/Text";
 import Button from "@/components/common/Button";
 import View from "@/components/common/View";
+import Colors from "@/constants/Colors";
 
 interface AudioPlayerProps {
   uri: string; // Audio URI passed as a prop
 }
 
 const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri }) => {
+  const { t } = useTranslation();
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
   const [status, setStatus] = useState({
     positionMillis: 0,
     durationMillis: 0,
@@ -26,13 +31,21 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri }) => {
   }, [sound]);
 
   const playSound = async () => {
-    const { sound } = await Audio.Sound.createAsync(
-      { uri }, // Use the URI from props
-      { shouldPlay: true },
-      onPlaybackStatusUpdate
-    );
-    setSound(sound);
-    setIsPlaying(true);
+    setBusy(true);
+    setError(false);
+    try {
+      const created = await Audio.Sound.createAsync(
+        { uri },
+        { shouldPlay: true },
+        onPlaybackStatusUpdate,
+      );
+      setSound(created.sound);
+      setIsPlaying(true);
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const onPlaybackStatusUpdate = (playbackStatus: AVPlaybackStatus) => {
@@ -48,17 +61,27 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri }) => {
   };
 
   const togglePlayback = async () => {
-    if (sound) {
-      const status = await sound.getStatusAsync();
-      if (status.isLoaded && status.isPlaying) {
+    if (busy) return;
+    if (!sound) {
+      await playSound();
+      return;
+    }
+
+    setBusy(true);
+    setError(false);
+    try {
+      const playback = await sound.getStatusAsync();
+      if (playback.isLoaded && playback.isPlaying) {
         await sound.pauseAsync();
         setIsPlaying(false);
       } else {
         await sound.playAsync();
         setIsPlaying(true);
       }
-    } else {
-      playSound();
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -76,6 +99,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri }) => {
           variant="white"
           iconTypeName="FontAwesome"
           rightIcon={isPlaying ? "pause" : "play"}
+          accessibilityLabel={t("requestFlow.audio")}
+          accessibilityState={{ selected: isPlaying, busy }}
+          disabled={busy}
           onPress={togglePlayback}
         />
       </View>
@@ -85,6 +111,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri }) => {
           {formatTime(status.durationMillis)}
         </Text>
       </View>
+      {error ? (
+        <Text accessibilityRole="alert" style={styles.error}>
+          {t("requestFlow.audioError")}
+        </Text>
+      ) : null}
     </View>
   );
 };
@@ -100,6 +131,10 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   progressContainer: {},
+  error: {
+    flex: 1,
+    color: Colors.red,
+  },
 });
 
 export default AudioPlayer;

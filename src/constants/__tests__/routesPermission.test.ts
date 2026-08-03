@@ -10,8 +10,9 @@ describe("route permissions", () => {
     ["guest profile edit", undefined, "(client)/settings/profile/index"],
     ["guest request list", undefined, "(client)/requests/index"],
     ["guest cart", undefined, "(client)/cart/index"],
+    ["guest unavailable legal", undefined, "(auth)/legal"],
+    ["guest unavailable waitlist", undefined, "(auth)/prestataire/waitlist"],
     ["client unapproved legal", "client" as const, "(client)/settings/pages/Legal"],
-    ["prestataire unapproved legal", "prestataire" as const, "(prestataire)/profile/legal"],
     ["client", "client" as const, "(prestataire)/dashboard"],
     ["prestataire", "prestataire" as const, "(client)/settings/index"],
     ["prestataire preview", "prestataire" as const, "(client)/index"],
@@ -43,6 +44,7 @@ describe("route permissions", () => {
     expect(
       canAccessRoute("(prestataire)/dashboard", "prestataire"),
     ).toBe(true);
+    expect(canAccessRoute("(prestataire)/profile/legal", "prestataire")).toBe(true);
   });
 
   it("uses the correct unauthenticated fallback for each app area", () => {

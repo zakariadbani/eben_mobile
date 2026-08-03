@@ -17,26 +17,15 @@ import {
   mockCarModels,
   mockCarMotorizations,
   mockCarYears,
-  mockVehicles,
 } from './mockVehicles';
-import type { CarBrand, CarMotorization, CarYear, Vehicle } from '@/interfaces/Vehicle';
-import {
-  mockRequests,
-  mockRequestSummaries,
-  mockOffers,
-} from './mockRequests';
-import type { Request, RequestSummary } from '@/interfaces/Request';
+import type { CarBrand, CarModel, CarMotorization, CarYear } from '@/interfaces/Vehicle';
 import type { Offer } from '@/interfaces/Offer';
-import { mockOrders, mockAddresses, mockNotifications, mockPaymentMethods, mockProfile } from './mockOrders';
-import type { Order } from '@/interfaces/Order';
-import type { ClientProfile } from '@/interfaces/User';
+import { mockNotifications, mockPaymentMethods, mockProfile } from './mockOrders';
+import type { ClientProfile, AuthUser } from '@/interfaces/User';
+import type { RegisterPayload } from '../resources/auth';
 import type { UpdateProfilePayload } from '../resources/users';
-import type { Address } from '@/interfaces/Address';
-import type { Notification } from '@/interfaces/Notification';
+import type { Notification, UserNotificationPreferences } from '@/interfaces/Notification';
 import type { PaymentMethod } from '@/interfaces/Payment';
-import type { PlaceOrderPayload } from '../resources/orders';
-import type { AddVehiclePayload } from '../resources/vehicles';
-import type { AddAddressPayload } from '../resources/addresses';
 import {
   mockProducts,
   mockReviews,
@@ -45,27 +34,33 @@ import {
 } from './mockProducts';
 import {
   mockPrestataireDashboardStats,
-  mockPrestataireIncomingRequests,
-  mockPrestataireOffers,
-  mockPartnerOrders,
   mockPrestataireProfile,
   mockPrestataireCompany,
-  mockPrestataireWallet,
-  mockWithdrawals,
   mockPrestataireOffersHistory,
   mockPrestataireNotifications,
 } from './mockPrestataire';
 import type { PrestataireDashboardStats } from '@/interfaces/PrestataireDashboard';
 import type { PrestataireProfile } from '@/interfaces/User';
 import type { PrestataireCompany } from '@/interfaces/PrestataireCompany';
-import type { PrestataireWallet, Withdrawal } from '@/interfaces/Wallet';
-import type { RequestWithdrawalResult } from '../resources/prestataire';
 import type { Product } from '@/interfaces/Product';
 import type { Review } from '@/interfaces/Review';
 import type { Basket } from '@/interfaces/Basket';
 import type { WishlistItem } from '@/interfaces/Wishlist';
 import type { ReportConfirmation } from '../resources/report';
 import type { CouponResult } from '../resources/basket';
+import type { UpdateNotificationPreferencesPayload } from '../resources/notifications';
+
+let mockUploadSequence = 0;
+let mockOtp: { phone: string; purpose: 'register' | 'password_reset'; verified: boolean } | null = null;
+
+let mockNotificationPreferences: UserNotificationPreferences = {
+  id: 1,
+  userId: 1,
+  channelPreferences: { email: true, sms: true, push: true, whatsapp: false },
+  notificationTypes: {},
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+};
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- registry values are heterogeneous
 type MockHandler = (body?: unknown) => ApiResponse<any> | Paginated<any>;
@@ -92,72 +87,49 @@ function single<T>(data: T): ApiResponse<T> {
 }
 
 export const mockRegistry: Record<string, MockHandler> = {
-  // ── Categories ─────────────────────────────────────────────────────────────
-  'GET:/categories':         () => paginated<Category>(mockCategoriesLevel1),
+  'POST:/auth/register': (body) => {
+    const payload = body as RegisterPayload;
+    if (!payload.name.trim() || !/^\+2126\d{8}$/.test(payload.phone) || !payload.password) throw new Error('Invalid registration');
+    const token = `mock-client-${Date.now()}`;
+    const user: AuthUser = { id: Date.now(), name: payload.name.trim(), email: payload.email?.trim() || null, phone: payload.phone, role: 'client', avatar: null, status: 'active', token };
+    return single({ user });
+  },
+  'POST:/auth/otp/send': (body) => {
+    const payload = body as { phone?: string; purpose?: 'register' | 'password_reset' };
+    if (!/^\+2126\d{8}$/.test(payload.phone ?? '') || !payload.purpose) throw new Error('Invalid OTP request');
+    mockOtp = { phone: payload.phone!, purpose: payload.purpose, verified: false };
+    return single({ sent: true as const });
+  },
+  'POST:/auth/otp/verify': (body) => {
+    const payload = body as { phone?: string; purpose?: 'register' | 'password_reset'; code?: string };
+    if (!mockOtp || mockOtp.phone !== payload.phone || mockOtp.purpose !== payload.purpose || !/^\d{6}$/.test(payload.code ?? '')) throw new Error('Invalid OTP');
+    mockOtp.verified = true;
+    return single({ verified: true as const });
+  },
+  'POST:/auth/verify-phone': (body) => {
+    const payload = body as { phone?: string; code?: string };
+    if (!mockOtp || mockOtp.phone !== payload.phone || !/^\d{6}$/.test(payload.code ?? '')) throw new Error('Invalid OTP');
+    mockOtp.verified = true;
+    return single({ verified: true as const });
+  },
+  'POST:/auth/forgot-password': (body) => {
+    const payload = body as { phone?: string };
+    if (!/^\+2126\d{8}$/.test(payload.phone ?? '')) throw new Error('Invalid password reset');
+    mockOtp = { phone: payload.phone!, purpose: 'password_reset', verified: false };
+    return single({ sent: true as const });
+  },
+  'POST:/auth/reset-password': (body) => {
+    const payload = body as { phone?: string; code?: string; password?: string };
+    if (!mockOtp?.verified || mockOtp.phone !== payload.phone || mockOtp.purpose !== 'password_reset' || !/^\d{6}$/.test(payload.code ?? '') || !payload.password) throw new Error('Invalid password reset');
+    mockOtp = null;
+    return single({ success: true as const });
+  },  'GET:/categories':         () => paginated<Category>(mockCategoriesLevel1),
   'GET:/categories/tree':    () => single<Category[]>(buildCategoryTree(mockCategories)),
 
   // ── Vehicle catalog ────────────────────────────────────────────────────────
   'GET:/brands':             () => paginated<CarBrand>(mockCarBrands),
   'GET:/motorizations':      () => paginated<CarMotorization>(mockCarMotorizations),
   'GET:/years':              () => single<CarYear[]>(mockCarYears),
-
-  // ── User's garage ──────────────────────────────────────────────────────────
-  'GET:/vehicles':           () => paginated<Vehicle>(mockVehicles),
-  // POST /vehicles — add a new vehicle; returns a synthetic Vehicle
-  'POST:/vehicles': (body) => {
-    const b = body as AddVehiclePayload;
-    const brand = mockCarBrands.find((br) => br.id === b.brandId);
-    const model = mockCarModels.find((m) => m.id === b.modelId);
-    const moto = mockCarMotorizations.find((m) => m.id === (b.motorizationId ?? 0));
-    const newVehicle: Vehicle = {
-      id: Date.now(),
-      userId: 1,
-      brandId: b.brandId,
-      modelId: b.modelId,
-      motorizationId: b.motorizationId ?? null,
-      year: b.year,
-      vin: null,
-      licensePlate: null,
-      nickname: b.nickname ?? null,
-      imageUrl: null,
-      isDefault: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      brandName: brand?.name,
-      modelName: model?.name,
-      motorizationName: moto?.name ?? null,
-    };
-    return single<Vehicle>(newVehicle);
-  },
-  // DELETE /vehicles/:id — remove a vehicle
-  'DELETE:/vehicles/1': () => single<{ deleted: boolean }>({ deleted: true }),
-  'DELETE:/vehicles/2': () => single<{ deleted: boolean }>({ deleted: true }),
-  'DELETE:/vehicles/3': () => single<{ deleted: boolean }>({ deleted: true }),
-  'DELETE:/vehicles/4': () => single<{ deleted: boolean }>({ deleted: true }),
-
-  // ── Requests ───────────────────────────────────────────────────────────────
-  'GET:/requests':           () => paginated<RequestSummary>(mockRequestSummaries),
-  'GET:/requests/1':         () => single<Request>(mockRequests[0]!),
-  'GET:/requests/2':         () => single<Request>(mockRequests[1]!),
-  'GET:/requests/3':         () => single<Request>(mockRequests[2]!),
-  // Create a new request draft — returns a synthetic reference
-  'POST:/requests': (_body) => {
-    return single<{ id: number; reference: string }>({
-      id: Date.now(),
-      reference: String(Math.floor(100000000 + Math.random() * 900000000)),
-    });
-  },
-  // Send request — transitions to pending
-  'POST:/requests/1/send': () =>
-    single<{ id: number; reference: string; status: 'pending' }>({
-      id: 1,
-      reference: '268303280',
-      status: 'pending',
-    }),
-
-  // ── Offers ─────────────────────────────────────────────────────────────────
-  'GET:/requests/1/offers':  () => paginated<Offer>(mockOffers),
-  'GET:/offers/1':           () => single<Offer>(mockOffers[0]!),
 
   // ── Profile ────────────────────────────────────────────────────────────────
   'GET:/profile': () => single<ClientProfile>(mockProfile),
@@ -167,75 +139,24 @@ export const mockRegistry: Record<string, MockHandler> = {
     return single<ClientProfile>(updated);
   },
 
-  // ── Orders ─────────────────────────────────────────────────────────────────
-  'GET:/orders':             () => paginated<Order>(mockOrders),
-  'GET:/orders/1':           () => single<Order>(mockOrders[0]!),
-  // POST /orders — place a new order from the basket; mock returns a synthetic Order.
-  'POST:/orders': (body) => {
-    const b = body as PlaceOrderPayload;
-    const newOrder: Order = {
-      id: Date.now(),
-      reference: String(Math.floor(10000000 + Math.random() * 90000000)),
-      userId: 1,
-      addressId: b.addressId,
-      couponId: null,
-      subtotal: 2996.30,
-      discountAmount: 0,
-      shippingFee: 0,
-      taxAmount: 0,
-      total: 2996.30,
-      status: 'confirmed',
-      paymentMethod: b.paymentMethod,
-      paymentStatus: 'pending',
-      notes: b.notes ?? null,
-      confirmedBy: null,
-      confirmedAt: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    return single<Order>(newOrder);
-  },
-
   // ── Payment methods ────────────────────────────────────────────────────────
   'GET:/payment-methods':    () => single<PaymentMethod[]>(mockPaymentMethods),
 
-  // ── Addresses ──────────────────────────────────────────────────────────────
-  'GET:/addresses':          () => paginated<Address>(mockAddresses),
-  // POST /addresses — add a new address
-  'POST:/addresses': (body) => {
-    const b = body as AddAddressPayload;
-    const newAddress: Address = {
-      id: Date.now(),
-      userId: 1,
-      label: b.label ?? null,
-      addressLine1: b.addressLine1,
-      addressLine2: b.addressLine2 ?? null,
-      city: b.city,
-      postalCode: b.postalCode ?? null,
-      region: b.region ?? null,
-      country: b.country ?? 'Morocco',
-      latitude: null,
-      longitude: null,
-      isDefault: false,
-      createdAt: new Date().toISOString(),
+  // ── Notifications ──────────────────────────────────────────────────────────
+  'GET:/notifications/preferences': () => single<UserNotificationPreferences>(mockNotificationPreferences),
+  'PUT:/notifications/preferences': (body) => {
+    const update = body as UpdateNotificationPreferencesPayload;
+    mockNotificationPreferences = {
+      ...mockNotificationPreferences,
+      channelPreferences: {
+        ...mockNotificationPreferences.channelPreferences,
+        ...update.channelPreferences,
+      },
+      notificationTypes: update.notificationTypes ?? mockNotificationPreferences.notificationTypes,
       updatedAt: new Date().toISOString(),
     };
-    return single<Address>(newAddress);
+    return single<UserNotificationPreferences>(mockNotificationPreferences);
   },
-  // PUT /addresses/:id — update address (reuse existing mock for any id)
-  'PUT:/addresses/1': (body) => single<Address>({ ...mockAddresses[0]!, ...(body as Partial<Address>) }),
-  'PUT:/addresses/2': (body) => single<Address>({ ...mockAddresses[1]!, ...(body as Partial<Address>) }),
-  'PUT:/addresses/3': (body) => single<Address>({ ...mockAddresses[2]!, ...(body as Partial<Address>) }),
-  // DELETE /addresses/:id — soft-delete
-  'DELETE:/addresses/1': () => single<{ deleted: boolean }>({ deleted: true }),
-  'DELETE:/addresses/2': () => single<{ deleted: boolean }>({ deleted: true }),
-  'DELETE:/addresses/3': () => single<{ deleted: boolean }>({ deleted: true }),
-  // POST /addresses/:id/default — set default
-  'POST:/addresses/1/default': () => single<Address>({ ...mockAddresses[0]!, isDefault: true }),
-  'POST:/addresses/2/default': () => single<Address>({ ...mockAddresses[1]!, isDefault: true }),
-  'POST:/addresses/3/default': () => single<Address>({ ...mockAddresses[2]!, isDefault: true }),
-
-  // ── Notifications ──────────────────────────────────────────────────────────
   'GET:/notifications':      () => paginated<Notification>(mockNotifications),
   // markNotificationRead — mock: echo back a synthetic read notification
   'POST:/notifications/1/read':  () => single<Notification>({ ...mockNotifications[0]!, isRead: true, readAt: new Date().toISOString() }),
@@ -253,19 +174,6 @@ export const mockRegistry: Record<string, MockHandler> = {
   'GET:/products/1005':      () => single<Product>(mockProducts[4]!),
   'GET:/products/1006':      () => single<Product>(mockProducts[5]!),
 
-  // Category listings — condition-agnostic (returns all, screen can filter locally)
-  'GET:/products?categoryId=100':                    () => paginated<Product>(mockProducts.filter((p) => p.categoryId === 100)),
-  'GET:/products?categoryId=100&condition=en_stock': () => paginated<Product>(mockProducts.filter((p) => p.categoryId === 100 && p.condition === 'en_stock')),
-  'GET:/products?categoryId=100&condition=occasion': () => paginated<Product>(mockProducts.filter((p) => p.categoryId === 100 && p.condition === 'occasion')),
-  'GET:/products?categoryId=101':                    () => paginated<Product>(mockProducts.filter((p) => p.categoryId === 101)),
-  'GET:/products?categoryId=101&condition=en_stock': () => paginated<Product>(mockProducts.filter((p) => p.categoryId === 101 && p.condition === 'en_stock')),
-  'GET:/products?categoryId=102':                    () => paginated<Product>(mockProducts.filter((p) => p.categoryId === 102)),
-  'GET:/products?categoryId=102&condition=occasion': () => paginated<Product>(mockProducts.filter((p) => p.categoryId === 102 && p.condition === 'occasion')),
-  'GET:/products?categoryId=103':                    () => paginated<Product>(mockProducts.filter((p) => p.categoryId === 103)),
-  'GET:/products?categoryId=103&condition=en_stock': () => paginated<Product>(mockProducts.filter((p) => p.categoryId === 103 && p.condition === 'en_stock')),
-  'GET:/products?categoryId=104':                    () => paginated<Product>(mockProducts.filter((p) => p.categoryId === 104)),
-  'GET:/products?categoryId=104&condition=occasion': () => paginated<Product>(mockProducts.filter((p) => p.categoryId === 104 && p.condition === 'occasion')),
-
   // ── Reviews ─────────────────────────────────────────────────────────────────
   'GET:/products/1001/reviews': () => paginated<Review>(mockReviews.filter((r) => r.reviewableId === 1001)),
   'GET:/products/1002/reviews': () => paginated<Review>(mockReviews.filter((r) => r.reviewableId === 1002)),
@@ -274,27 +182,7 @@ export const mockRegistry: Record<string, MockHandler> = {
   'GET:/products/1005/reviews': () => paginated<Review>(mockReviews.filter((r) => r.reviewableId === 1005)),
   'GET:/products/1006/reviews': () => paginated<Review>(mockReviews.filter((r) => r.reviewableId === 1006)),
 
-  // POST review — mock: echo back a synthetic Review so the screen can optimistically append it
-  'POST:/products/1001/reviews': (body) => {
-    const b = body as { rating: 1 | 2 | 3 | 4 | 5; comment?: string };
-    return single<Review>({
-      id: Date.now(),
-      reviewerId: 1,
-      reviewableType: 'order_item',
-      reviewableId: 1001,
-      rating: b.rating,
-      comment: b.comment ?? null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      reviewerName: 'Vous',
-      reviewerAvatar: null,
-    });
-  },
-
   // ── Basket ──────────────────────────────────────────────────────────────────
-  'GET:/basket':        () => single<Basket>(mockBasket),
-  'POST:/basket/items': () => single<Basket>(mockBasket),  // mock: return existing basket unchanged
-
   // applyCoupon — mock accepts any non-empty code; EBEN100 grants 100 Dhs
   'POST:/basket/coupon': (body) => {
     const b = body as { code?: string };
@@ -304,12 +192,6 @@ export const mockRegistry: Record<string, MockHandler> = {
     }
     return single<CouponResult>({ valid: false, discountAmount: 0, code });
   },
-
-  // updateBasketItem — PUT:* wildcard catches all PUT paths (only basket uses PUT in mock mode)
-  'PUT:*': () => single<Basket>(mockBasket),
-
-  // removeBasketItem — DELETE:* wildcard catches all DELETE paths (only basket uses DELETE in mock mode)
-  'DELETE:*': () => single<Basket>(mockBasket),
 
   // ── Wishlist ────────────────────────────────────────────────────────────────
   'GET:/wishlist':       () => paginated<WishlistItem>(mockWishlistItems),
@@ -332,54 +214,21 @@ export const mockRegistry: Record<string, MockHandler> = {
   'DELETE:/wishlist/items/4002': () => single<{ id: number }>({ id: 4002 }),
   'DELETE:/wishlist/items/4003': () => single<{ id: number }>({ id: 4003 }),
 
+  // ── Uploads ─────────────────────────────────────────────────────────────────
+  'POST:/uploads/images': () =>
+    single<{ path: string }>({ path: `tmp/mobile/mock/${++mockUploadSequence}.jpg` }),
   // ── Prestataire (partner) ───────────────────────────────────────────────────
   // Dashboard stats — KPIs for the partner home screen
   'GET:/prestataire/dashboard': () =>
     single<PrestataireDashboardStats>(mockPrestataireDashboardStats),
+  'GET:/prestataire/dashboard/series?period=1j': () => single({ period: '1j', buckets: [] }),
+  'GET:/prestataire/dashboard/series?period=7j': () => single({ period: '7j', buckets: [] }),
+  'GET:/prestataire/dashboard/series?period=1m': () => single({ period: '1m', buckets: [] }),
+  'GET:/prestataire/dashboard/series?period=6m': () => single({ period: '6m', buckets: [] }),
+  'GET:/prestataire/dashboard/series?period=1a': () => single({ period: '1a', buckets: [] }),
+  'GET:/prestataire/dashboard/series?period=max': () => single({ period: 'max', buckets: [] }),
 
-  // Incoming requests — pending requests this prestataire can respond to
-  'GET:/prestataire/incoming-requests': () =>
-    paginated<Request>(mockPrestataireIncomingRequests),
-
-  // All of the prestataire's offers (no status filter)
-  'GET:/prestataire/offers': () => paginated<Offer>(mockPrestataireOffers),
-
-  // Status-filtered offer lists — mapped from the tab filter to internal OfferStatus
-  'GET:/prestataire/offers?status=active': () =>
-    paginated<Offer>(mockPrestataireOffers.filter((o) => o.status === 'validated')),
-  'GET:/prestataire/offers?status=accepted': () =>
-    paginated<Offer>(mockPrestataireOffers.filter((o) => o.status === 'selected')),
-  'GET:/prestataire/offers?status=sent': () =>
-    paginated<Offer>(mockPrestataireOffers.filter((o) => o.status === 'pending')),
-  // "shipped" — for mock purposes: offers that have a non-null adminNotes (used as shipping note)
-  'GET:/prestataire/offers?status=shipped': () =>
-    paginated<Offer>(mockPrestataireOffers.filter((o) => o.adminNotes !== null)),
-
-  // Single offer by id
-  'GET:/prestataire/offers/101': () =>
-    single<Offer>(mockPrestataireOffers.find((o) => o.id === 101)!),
-  'GET:/prestataire/offers/102': () =>
-    single<Offer>(mockPrestataireOffers.find((o) => o.id === 102)!),
-  'GET:/prestataire/offers/103': () =>
-    single<Offer>(mockPrestataireOffers.find((o) => o.id === 103)!),
-  'GET:/prestataire/offers/104': () =>
-    single<Offer>(mockPrestataireOffers.find((o) => o.id === 104)!),
-  'GET:/prestataire/offers/105': () =>
-    single<Offer>(mockPrestataireOffers.find((o) => o.id === 105)!),
-  'GET:/prestataire/offers/106': () =>
-    single<Offer>(mockPrestataireOffers.find((o) => o.id === 106)!),
-
-  // ── Prestataire P3: submit offer / decline / resend ────────────────────────
-  // POST /prestataire/requests/:requestId/offers — submit multi-line offer
-  'POST:/prestataire/requests/101/offers': () =>
-    single<{ success: boolean; offerId: number }>({ success: true, offerId: Date.now() }),
-  'POST:/prestataire/requests/102/offers': () =>
-    single<{ success: boolean; offerId: number }>({ success: true, offerId: Date.now() }),
-  'POST:/prestataire/requests/103/offers': () =>
-    single<{ success: boolean; offerId: number }>({ success: true, offerId: Date.now() }),
-  'POST:/prestataire/requests/104/offers': () =>
-    single<{ success: boolean; offerId: number }>({ success: true, offerId: Date.now() }),
-
+  // ── Prestataire P3: decline / resend ────────────────────────────────────────
   // POST /prestataire/requests/:requestId/decline
   'POST:/prestataire/requests/101/decline': () =>
     single<{ success: boolean; requestId: number }>({ success: true, requestId: 101 }),
@@ -403,37 +252,6 @@ export const mockRegistry: Record<string, MockHandler> = {
     single<{ success: boolean; offerId: number }>({ success: true, offerId: 105 }),
   'POST:/prestataire/offers/106/resend': () =>
     single<{ success: boolean; offerId: number }>({ success: true, offerId: 106 }),
-
-  // ── Prestataire P3 sub-flow B: ship offer ─────────────────────────────────
-  // POST /prestataire/offers/:offerId/ship — mark accepted offer as shipped
-  'POST:/prestataire/offers/101/ship': () =>
-    single<{ offerId: number; shipped: boolean }>({ offerId: 101, shipped: true }),
-  'POST:/prestataire/offers/102/ship': () =>
-    single<{ offerId: number; shipped: boolean }>({ offerId: 102, shipped: true }),
-  'POST:/prestataire/offers/103/ship': () =>
-    single<{ offerId: number; shipped: boolean }>({ offerId: 103, shipped: true }),
-  'POST:/prestataire/offers/104/ship': () =>
-    single<{ offerId: number; shipped: boolean }>({ offerId: 104, shipped: true }),
-  'POST:/prestataire/offers/105/ship': () =>
-    single<{ offerId: number; shipped: boolean }>({ offerId: 105, shipped: true }),
-  'POST:/prestataire/offers/106/ship': () =>
-    single<{ offerId: number; shipped: boolean }>({ offerId: 106, shipped: true }),
-
-  // ── Prestataire P4: partner orders ────────────────────────────────────────
-  'GET:/prestataire/orders': () => paginated<Order>(mockPartnerOrders),
-  'GET:/prestataire/orders?status=accepted': () =>
-    paginated<Order>(mockPartnerOrders.filter((o) => o.status === 'confirmed')),
-  'GET:/prestataire/orders?status=shipped': () =>
-    paginated<Order>(mockPartnerOrders.filter((o) => o.status === 'shipped')),
-  'GET:/prestataire/orders?status=delivered': () =>
-    paginated<Order>(mockPartnerOrders.filter((o) => o.status === 'delivered')),
-
-  'GET:/prestataire/orders/201': () =>
-    single<Order>(mockPartnerOrders.find((o) => o.id === 201)!),
-  'GET:/prestataire/orders/202': () =>
-    single<Order>(mockPartnerOrders.find((o) => o.id === 202)!),
-  'GET:/prestataire/orders/203': () =>
-    single<Order>(mockPartnerOrders.find((o) => o.id === 203)!),
 
   // ── Prestataire P5: profile / company / wallet / history / notifications ─────
 
@@ -459,36 +277,6 @@ export const mockRegistry: Record<string, MockHandler> = {
     return single<PrestataireCompany>(updated);
   },
 
-  // Wallet
-  'GET:/prestataire/wallet': () =>
-    single<PrestataireWallet>(mockPrestataireWallet),
-
-  // Withdrawals list
-  'GET:/prestataire/wallet/withdrawals': () =>
-    paginated<Withdrawal>(mockWithdrawals),
-
-  // Request withdrawal — always mock-resolves with requiresVerification: true
-  'POST:/prestataire/wallet/withdraw': (body) => {
-    const b = body as { amount: number; method?: 'virement' | 'cheque' | 'cash' };
-    const newWithdrawal: Withdrawal = {
-      id: Date.now(),
-      userId: 10,
-      amount: b.amount,
-      bankIban: mockWithdrawals[0]?.bankIban ?? null,
-      bankName: mockWithdrawals[0]?.bankName ?? null,
-      method: b.method ?? 'virement',
-      status: 'pending',
-      adminNotes: null,
-      processedAt: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    return single<RequestWithdrawalResult>({
-      withdrawal: newWithdrawal,
-      requiresVerification: true,
-    });
-  },
-
   // Offers history (all statuses, all time)
   'GET:/prestataire/offers/history': () =>
     paginated<Offer>(mockPrestataireOffersHistory),
@@ -506,6 +294,14 @@ export const mockRegistry: Record<string, MockHandler> = {
     single<Notification>({ ...mockPrestataireNotifications[2]!, isRead: true, readAt: new Date().toISOString() }),
   'POST:/prestataire/notifications/5004/read': () =>
     single<Notification>({ ...mockPrestataireNotifications[3]!, isRead: true, readAt: new Date().toISOString() }),
+  'POST:/prestataire/notifications/read-all': () => {
+    const updated = mockPrestataireNotifications.filter((item) => !item.isRead).length;
+    mockPrestataireNotifications.forEach((item) => {
+      item.isRead = true;
+      item.readAt ??= new Date().toISOString();
+    });
+    return single({ updated });
+  },
 
   // ── Reports ─────────────────────────────────────────────────────────────────
   // All product report paths resolve with success (fire-and-forget in the UI).
@@ -518,3 +314,8 @@ export const mockRegistry: Record<string, MockHandler> = {
   'POST:/products/1005/reports': () => single<ReportConfirmation>({ reported: true, productId: 1005 }),
   'POST:/products/1006/reports': () => single<ReportConfirmation>({ reported: true, productId: 1006 }),
 };
+
+for (const { id } of mockCarBrands) {
+  mockRegistry[`GET:/brands/${id}/models`] = () =>
+    paginated<CarModel>(mockCarModels.filter(({ brandId }) => brandId === id));
+}

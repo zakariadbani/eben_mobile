@@ -22,11 +22,7 @@ export const mockProducts: Product[] = [
     articleNumber: '18548 10001',
     price: 2676.50,
     promoPrice: undefined,
-    images: [
-      'https://picsum.photos/id/514/800/800',
-      'https://picsum.photos/id/1071/800/800',
-      'https://picsum.photos/id/133/800/800',
-    ],
+    images: [],
     description:
       'Plaquettes de frein avant haute performance pour véhicules légers. ' +
       'Formule semi-métallique pour une friction optimale et une durée de vie prolongée. ' +
@@ -59,9 +55,7 @@ export const mockProducts: Product[] = [
     articleNumber: '18548 10002',
     price: 901.00,
     promoPrice: undefined,
-    images: [
-      'https://picsum.photos/id/655/800/800',
-    ],
+    images: [],
     description:
       'Plaquettes de frein avant en bon état général. Usure inférieure à 40 %. ' +
       'Idéal pour prolonger la durée de vie à petit budget.',
@@ -93,10 +87,7 @@ export const mockProducts: Product[] = [
     price: 190.80,
     // promo: was 190.80, now 159.90
     promoPrice: 159.90,
-    images: [
-      'https://picsum.photos/id/111/800/800',
-      'https://picsum.photos/id/200/800/800',
-    ],
+    images: [],
     description:
       'Flexible de frein avant certifié Bosch. Supporte des pressions allant jusqu\'à 250 bar. ' +
       'Résistant aux huiles, carburants et à la chaleur.',
@@ -127,10 +118,7 @@ export const mockProducts: Product[] = [
     articleNumber: '18548 10004',
     price: 339.20,
     promoPrice: undefined,
-    images: [
-      'https://picsum.photos/id/102/800/800',
-      'https://picsum.photos/id/250/800/800',
-    ],
+    images: [],
     description:
       'Disque de frein arrière en bon état, compatible avec véhicules Renault Logan, Dacia Sandero. ' +
       'Épaisseur résiduelle conforme aux normes de sécurité.',
@@ -161,11 +149,7 @@ export const mockProducts: Product[] = [
     articleNumber: '18548 10005',
     price: 1272.00,
     promoPrice: undefined,
-    images: [
-      'https://picsum.photos/id/500/800/800',
-      'https://picsum.photos/id/501/800/800',
-      'https://picsum.photos/id/502/800/800',
-    ],
+    images: [],
     description:
       'Kit de distribution complet : courroie, galet tendeur, galet enrouleur et pompe à eau. ' +
       'Compatible moteurs 1.5 dCi, 1.6 HDi et 1.9 TDI. Garantie constructeur incluse.',
@@ -196,14 +180,12 @@ export const mockProducts: Product[] = [
     articleNumber: '18548 10006',
     price: 901.00,
     promoPrice: undefined,
-    images: [
-      'https://picsum.photos/id/400/800/800',
-    ],
+    images: [],
     description:
-      'Pare-chocs avant en bon état, légère égratignure à gauche (voir photo). ' +
+      'Pare-chocs avant en bon état, légère égratignure à gauche. ' +
       'Compatible Peugeot 207 2006-2012. Prêt à peindre.',
     descriptionAr:
-      'مصد أمامي بحالة جيدة، خدش طفيف على اليسار (انظر الصورة). ' +
+      'مصد أمامي بحالة جيدة، خدش طفيف على اليسار. ' +
       'متوافق مع بيجو 207 من 2006 إلى 2012. جاهز للطلاء.',
     categoryId: 104,
     categoryName: 'Pare-chocs avant',

@@ -8,9 +8,14 @@ import Screen from "@/components/common/Screen";
 import Colors from "@/constants/Colors";
 import GoBack from "@/components/common/GoBack";
 import { useTranslation } from "react-i18next";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { clientAuthHref, getClientReturnTo } from "@/constants/clientReturnTo";
 
 const ClientAuthenticationOptionsScreen = () => {
   const { i18n } = useTranslation();
+  const router = useRouter();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const destination = String(getClientReturnTo(returnTo));
 
   const isArabic = i18n.language === "ar";
   return (
@@ -42,7 +47,7 @@ const ClientAuthenticationOptionsScreen = () => {
             <View style={styles.button}>
               <Button
                 color={"white"}
-                navigateTo={"/(auth)/ClientLoginScreen"}
+                onPress={() => router.push(clientAuthHref("/(auth)/ClientLoginScreen", destination))}
                 title={"Connectez-vous"}
               />
               <View flexDirection="row">
@@ -58,7 +63,7 @@ const ClientAuthenticationOptionsScreen = () => {
             <View style={styles.button}>
               <Button
                 title={"S'inscrire"}
-                navigateTo={"/(auth)/ClientRegisterScreen"}
+                onPress={() => router.push(clientAuthHref("/(auth)/ClientRegisterScreen", destination))}
               />
             </View>
           </View>
@@ -69,7 +74,7 @@ const ClientAuthenticationOptionsScreen = () => {
               outline
               color="white"
               navigateTo={"(client)"}
-              title={"Continuer en tant qu'invité"}
+              title="Explorer les produits"
             />
           </View>
         </View>

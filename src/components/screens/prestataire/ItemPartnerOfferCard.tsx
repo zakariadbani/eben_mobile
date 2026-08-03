@@ -48,30 +48,33 @@ export default function ItemPartnerOfferCard({ item, listMode = "sent", isShippe
     }
     handlePress();
   };
+  const imageSource = typeof item.categoryImage === "string"
+    ? { uri: item.categoryImage }
+    : item.categoryImage || require("@/assets/img/freins.png");
   const actionLabel = listMode === "accepted" && item.status === "selected" && !isShipped
     ? t("partner.offers.action")
     : t("partner.offers.card.details");
 
   return (
-    <TouchableOpacity style={[styles.card, styleContainer]} activeOpacity={0.78} onPress={handlePress}>
+    <TouchableOpacity style={[styles.card, isArabic && styles.cardRtl, styleContainer]} activeOpacity={0.78} onPress={handlePress}>
       <Image
-        source={item.categoryImage ? { uri: item.categoryImage } : require("@/assets/img/freins.png")}
+        source={imageSource}
         style={styles.image}
         resizeMode="contain"
       />
       <View flex style={styles.content}>
-        <Text type="label" color={Colors.gray} translate={false}>{`${t("partner.offers.card.ref")} ${item.reference}`}</Text>
-        <Text type="labelTwo" semiBold numberOfLines={2} translate={false}>{title ?? item.description ?? t("partner.offers.unknownPart")}</Text>
-        <View flexDirection="row" alignItems="center" gap={7} style={styles.statusRow}>
+        <Text type="label" color={Colors.gray} translate={false} style={isArabic ? styles.textRtl : undefined}>{`${t("partner.offers.card.ref")} ${item.reference}`}</Text>
+        <Text type="labelTwo" semiBold numberOfLines={2} translate={false} style={isArabic ? styles.textRtl : undefined}>{title ?? item.description ?? t("partner.offers.unknownPart")}</Text>
+        <View flexDirection="row" alignItems="center" gap={7} style={[styles.statusRow, isArabic && styles.rowRtl]}>
           <Icon name={status.icon} type="MaterialCommunityIcons" size={22} iconColor={status.color} />
-          <Text type="labelTwo" semiBold color={status.color}>
+          <Text type="labelTwo" semiBold color={status.color} style={isArabic ? styles.textRtl : undefined}>
             {t(status.key)}
           </Text>
         </View>
       </View>
-      <View style={styles.trailing} alignItems="flex-end">
-        <Text type="labelTwo" semiBold translate={false}>{`${item.priceFerrailleur.toLocaleString("fr-MA")} Dhs`}</Text>
-        <Text type="label" translate={false}>{t("partner.offers.quantity", { count: item.quantity })}</Text>
+      <View style={styles.trailing} alignItems={isArabic ? "flex-start" : "flex-end"}>
+        <Text type="labelTwo" semiBold translate={false} style={isArabic ? styles.textRtl : undefined}>{`${item.priceFerrailleur.toLocaleString("fr-MA")} Dhs`}</Text>
+        <Text type="label" translate={false} style={isArabic ? styles.textRtl : undefined}>{t("partner.offers.quantity", { count: item.quantity })}</Text>
         <TouchableOpacity style={[styles.button, listMode === "accepted" ? styles.actionButton : null]} onPress={handleAction} accessibilityRole="button">
           <Text type="labelTwo" semiBold>{actionLabel}</Text>
         </TouchableOpacity>
@@ -82,9 +85,12 @@ export default function ItemPartnerOfferCard({ item, listMode = "sent", isShippe
 
 const styles = StyleSheet.create({
   card: { minHeight: 106, marginBottom: 12, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 7, backgroundColor: Colors.white, flexDirection: "row", alignItems: "center", shadowColor: Colors.gray, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.17, shadowRadius: 7, elevation: 4 },
+  cardRtl: { flexDirection: "row-reverse" },
   image: { width: 61, height: 61, marginEnd: 12 },
   content: { minWidth: 0 },
   statusRow: { marginTop: 9 },
+  rowRtl: { flexDirection: "row-reverse" },
+  textRtl: { textAlign: "right" },
   trailing: { minWidth: 84, marginStart: 8 },
   button: { marginTop: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 4, backgroundColor: Colors.primary },
   actionButton: { backgroundColor: Colors.noticeUnread },

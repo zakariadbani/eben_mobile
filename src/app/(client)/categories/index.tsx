@@ -22,6 +22,7 @@ import EmptyListComponent from "@/components/screens/shared/app/EmptyListCompone
 import Colors from "@/constants/Colors";
 import { getCategories } from "@/api";
 import { Role, useSession } from "@/context/AuthContext";
+import { clientAuthHref } from "@/constants/clientReturnTo";
 import type { Category } from "@/interfaces/Category";
 import type { CategoryProps } from "@/interfaces/Category";
 
@@ -83,7 +84,7 @@ const CategoriesListScreen: React.FC = () => {
     router.push((
       role === Role.CLIENT
         ? "/(client)/requests/CreateRequestScreen"
-        : "/(auth)/ClientLoginScreen"
+        : clientAuthHref("/(auth)/ClientLoginScreen", "/(client)/requests/CreateRequestScreen")
     ) as Href);
   };
 
@@ -106,11 +107,11 @@ const CategoriesListScreen: React.FC = () => {
   };
 
   return (
-    <Screen scrollable padding>
+    <Screen scrollable padding whatsapp={false}>
       <View style={styles.container}>
         {/* ── Page heading ───────────────────────────────────── */}
         <Text type="titleSection" semiBold style={styles.heading}>
-          Voulez-vous acheter de l&apos;occasion ou En stock ?
+          catalog.conditionQuestion
         </Text>
 
         {/* ── Condition selector (segmented toggle) ──────────── */}

@@ -2,7 +2,7 @@
  * Mock orders and addresses data.
  */
 
-import type { Order, OrderItem, OrderSummary } from '@/interfaces/Order';
+import type { Order, OrderItem } from '@/interfaces/Order';
 import type { Address } from '@/interfaces/Address';
 import type { Notification } from '@/interfaces/Notification';
 import type { PaymentMethod } from '@/interfaces/Payment';
@@ -253,15 +253,6 @@ export const mockOrders: Order[] = [
   },
 ];
 
-export const mockOrderSummaries: OrderSummary[] = mockOrders.map((o) => ({
-  id: o.id,
-  reference: o.reference,
-  status: o.status,
-  total: o.total,
-  paymentStatus: o.paymentStatus,
-  createdAt: o.createdAt,
-}));
-
 export const mockPaymentMethods: PaymentMethod[] = [
   {
     id: 1,
@@ -272,42 +263,6 @@ export const mockPaymentMethods: PaymentMethod[] = [
     expiryMonth: null,
     expiryYear: null,
     isDefault: true,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-  },
-  {
-    id: 2,
-    userId: 1,
-    type: 'cache_plus',
-    label: 'Cash Plus',
-    lastFour: null,
-    expiryMonth: null,
-    expiryYear: null,
-    isDefault: false,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-  },
-  {
-    id: 3,
-    userId: 1,
-    type: 'virement',
-    label: 'Virement bancaire',
-    lastFour: null,
-    expiryMonth: null,
-    expiryYear: null,
-    isDefault: false,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-  },
-  {
-    id: 4,
-    userId: 1,
-    type: 'visa',
-    label: 'Carte bancaire',
-    lastFour: null,
-    expiryMonth: null,
-    expiryYear: null,
-    isDefault: false,
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
   },

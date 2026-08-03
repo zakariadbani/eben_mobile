@@ -34,7 +34,7 @@ const TitleBlockComponent: React.FC<TitleBlockComponentProps> = ({
   seeAllNavigate,
   seeAllPress,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const showSeeAll = Boolean(seeAllNavigate ?? seeAllPress);
 
@@ -55,7 +55,7 @@ const TitleBlockComponent: React.FC<TitleBlockComponentProps> = ({
             <Text type="small" style={styles.seeAllText}>
               {t("Voir tous")}
             </Text>
-            <CustomIcon name="arrow_right" size={14} tintColor={Colors.primary} />
+            <CustomIcon name={i18n.language === "ar" ? "arrow_left" : "arrow_right"} size={14} tintColor={Colors.primary} />
           </View>
         </Button>
       ) : null}

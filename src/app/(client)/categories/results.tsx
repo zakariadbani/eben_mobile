@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import {
   addToWishlist,
   getCategories,
+  getCategoryTree,
   getProductsByCategory,
   searchAllPneumatics,
   type PneumaticSearchParams,
@@ -21,6 +22,7 @@ import PubPlacerDemandeBlockComponent from "@/components/screens/shared/app/PubP
 import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
 import Colors from "@/constants/Colors";
 import { Role, useSession } from "@/context/AuthContext";
+import { clientAuthHref } from "@/constants/clientReturnTo";
 import type { Category, CategoryProps } from "@/interfaces/Category";
 import type { Product } from "@/interfaces/Product";
 import type { Pneumatic } from "@/interfaces/Pneumatic";
@@ -110,6 +112,14 @@ function toCategoryProps(category: Category): CategoryProps {
   };
 }
 
+function categoryById(categories: Category[], id: number): Category | undefined {
+  for (const category of categories) {
+    if (category.id === id) return category;
+    const nested = categoryById(category.children ?? [], id);
+    if (nested) return nested;
+  }
+  return undefined;
+}
 function productResult(product: Product): ResultItem {
   return {
     id: product.id,
@@ -136,7 +146,7 @@ function pneumaticResult(item: Pneumatic): ResultItem {
 
 const CategoryResultsScreen: React.FC = () => {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const { role } = useSession();
   const rawParams = useLocalSearchParams() as Record<
     string,
@@ -161,6 +171,7 @@ const CategoryResultsScreen: React.FC = () => {
 
   const [items, setItems] = useState<ResultItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<Category>();
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -185,12 +196,13 @@ const CategoryResultsScreen: React.FC = () => {
     setState("loading");
     try {
       const [categoriesResponse, resultResponse] = await Promise.all([
-        getCategories(),
+        getCategoryTree(),
         isPneumaticSearch
           ? searchAllPneumatics(tyreFilters ?? {})
           : getProductsByCategory(categoryId as number, condition, query || undefined),
       ]);
       setCategories(categoriesResponse.data.filter((category) => category.level === 1));
+      setSelectedCategory(categoryId ? categoryById(categoriesResponse.data, categoryId) : undefined);
       setItems(
         isPneumaticSearch
           ? (resultResponse.data as Pneumatic[]).map(pneumaticResult)
@@ -217,9 +229,9 @@ const CategoryResultsScreen: React.FC = () => {
 
   useEffect(() => { void load(); }, [load]);
 
-  const requireClient = (action: () => void) => {
+  const requireClient = (returnTo: string, action: () => void) => {
     if (role !== Role.CLIENT) {
-      router.push("/(auth)/ClientLoginScreen" as Href);
+      router.push(clientAuthHref("/(auth)/ClientLoginScreen", returnTo));
       return;
     }
     action();
@@ -235,15 +247,11 @@ const CategoryResultsScreen: React.FC = () => {
   };
 
   const renderItem = ({ item }: { item: ResultItem }) => (
-    <TouchableOpacity
+    <ItemSubCategoryComponent
       onPress={() => item.isProduct && router.push({
         pathname: "/(client)/products/[productId]",
         params: { productId: String(item.id) },
       } as Href)}
-      activeOpacity={0.85}
-      style={styles.productWrapper}
-    >
-      <ItemSubCategoryComponent
         item={{
           id: item.id,
           title: item.title,
@@ -257,26 +265,35 @@ const CategoryResultsScreen: React.FC = () => {
         actionButton={condition === "occasion" && item.isProduct ? {
           variant: "primary",
           title: t("Ajouter"),
-          onPress: () => requireClient(() => router.push({
+          onPress: () => requireClient(
+            `/(client)/requests/CreateRequestScreen?categoryId=${categoryId}&productId=${item.id}`,
+            () => router.push({
             pathname: "/(client)/requests/CreateRequestScreen",
             params: { categoryId: String(categoryId), productId: String(item.id) },
-          } as Href)),
+          } as Href),
+          ),
         } : undefined}
         actionButtonTwo={item.isProduct ? {
           variant: "secondary",
           leftIcon: "heart",
           iconType: "standard",
-          onPress: () => requireClient(() => { void addWishlist(item.id); }),
+          onPress: () => requireClient(
+            `/(client)/products/${item.id}`,
+            () => { void addWishlist(item.id); },
+          ),
         } : undefined}
       />
-    </TouchableOpacity>
   );
 
   return (
-    <Screen scrollable padding>
+    <Screen scrollable padding whatsapp={false}>
       <View style={styles.container}>
         <Text type="titleSection" semiBold style={styles.screenTitle} translate={false}>
-          {isPneumaticSearch ? t("Recherche pneumatiques") : query || items[0]?.title || ""}
+          {isPneumaticSearch
+            ? t("Recherche pneumatiques")
+            : query || (selectedCategory
+              ? i18n.language === "ar" ? selectedCategory.titleAr : selectedCategory.title
+              : "")}
         </Text>
         {actionError ? (
           <Text style={styles.actionError} accessibilityRole="alert" translate={false}>
@@ -328,7 +345,10 @@ const CategoryResultsScreen: React.FC = () => {
 
         <View style={styles.pubBlock}>
           <TouchableOpacity
-            onPress={() => requireClient(() => router.push("/(client)/requests/CreateRequestScreen" as Href))}
+            onPress={() => requireClient(
+              "/(client)/requests/CreateRequestScreen",
+              () => router.push("/(client)/requests/CreateRequestScreen" as Href),
+            )}
             accessibilityRole="button"
             accessibilityLabel={t("Placer une demande")}
             activeOpacity={0.9}

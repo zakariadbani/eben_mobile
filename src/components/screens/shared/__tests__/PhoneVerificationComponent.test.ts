@@ -39,6 +39,7 @@ describe('PhoneVerificationComponent', () => {
     fireEvent.changeText(screen.UNSAFE_getByType(TextInput), '123456');
     fireEvent.press(screen.getByRole('button', { name: 'auth.otp.verify' }));
 
+    expect(screen.getByLabelText('auth.otp.codeLabel')).toBeTruthy();
     await waitFor(() => expect(validate).toHaveBeenCalledWith(true, '123456'));
   });
 

@@ -32,6 +32,7 @@ import EmptyListComponent from "@/components/screens/shared/app/EmptyListCompone
 import Colors from "@/constants/Colors";
 import { getCategoryTree } from "@/api";
 import { Role, useSession } from "@/context/AuthContext";
+import { clientAuthHref } from "@/constants/clientReturnTo";
 import type { Category } from "@/interfaces/Category";
 import type { CategoryProps } from "@/interfaces/Category";
 import type { SubCategoryItem } from "@/components/screens/shared/app/ItemSubCategoryComponent";
@@ -171,7 +172,10 @@ const CategoryDrillScreen: React.FC = () => {
     router.push((
       role === Role.CLIENT
         ? "/(client)/requests/CreateRequestScreen"
-        : "/(auth)/ClientLoginScreen"
+        : clientAuthHref(
+            "/(auth)/ClientLoginScreen",
+            `/(client)/requests/CreateRequestScreen?categoryId=${categoryId}&condition=${condition}`,
+          )
     ) as Href);
   };
 
@@ -204,12 +208,12 @@ const CategoryDrillScreen: React.FC = () => {
   const isLevelThreeDrill = current?.level === 2 && children.length > 0;
 
   if (state === "loading") {
-    return <Screen><View flex alignItems="center"><ActivityIndicator color={Colors.primary} size="large" /></View></Screen>;
+    return <Screen whatsapp={false}><View flex alignItems="center"><ActivityIndicator color={Colors.primary} size="large" /></View></Screen>;
   }
 
   if (state === "error") {
     return (
-      <Screen padding>
+      <Screen padding whatsapp={false}>
         <EmptyListComponent
           title={t("auth.error.generic")}
           actionButton={{ title: t("reviews.retry"), onPress: load }}
@@ -219,7 +223,7 @@ const CategoryDrillScreen: React.FC = () => {
   }
 
   return (
-    <Screen scrollable padding>
+    <Screen scrollable padding whatsapp={false}>
       <View style={styles.container}>
         {/* ── Screen title (category name) ───────────────────── */}
         <Text type="titleSection" semiBold style={styles.screenTitle} translate={false}>
