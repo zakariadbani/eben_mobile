@@ -17,6 +17,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useTranslation } from "react-i18next";
+import { useRouter } from "expo-router";
 
 import Screen from "@/components/common/Screen";
 import { Text } from "@/components/common/Text";
@@ -64,12 +65,12 @@ function relativeTime(isoDate: string, t: (k: string) => string): string {
 
 interface NotificationRowProps {
   item: Notification;
-  onMarkRead: (id: number) => void;
+  onOpen: (item: Notification) => void;
 }
 
 const NotificationRow: React.FC<NotificationRowProps> = ({
   item,
-  onMarkRead,
+  onOpen,
 }) => {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === "ar";
@@ -78,7 +79,10 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
   const body = isAr && item.messageAr ? item.messageAr : item.message;
 
   return (
-    <RNView
+    <TouchableOpacity
+      onPress={() => onOpen(item)}
+      accessibilityRole="button"
+      accessibilityLabel={title}
       style={[
         styles.row,
         isAr && styles.rowRtl,
@@ -129,7 +133,7 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
           {!item.isRead && item.type !== "list_received" && (
             <TouchableOpacity
               style={styles.detailsBtn}
-              onPress={() => onMarkRead(item.id)}
+              onPress={() => onOpen(item)}
               accessibilityLabel={t("Marquer comme lu")}
             >
               <Text type="small" color={Colors.brand} semiBold>
@@ -148,7 +152,7 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
           )}
         </View>
       </RNView>
-    </RNView>
+    </TouchableOpacity>
   );
 };
 
@@ -156,6 +160,7 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
 
 const NotificationsScreen: React.FC = () => {
   const { t } = useTranslation();
+  const router = useRouter();
 
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -213,6 +218,18 @@ const NotificationsScreen: React.FC = () => {
     }
   }, [t]);
 
+  const handleOpen = useCallback(async (item: Notification) => {
+    if (!item.isRead) await handleMarkRead(item.id);
+    const data = item.data ?? {};
+    const positiveId = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;
+    const orderId = positiveId(data.orderId ?? data.order_id);
+    const requestId = positiveId(data.requestId ?? data.request_id);
+    const productId = positiveId(data.productId ?? data.product_id);
+    if (orderId !== null) router.push(`/(client)/settings/orders/${orderId}` as never);
+    else if (requestId !== null) router.push(`/(client)/requests/${requestId}` as never);
+    else if (productId !== null) router.push(`/(client)/products/${productId}` as never);
+  }, [handleMarkRead, router]);
+
   return (
     <Screen>
       {/* Section header */}
@@ -247,7 +264,7 @@ const NotificationsScreen: React.FC = () => {
           data={visibleItems}
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => (
-            <NotificationRow item={item} onMarkRead={handleMarkRead} />
+            <NotificationRow item={item} onOpen={handleOpen} />
           )}
           contentContainerStyle={styles.listContent}
           ItemSeparatorComponent={() => <RNView style={styles.separator} />}

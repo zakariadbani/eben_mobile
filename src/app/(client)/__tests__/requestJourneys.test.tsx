@@ -266,6 +266,20 @@ it("keeps unvalidated offer counts from enabling the request offers action", asy
   expect(screen.UNSAFE_queryAllByType(WhatsappBtn)).toHaveLength(0);
 });
 
+it("shows an expired request as terminal and offers a truthful new-request path", async () => {
+  mockParams = { requestId: "73" };
+  mockGetRequest.mockResolvedValueOnce({
+    success: true,
+    data: { ...request, status: "expired", offersCount: 0, expiresAt: "2026-08-01T00:00:00.000Z" },
+  });
+  const screen = render(<RequestDetailScreen />);
+
+  expect(await screen.findByText(i18n.t("requestFlow.requestStatus.expired"))).toBeTruthy();
+  expect(screen.queryByRole("button", { name: i18n.t("requestFlow.waitingOffers") })).toBeNull();
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.createNew") }));
+  expect(mockPush).toHaveBeenCalledWith("/(client)/requests/CreateRequestScreen");
+});
+
 it("shows only closed requests in archived offers", async () => {
   const summary = (id: number, status: "draft" | "offers_received" | "validated" | "ordered" | "expired" | "cancelled") => ({
     id,
@@ -350,4 +364,16 @@ it("accepts a validated offer once and routes with the returned basket state", a
     pathname: "/(client)/cart",
     params: { basketId: "19" },
   });
+});
+
+it("disables a leftover validated offer after its parent request is ordered", async () => {
+  mockParams = { requestId: "73", offerId: "88" };
+  mockGetRequest.mockResolvedValueOnce({ success: true, data: { ...request, status: "ordered" } });
+  const screen = render(<OfferDetailScreen />);
+
+  const accept = await screen.findByRole("button", { name: i18n.t("requestFlow.acceptOffer") });
+  expect(accept.props.accessibilityState.disabled).toBe(true);
+  expect(screen.getByText(i18n.t("requestFlow.offerRequestClosed"))).toBeTruthy();
+  fireEvent.press(accept);
+  expect(mockAcceptOffer).not.toHaveBeenCalled();
 });

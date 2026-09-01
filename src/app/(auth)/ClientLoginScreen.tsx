@@ -9,11 +9,10 @@ import Colors from "@/constants/Colors";
 import { Text } from "@/components/common/Text";
 import LoginForm from "@/components/screens/shared/LoginForm";
 import Button from "@/components/common/Button";
-import { ApiClientError } from "@/api/types";
 import { clientAuthHref, getClientReturnTo } from '@/constants/clientReturnTo';
 import { normalizeMoroccanPhone } from "@/helpers/phoneHelper";
+import { getLoginErrorKey } from "@/helpers/loginErrorKey";
 import {
-  AuthRoleMismatchError,
   Role,
   useSession,
 } from "@/context/AuthContext";
@@ -44,15 +43,7 @@ const ClientLoginScreen = () => {
       );
       if (role === Role.CLIENT) router.replace(getClientReturnTo(returnTo));
     } catch (loginError) {
-      setError(
-        t(
-          loginError instanceof ApiClientError
-            ? "auth.login.error"
-            : loginError instanceof AuthRoleMismatchError
-              ? "auth.login.roleMismatch"
-              : "auth.error.generic",
-        ),
-      );
+      setError(t(getLoginErrorKey(loginError, "auth.login.roleMismatch")));
     }
   };
 

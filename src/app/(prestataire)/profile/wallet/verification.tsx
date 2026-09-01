@@ -42,10 +42,9 @@ export default function PrestataireWalletVerificationScreen(): React.ReactElemen
         params: { withdrawalId: String(response.data.id) },
       } as never);
     } catch (caught) {
-      const fieldMessage = caught instanceof ApiClientError
-        ? Object.values(caught.errors)[0]?.[0]
-        : undefined;
-      setError(fieldMessage ?? (caught instanceof ApiClientError ? caught.message : t("auth.error.generic")));
+      setError(caught instanceof ApiClientError
+        ? t("auth.otp.invalid")
+        : t("auth.error.generic"));
     } finally {
       confirming.current = false;
     }

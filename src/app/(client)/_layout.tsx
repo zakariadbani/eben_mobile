@@ -58,6 +58,12 @@ const TAB_BAR_STYLE = StyleSheet.create({
   item: {
     minHeight: 48,
   },
+  barRtl: {
+    transform: [{ scaleX: -1 }],
+  },
+  itemRtl: {
+    transform: [{ scaleX: -1 }],
+  },
 });
 
 const styles = StyleSheet.create({
@@ -187,7 +193,8 @@ const ClientHomeHeader: React.FC = () => {
 // Layout
 // ---------------------------------------------------------------------------
 export default function ClientLayout() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === "ar";
   const { session } = useSession();
   const router = useRouter();
   const [guestAuthVisible, setGuestAuthVisible] = useState(false);
@@ -290,8 +297,8 @@ export default function ClientLayout() {
         screenOptions={{
           headerShown: true,
           header: customHeader,
-          tabBarStyle: TAB_BAR_STYLE.bar,
-          tabBarItemStyle: TAB_BAR_STYLE.item,
+          tabBarStyle: [TAB_BAR_STYLE.bar, isArabic && TAB_BAR_STYLE.barRtl],
+          tabBarItemStyle: [TAB_BAR_STYLE.item, isArabic && TAB_BAR_STYLE.itemRtl],
         }}
       >
       {/* ================================================================

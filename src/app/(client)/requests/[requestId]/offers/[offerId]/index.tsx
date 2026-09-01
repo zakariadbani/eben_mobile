@@ -10,8 +10,9 @@ import Button from "@/components/common/Button";
 import ImageSlider from "@/components/common/ImageSlider";
 import AudioPlayer from "@/components/common/AudioPlayer";
 import Colors from "@/constants/Colors";
-import { acceptOffer, getOffer } from "@/api/resources/requests";
+import { acceptOffer, getOffer, getRequest } from "@/api/resources/requests";
 import type { ClientOfferItem } from "@/interfaces/Offer";
+import type { RequestStatus } from "@/interfaces/Request";
 
 function positiveId(value: string | undefined): number | null {
   if (!value || !/^\d+$/.test(value)) return null;
@@ -29,6 +30,7 @@ export default function OfferDetailScreen() {
   const acceptingRef = useRef(false);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [offer, setOffer] = useState<ClientOfferItem | null>(null);
+  const [requestStatus, setRequestStatus] = useState<RequestStatus | null>(null);
   const [accepting, setAccepting] = useState(false);
   const [acceptError, setAcceptError] = useState(false);
 
@@ -36,9 +38,15 @@ export default function OfferDetailScreen() {
     if (offerId === null || requestId === null) { setState("error"); return; }
     setState("loading");
     try {
-      const response = await getOffer(offerId);
-      if (response.data.requestId !== requestId) throw new Error("Offer does not belong to request");
-      setOffer(response.data);
+      const [offerResponse, requestResponse] = await Promise.all([
+        getOffer(offerId),
+        getRequest(requestId),
+      ]);
+      if (offerResponse.data.requestId !== requestId || requestResponse.data.id !== requestId) {
+        throw new Error("Offer does not belong to request");
+      }
+      setOffer(offerResponse.data);
+      setRequestStatus(requestResponse.data.status);
       setState("ready");
     } catch {
       setState("error");
@@ -55,7 +63,8 @@ export default function OfferDetailScreen() {
   }, [i18n.language, navigation, offer, t]);
 
   const accept = async () => {
-    if (acceptingRef.current || offerId === null || !offer) return;
+    const requestClosed = requestStatus === "ordered" || requestStatus === "expired" || requestStatus === "cancelled";
+    if (acceptingRef.current || offerId === null || !offer || requestClosed) return;
     acceptingRef.current = true;
     setAccepting(true);
     setAcceptError(false);
@@ -89,7 +98,8 @@ export default function OfferDetailScreen() {
   }
 
   const isAvailable = offer.availability === "available";
-  const canAccept = isAvailable && offer.status === "validated";
+  const requestClosed = requestStatus === "ordered" || requestStatus === "expired" || requestStatus === "cancelled";
+  const canAccept = isAvailable && offer.status === "validated" && !requestClosed;
   const locale = i18n.language === "ar" ? "ar-MA" : "fr-MA";
   return (
     <Screen whatsapp={false}>
@@ -118,6 +128,7 @@ export default function OfferDetailScreen() {
       </ScrollView>
       <View style={styles.sticky}>
         {acceptError ? <Text accessibilityRole="alert" color={Colors.error}>requestFlow.acceptError</Text> : null}
+        {requestClosed ? <Text accessibilityRole="alert" color={Colors.error}>requestFlow.offerRequestClosed</Text> : null}
         <View flexDirection="row" alignItems="center" gap={12}>
           <View style={styles.total}>
             <Text type="small">requestFlow.total</Text>

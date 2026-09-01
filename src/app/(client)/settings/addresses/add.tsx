@@ -8,29 +8,26 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import Screen from '@/components/common/Screen';
-import CustomHeader from '@/components/common/CustomHeader';
 import View from '@/components/common/View';
 import ClientAddEditAddressForm from '@/components/screens/client/addresses/ClientAddEditAddressForm';
 import type { Address } from '@/interfaces/Address';
-import { useTranslation } from 'react-i18next';
 
 export default function AddAddressScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
 
   const handleSuccess = (_address: Address) => {
     router.back();
   };
 
+  // Title/back button come from the (client) Tabs.Screen `darkHeader` for
+  // this route (see _layout.tsx) — rendering another CustomHeader here
+  // stacked a duplicate header bar under it.
   return (
-    <>
-      <CustomHeader title={t('settings.address.addTitle')} />
-      <Screen scrollable whatsapp={false} padding>
-        <View style={styles.container}>
-          <ClientAddEditAddressForm onSuccess={handleSuccess} />
-        </View>
-      </Screen>
-    </>
+    <Screen scrollable whatsapp={false} padding>
+      <View style={styles.container}>
+        <ClientAddEditAddressForm onSuccess={handleSuccess} />
+      </View>
+    </Screen>
   );
 }
 

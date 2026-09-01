@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import {
   getPrestataireNotifications,
@@ -35,19 +35,17 @@ function relativeTime(iso: string, t: (key: string, options?: { count: number })
   return t('partner.notifications.timeDays', { count: Math.floor(hours / 24) });
 }
 
-function NotificationRow({ item, isArabic, onRead }: { item: Notification; isArabic: boolean; onRead: (id: number) => void }): React.ReactElement {
+function NotificationRow({ item, isArabic, onOpen }: { item: Notification; isArabic: boolean; onOpen: (item: Notification) => void }): React.ReactElement {
   const { t } = useTranslation();
   const title = isArabic ? item.titleAr ?? item.title : item.title;
   const message = isArabic ? item.messageAr ?? item.message : item.message;
   return (
     <TouchableOpacity
-      onPress={() => { if (!item.isRead) onRead(item.id); }}
-      disabled={item.isRead}
+      onPress={() => onOpen(item)}
       activeOpacity={0.8}
       style={[styles.row, { backgroundColor: item.isRead ? Colors.noticeRead : Colors.white }]}
       accessibilityRole="button"
       accessibilityLabel={title}
-      accessibilityState={{ disabled: item.isRead }}
     >
       {!item.isRead ? <View style={styles.unreadDot} /> : null}
       <View style={styles.iconBox}>
@@ -64,6 +62,7 @@ function NotificationRow({ item, isArabic, onRead }: { item: Notification; isAra
 
 export default function PrestataireNotificationsScreen(): React.ReactElement {
   const { t, i18n } = useTranslation();
+  const router = useRouter();
   const isArabic = i18n.language === 'ar';
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -119,6 +118,19 @@ export default function PrestataireNotificationsScreen(): React.ReactElement {
     }
   }, [notifications, t]);
 
+  const openNotification = useCallback(async (item: Notification) => {
+    if (!item.isRead) await markRead(item.id);
+    const data = item.data ?? {};
+    const positiveId = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;
+    const orderId = positiveId(data.orderId ?? data.order_id);
+    const requestId = positiveId(data.requestId ?? data.request_id);
+    if (orderId !== null) router.push(`/(prestataire)/orders/${orderId}` as never);
+    else if (requestId !== null) router.push({
+      pathname: `/(prestataire)/offers/${requestId}/fill`,
+      params: {},
+    } as never);
+  }, [markRead, router]);
+
   const unreadCount = notifications.filter((item) => !item.isRead).length;
   const visible = unreadOnly ? notifications.filter((item) => !item.isRead) : notifications;
 
@@ -131,7 +143,7 @@ export default function PrestataireNotificationsScreen(): React.ReactElement {
   ) : visible.length === 0 ? (
     <EmptyListComponent title={t('partner.notifications.noUnread')} />
   ) : (
-    <FlatList data={visible} keyExtractor={(item) => String(item.id)} renderItem={({ item }) => <NotificationRow item={item} isArabic={isArabic} onRead={markRead} />} ItemSeparatorComponent={() => <View style={styles.separator} />} contentContainerStyle={styles.listContent} />
+    <FlatList data={visible} keyExtractor={(item) => String(item.id)} renderItem={({ item }) => <NotificationRow item={item} isArabic={isArabic} onOpen={openNotification} />} ItemSeparatorComponent={() => <View style={styles.separator} />} contentContainerStyle={styles.listContent} />
   );
 
   return (

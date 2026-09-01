@@ -10,7 +10,7 @@ import CustomModal from '@/components/common/CustomModal';
 import TextInput from '@/components/common/TextInput';
 import EmptyListComponent from '@/components/screens/shared/app/EmptyListComponent';
 import ItemBasketComponent from '@/components/screens/shared/app/ItemBasketComponent';
-import { applyCoupon, getBasket, removeBasketItem, updateBasketItem } from '@/api';
+import { applyCoupon, getBasket, getRequest, removeBasketItem, updateBasketItem } from '@/api';
 import type { Basket, BasketItem } from '@/interfaces/Basket';
 import Colors from '@/constants/Colors';
 import { useConfirmation } from '@/context/ConfirmationContext';
@@ -33,6 +33,8 @@ const CartScreen: React.FC = () => {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponSuccess, setCouponSuccess] = useState(false);
+  const [remainingParts, setRemainingParts] = useState(0);
+  const [checkingOut, setCheckingOut] = useState(false);
   const activeItems = useRef(new Set<number>());
   const couponActive = useRef(false);
   const isArabic = i18n.language === 'ar';
@@ -100,6 +102,36 @@ const CartScreen: React.FC = () => {
     }
   }, [couponCode, t]);
 
+  const continueToPayment = useCallback(() => {
+    setRemainingParts(0);
+    router.push('/(client)/payment' as Href);
+  }, [router]);
+
+  const checkout = useCallback(async () => {
+    if (!basket || checkingOut) return;
+    if (basket.requestId === null) {
+      continueToPayment();
+      return;
+    }
+    setCheckingOut(true);
+    setMutationError(null);
+    try {
+      const response = await getRequest(basket.requestId);
+      if (!response.data.items) throw new Error('Request items unavailable');
+      const selectedCategoryIds = new Set((basket.items ?? []).map((item) => item.categoryId));
+      const missingCount = response.data.items.filter((item) => !selectedCategoryIds.has(item.categoryId)).length;
+      if (missingCount > 0) {
+        setRemainingParts(missingCount);
+      } else {
+        continueToPayment();
+      }
+    } catch {
+      setMutationError(t('commerce.cart.preflightError'));
+    } finally {
+      setCheckingOut(false);
+    }
+  }, [basket, checkingOut, continueToPayment, t]);
+
   if (loading) return <View flex style={styles.centered}><ActivityIndicator size="large" color={Colors.primary} /></View>;
   if (loadError) return <View flex style={styles.centered} gap={16}>
     <Text accessibilityRole="alert" color={Colors.error}>{loadError}</Text>
@@ -146,10 +178,31 @@ const CartScreen: React.FC = () => {
       <Summary label="TVA 20%" value={basket?.taxAmount ?? 0} testID="basket-tax" />
       <View style={styles.divider} />
       <Summary label="Total" value={basket?.total ?? 0} testID="basket-total" total />
-      <Button title="Caisse de sortie" onPress={() => router.push('/(client)/payment' as Href)} variant="primary" />
+      <Button title={checkingOut ? t('commerce.cart.checking') : "Caisse de sortie"} onPress={() => { void checkout(); }} variant="primary" disabled={checkingOut} />
     </View> : null}
     <CustomModal visible={couponSuccess} variant="black" primaryButton={{ title: 'Fermer', variant: 'primary', onPress: () => setCouponSuccess(false) }}>
       <Text type="loginSubTitle" center>{t('Réduction appliquée')} : {formatPrice(couponDiscount)}</Text>
+    </CustomModal>
+    <CustomModal
+      visible={remainingParts > 0}
+      title={t('commerce.cart.remainingPartsTitle')}
+      onClose={() => setRemainingParts(0)}
+      primaryButton={{
+        title: t('commerce.cart.continueShopping'),
+        onPress: () => {
+          const requestId = basket?.requestId;
+          setRemainingParts(0);
+          if (requestId !== null && requestId !== undefined) {
+            router.push({
+              pathname: '/(client)/requests/[requestId]',
+              params: { requestId: String(requestId) },
+            } as Href);
+          }
+        },
+      }}
+      secondaryButton={{ title: t('commerce.cart.checkoutAnyway'), variant: 'white', onPress: continueToPayment }}
+    >
+      <Text center>{t('commerce.cart.remainingPartsBody', { count: remainingParts })}</Text>
     </CustomModal>
   </View>;
 };

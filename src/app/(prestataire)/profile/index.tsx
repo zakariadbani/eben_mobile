@@ -38,6 +38,7 @@ import { Text } from '@/components/common/Text';
 import Icon from '@/components/common/Icon';
 import CustomIcon from '@/components/common/CustomIcon';
 import ItemMenuComponent from '@/components/screens/shared/app/ItemMenuComponent';
+import Footer from '@/components/common/Footer';
 
 import { useSession } from '@/context/AuthContext';
 import { getPrestataireProfile } from '@/api';
@@ -207,15 +208,7 @@ export default function PrestataireProfileScreen(): React.ReactElement {
         </View>
 
         {/* ── Footer ── */}
-        <View style={styles.footer} flexDirection="row" alignItems="center">
-          <Text type="small" color={Colors.gray}>
-            {t('partner.profile.copyright')}
-          </Text>
-          <View flex />
-          <Text type="small" color={Colors.gray}>
-            {t('partner.profile.version')}
-          </Text>
-        </View>
+        <Footer />
       </ScrollView>
     </SafeAreaView>
   );
@@ -283,9 +276,5 @@ const styles = StyleSheet.create({
   },
   logoutLabel: {
     marginTop: 6,
-  },
-  footer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
   },
 });

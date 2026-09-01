@@ -204,7 +204,12 @@ export default function OrderSuccessScreen() {
           {items.length > 0 ? items.map((item) => (
             <View key={item.id} style={styles.resumeItem} gap={4}>
               <Text type="label" bold>
-                {t('commerce.success.item', { count: item.quantity, title: item.categoryTitle ?? '' })}
+                {t('commerce.success.item', {
+                  count: item.quantity,
+                  title: i18n.language === 'ar'
+                    ? item.categoryTitleAr ?? item.categoryTitle ?? ''
+                    : item.categoryTitle ?? '',
+                })}
               </Text>
               <View flexDirection="row" alignItems="center" gap={6}>
                 <Text type="label" translate={false} color={Colors.brand}>

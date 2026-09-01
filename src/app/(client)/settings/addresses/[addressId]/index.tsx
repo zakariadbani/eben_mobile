@@ -8,7 +8,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Screen from '@/components/common/Screen';
-import CustomHeader from '@/components/common/CustomHeader';
 import View from '@/components/common/View';
 import { Text } from '@/components/common/Text';
 import Colors from '@/constants/Colors';
@@ -49,24 +48,24 @@ export default function EditAddressScreen() {
     router.back();
   };
 
+  // Title/back button come from the (client) Tabs.Screen `darkHeader` for
+  // this route (see _layout.tsx) — rendering another CustomHeader here
+  // stacked a duplicate header bar under it.
   return (
-    <>
-      <CustomHeader title={t('settings.address.editTitle')} />
-      <Screen scrollable whatsapp={false} padding>
-        <View style={styles.container}>
-          {loading ? (
-            <ActivityIndicator color={Colors.primary} size="large" />
-          ) : error || !address ? (
-            <View gap={12} alignItems="center">
-              <Text type="default" color={Colors.red} center>{t('settings.address.loadError')}</Text>
-              <Button title={t('settings.retry')} onPress={() => { void load(); }} variant="primary" />
-            </View>
-          ) : (
-            <ClientAddEditAddressForm address={address} onSuccess={handleSuccess} />
-          )}
-        </View>
-      </Screen>
-    </>
+    <Screen scrollable whatsapp={false} padding>
+      <View style={styles.container}>
+        {loading ? (
+          <ActivityIndicator color={Colors.primary} size="large" />
+        ) : error || !address ? (
+          <View gap={12} alignItems="center">
+            <Text type="default" color={Colors.red} center>{t('settings.address.loadError')}</Text>
+            <Button title={t('settings.retry')} onPress={() => { void load(); }} variant="primary" />
+          </View>
+        ) : (
+          <ClientAddEditAddressForm address={address} onSuccess={handleSuccess} />
+        )}
+      </View>
+    </Screen>
   );
 }
 

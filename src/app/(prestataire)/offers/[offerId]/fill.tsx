@@ -320,7 +320,12 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
         setLineErrors(mapped);
         if (Object.keys(mapped).length === 0) setSubmitError(error.message);
       } else {
-        const message = t('partner.fill.errorSubmit');
+        // Surface the backend's own message (e.g. a condition-mismatch rule
+        // rejected outside a 422 field-validation shape) — only fall back to
+        // the generic copy when the API gave us nothing useful to show.
+        const message = error instanceof ApiClientError && error.message
+          ? error.message
+          : t('partner.fill.errorSubmit');
         setSubmitError(message);
         Alert.alert(t('partner.fill.errorTitle'), message);
       }
@@ -378,7 +383,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   if (submitDone) {
     return (
       <Screen whatsapp={false} scrollable={false}>
-        <CustomHeader title="partner.fill.openDetailTitle" />
+        <CustomHeader title="partner.fill.title" />
         <View flex justifyContent="center" alignItems="center" p={24} gap={20}>
           <Text type="headerTitle" semiBold color={Colors.brand} center>
             {isResendMode ? 'partner.fill.successTitleResend' : 'partner.fill.successTitle'}
@@ -403,7 +408,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   if (loadingRequest) {
     return (
       <Screen whatsapp={false} scrollable={false}>
-        <CustomHeader title="partner.fill.openDetailTitle" />
+        <CustomHeader title="partner.fill.title" />
         <View flex justifyContent="center" alignItems="center">
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
@@ -414,7 +419,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   if (loadError || (isResendMode ? !existingOffer : !request)) {
     return (
       <Screen whatsapp={false} scrollable={false}>
-        <CustomHeader title="partner.fill.openDetailTitle" />
+        <CustomHeader title="partner.fill.title" />
         <View flex justifyContent="center" alignItems="center" p={24} gap={16}>
           <Text type="default" color={Colors.red} center>
             {loadError ?? t('partner.fill.notFound')}
@@ -431,7 +436,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
 
   return (
     <Screen whatsapp={false} scrollable={false}>
-      <CustomHeader title="partner.fill.openDetailTitle" />
+      <CustomHeader title="partner.fill.title" />
 
       <KeyboardAvoidingView
         style={styles.flex}

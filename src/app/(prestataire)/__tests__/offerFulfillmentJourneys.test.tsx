@@ -265,6 +265,8 @@ beforeEach(async () => {
 it("requires a positive raw price and at least one image for every offer line", async () => {
   const screen = render(<OfferFillScreen />);
   const priceInputs = await screen.findAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"));
+  expect(screen.getByText(i18n.t("partner.fill.title"))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("partner.fill.openDetailTitle"))).toBeNull();
   fireEvent.changeText(priceInputs[0], "250");
   fireEvent.changeText(priceInputs[1], "300");
   fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.ctaSend") }));
@@ -402,6 +404,19 @@ it("labels an offer with no seller photo instead of showing a different part", a
 
   expect(await screen.findByText(i18n.t("requestFlow.noPhoto"))).toBeTruthy();
   expect(screen.queryByTestId("image-slider")).toBeNull();
+});
+
+it("offers the existing resend flow from a rejected offer detail", async () => {
+  mockParams = { offerId: "401" };
+  mockGetOffer.mockResolvedValueOnce({ success: true, data: { ...offer, status: "rejected" } });
+  const screen = render(<OfferDetailScreen />);
+
+  fireEvent.press(await screen.findByRole("button", { name: i18n.t("partner.offerDetail.ctaResend") }));
+
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: "/(prestataire)/offers/33/fill",
+    params: { mode: "resend", existingOfferId: "401" },
+  });
 });
 it("rejects an unsafe offer detail id without an API call", async () => {
   mockParams = { offerId: "9007199254740992" };

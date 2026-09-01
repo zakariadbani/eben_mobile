@@ -11,6 +11,7 @@ import Colors from "@/constants/Colors";
 import CustomHeader from "@/components/common/CustomHeader";
 import CustomIcon from "@/components/common/CustomIcon";
 import { Text } from "@/components/common/Text";
+import { useSession } from "@/context/AuthContext";
 
 // Minimal type alias so tabBarIcon/tabBarLabel callbacks are typed without
 // depending on @react-navigation/bottom-tabs .d.ts (which is absent in this
@@ -84,13 +85,14 @@ const HIDDEN_TAB_BAR_STYLE = { display: "none" as const };
 const PartnerDashboardHeader: React.FC = () => {
   const router = useRouter();
   const { t, i18n } = useTranslation();
+  const { username } = useSession();
   return (
     <View style={TAB_BAR_STYLE.dashboardHeaderInset}>
       <CustomHeader showBackButton={false}>
         <View style={[TAB_BAR_STYLE.headerRow, { flexDirection: i18n.language === "ar" ? "row-reverse" : "row" }]}>
           <Image source={require("@/assets/img/avatar.jpg")} style={TAB_BAR_STYLE.avatar} />
           <Text type="subTitleTwo" semiBold style={TAB_BAR_STYLE.greeting} numberOfLines={1}>
-            {"partner.dashboard.greeting"}
+            {t("partner.profile.greeting", { name: username ?? t("partner.profile.partnerFallback") })}
           </Text>
           <TouchableOpacity
             style={TAB_BAR_STYLE.notification}

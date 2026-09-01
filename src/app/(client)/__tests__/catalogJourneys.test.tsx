@@ -45,6 +45,10 @@ let mockParams: Record<string, string | undefined> = {};
 jest.mock("expo-router", () => ({
   useRouter: () => mockRouter,
   useLocalSearchParams: () => mockParams,
+  useFocusEffect: (callback: () => void) => {
+    const ReactModule = require("react") as typeof React;
+    ReactModule.useEffect(callback, [callback]);
+  },
 }));
 jest.mock("@/api", () => ({
   addToBasket: jest.fn(),
@@ -187,6 +191,25 @@ it("does not advertise moderated offers to the Client before validation", async 
   expect(await screen.findByText(i18n.t("home.reference", { value: "REQ-PENDING-REVIEW" }))).toBeTruthy();
   expect(screen.queryByText(i18n.t("home.checkPrices"))).toBeNull();
   expect(screen.getByText(i18n.t("home.details"))).toBeTruthy();
+});
+
+it("keeps terminal requests out of the active Home carousel", async () => {
+  mockedUseSession.mockReturnValue({ role: Role.CLIENT } as ReturnType<typeof useSession>);
+  mockGetRequests.mockResolvedValueOnce({
+    success: true,
+    data: [
+      { id: 8, reference: "REQ-ACTIVE", status: "pending", expiresDisplay: "45min", createdAt: "2026-01-01" },
+      { id: 9, reference: "REQ-ORDERED", status: "ordered", expiresDisplay: null, createdAt: "2026-01-01" },
+      { id: 10, reference: "REQ-EXPIRED", status: "expired", expiresDisplay: null, createdAt: "2026-01-01" },
+    ],
+    pagination: { ...pagination, total: 3 },
+  });
+
+  const screen = render(<HomeScreen />);
+
+  expect(await screen.findByText(i18n.t("home.reference", { value: "REQ-ACTIVE" }))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("home.reference", { value: "REQ-ORDERED" }))).toBeNull();
+  expect(screen.queryByText(i18n.t("home.reference", { value: "REQ-EXPIRED" }))).toBeNull();
 });
 
 it("renders category loading, live data, and retry after a failed read", async () => {

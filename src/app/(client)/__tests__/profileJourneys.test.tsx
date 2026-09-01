@@ -345,6 +345,32 @@ it('awaits notification and wishlist mutation envelopes before reconciling the c
   expect(mockDel).toHaveBeenCalledWith('/wishlist/items/51');
 });
 
+it('does not invent a wishlist condition or price when the API omits them', async () => {
+  const screen = render(<WishlistScreen />);
+
+  await screen.findByText('Freins');
+  expect(screen.queryByText(/Occasion/)).toBeNull();
+  expect(screen.queryByText('2,999 dhs')).toBeNull();
+});
+
+it('opens a notification target even after marking the row read', async () => {
+  const orderNotification = {
+    ...notification,
+    data: { orderId: 44 },
+  };
+  mockGet.mockImplementation((path: string) => {
+    if (path === '/notifications') return Promise.resolve({ success: true, data: [orderNotification], pagination });
+    return Promise.reject(new Error(`Unexpected GET ${path}`));
+  });
+  mockPost.mockResolvedValueOnce({ success: true, data: { ...orderNotification, isRead: true, readAt: '2026-01-02' } });
+  const screen = render(<NotificationsScreen />);
+
+  fireEvent.press(await screen.findByRole('button', { name: 'Commande expédiée' }));
+
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith('/notifications/31/read', {}));
+  expect(mockPush).toHaveBeenCalledWith('/(client)/settings/orders/44');
+});
+
 it('loads typed read-only payment methods and addresses without exposing an edit CTA', async () => {
   const screen = render(<PaymentScreen />);
   expect(await screen.findByText('Carte principale')).toBeTruthy();

@@ -6,7 +6,7 @@ import type { Address } from '@/interfaces/Address';
 import type { ClientProfile } from '@/interfaces/User';
 import type { Order } from '@/interfaces/Order';
 import { ApiClientError } from '@/api/types';
-import { addToBasket, addToWishlist, applyCoupon, getBasket, getProduct, getWishlist, postReview, removeBasketItem, removeWishlistItem, reportAbuse, updateBasketItem } from '@/api';
+import { addToBasket, addToWishlist, applyCoupon, getBasket, getProduct, getRequest, getWishlist, postReview, removeBasketItem, removeWishlistItem, reportAbuse, updateBasketItem } from '@/api';
 import { getAddresses } from '@/api/resources/addresses';
 import { getOrder, placeOrder } from '@/api/resources/orders';
 import { getProfile } from '@/api/resources/users';
@@ -38,6 +38,7 @@ jest.mock('expo-router', () => ({
 }));
 jest.mock('@/api', () => ({
   getBasket: jest.fn(), applyCoupon: jest.fn(), updateBasketItem: jest.fn(), removeBasketItem: jest.fn(),
+  getRequest: jest.fn(),
   postReview: jest.fn(), reportAbuse: jest.fn(),
   getProduct: jest.fn(), addToBasket: jest.fn(), getWishlist: jest.fn(), addToWishlist: jest.fn(), removeWishlistItem: jest.fn(),
 }));
@@ -71,9 +72,9 @@ jest.mock('@/components/common/CustomModal', () => {
   const React = require('react');
   const { View } = require('react-native');
   const { Text } = require('react-native');
-  return function MockModal({ visible, children, primaryButton, secondaryButton }: { visible: boolean; children?: React.ReactNode; primaryButton?: { title: string; onPress: () => void }; secondaryButton?: { title: string; onPress: () => void } }) {
+  return function MockModal({ visible, title, children, primaryButton, secondaryButton }: { visible: boolean; title?: string; children?: React.ReactNode; primaryButton?: { title: string; onPress: () => void }; secondaryButton?: { title: string; onPress: () => void } }) {
     const action = (button?: { title: string; onPress: () => void }) => button ? React.createElement(View, { accessible: true, accessibilityRole: 'button', accessibilityLabel: button.title, onPress: button.onPress }, React.createElement(Text, null, button.title)) : null;
-    return visible ? React.createElement(View, null, children, action(primaryButton), action(secondaryButton)) : null;
+    return visible ? React.createElement(View, null, title ? React.createElement(Text, null, title) : null, children, action(primaryButton), action(secondaryButton)) : null;
   };
 });
 jest.mock('@/components/screens/shared/app/EmptyListComponent', () => {
@@ -115,6 +116,7 @@ jest.mock('@/components/screens/shared/app/RatingStars', () => {
 });
 
 const apiGetBasket = getBasket as jest.MockedFunction<typeof getBasket>;
+const apiGetRequest = getRequest as jest.MockedFunction<typeof getRequest>;
 const apiUpdateBasketItem = updateBasketItem as jest.MockedFunction<typeof updateBasketItem>;
 const apiRemoveBasketItem = removeBasketItem as jest.MockedFunction<typeof removeBasketItem>;
 const apiApplyCoupon = applyCoupon as jest.MockedFunction<typeof applyCoupon>;
@@ -146,6 +148,18 @@ beforeEach(async () => {
   mockFocusCallback = null;
   await i18n.changeLanguage('fr');
   apiGetBasket.mockResolvedValue({ success: true, data: basket });
+  apiGetRequest.mockResolvedValue({
+    success: true,
+    data: {
+      id: 73, reference: 'REQ-73', userId: 5, vehicleId: 1, addressId: null, notes: null,
+      status: 'validated', aiValidationTag: null, aiValidationReason: null, offersCount: 2,
+      expiresAt: '2026-09-02T00:00:00.000Z', createdAt: '2026-01-01', updatedAt: '2026-01-01',
+      items: [
+        { id: 1, requestId: 73, categoryId: 12, quantity: 1, condition: 'occasion', notes: null, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+        { id: 2, requestId: 73, categoryId: 13, quantity: 1, condition: 'occasion', notes: null, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+      ],
+    },
+  });
   apiUpdateBasketItem.mockResolvedValue({ success: true, data: changedBasket });
   apiRemoveBasketItem.mockResolvedValue({ success: true, data: { ...basket, items: [] } });
   apiApplyCoupon.mockResolvedValue({ success: true, data: { valid: true, discountAmount: 7.22, code: 'LIVE' } });
@@ -196,6 +210,23 @@ it('shows only the recovery action when the basket is empty', async () => {
   expect(await screen.findByText('Votre panier est vide')).toBeTruthy();
   expect(screen.queryByTestId('basket-total')).toBeNull();
   expect(screen.queryByRole('button', { name: 'Caisse de sortie' })).toBeNull();
+});
+
+it('warns before checking out a request basket with unselected parts', async () => {
+  apiGetBasket.mockResolvedValueOnce({ success: true, data: { ...basket, requestId: 73 } });
+  const screen = render(<CartScreen />);
+  const checkout = await screen.findByRole('button', { name: 'Caisse de sortie' });
+
+  fireEvent.press(checkout);
+
+  expect(await screen.findByText(i18n.t('commerce.cart.remainingPartsTitle'))).toBeTruthy();
+  expect(screen.getByText(i18n.t('commerce.cart.remainingPartsBody', { count: 1 }))).toBeTruthy();
+  expect(mockPush).not.toHaveBeenCalledWith('/(client)/payment');
+  fireEvent.press(screen.getByRole('button', { name: i18n.t('commerce.cart.continueShopping') }));
+  expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({
+    pathname: '/(client)/requests/[requestId]',
+    params: { requestId: '73' },
+  }));
 });
 
 
@@ -317,6 +348,17 @@ it('toggles the returned wishlist item ID and labels the returned basket total',
 it('uses Arabic success copy and routes order history to the live settings collection', async () => {
   await i18n.changeLanguage('ar');
   mockParams = { orderId: '81' };
+  mockGetOrder.mockResolvedValueOnce({
+    success: true,
+    data: {
+      ...order,
+      items: [{
+        id: 1, orderId: 81, offerId: 88, categoryId: 12, quantity: 1, unitPrice: 101.11,
+        totalPrice: 101.11, status: 'pending', createdAt: '2026-01-01', updatedAt: '2026-01-01',
+        categoryTitle: 'Plaquettes', categoryTitleAr: 'وسادات',
+      }],
+    },
+  });
   const screen = render(<OrderSuccessScreen />);
   expect(await screen.findByText(i18n.t('commerce.success.confirmation'))).toBeTruthy();
   expect(screen.getAllByText(i18n.t('commerce.success.payment.cod')).length).toBeGreaterThan(0);
@@ -325,6 +367,8 @@ it('uses Arabic success copy and routes order history to the live settings colle
   fireEvent.press(orders);
   expect(mockReplace).toHaveBeenCalledWith('/(client)/settings/orders');
   expect(screen.getByRole('button', { name: i18n.t('commerce.success.invoice') }).props.accessibilityState.disabled).toBe(true);
+  expect(screen.getByText(i18n.t('commerce.success.item', { count: 1, title: 'وسادات' }))).toBeTruthy();
+  expect(screen.queryByText(/Plaquettes/)).toBeNull();
 });
 
 it('rejects a missing success order identity without rendering a false confirmation', async () => {

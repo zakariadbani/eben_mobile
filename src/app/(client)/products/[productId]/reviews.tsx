@@ -15,9 +15,9 @@
  * RTL: all rows through common/View flexDirection="row".
  */
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { FlatList, StyleSheet, ActivityIndicator } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import type { Href } from "expo-router";
 import { useTranslation } from "react-i18next";
 
@@ -70,9 +70,14 @@ const ReviewsScreen: React.FC = () => {
     }
   }, [numericProductId, t, validProductId]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // Focus (not mount-only) so a review submitted on the "Laisser un avis"
+  // sub-screen — reached via push, then router.back() to here — refreshes
+  // the list and aggregate rating without needing a full reload.
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   // Compute average from loaded reviews (more accurate than product-level aggregate).
   const average =

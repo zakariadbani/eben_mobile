@@ -58,10 +58,14 @@ export default function RequestDetailScreen() {
   }
 
   const hasOffers = request.offersCount > 0;
+  const isExpired = request.status === "expired";
   return (
     <Screen whatsapp={false}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text type="headerTitle" semiBold>{t("requestFlow.requestReference", { reference: request.reference })}</Text>
+        <Text type="label" color={isExpired ? Colors.error : Colors.gray} style={styles.status}>
+          {t(`requestFlow.requestStatus.${request.status}`)}
+        </Text>
         {request.expiresAt ? (
           <Text type="small" color={Colors.gray} style={styles.expiry}>
             {t("requestFlow.expires", { value: new Date(request.expiresAt).toLocaleString(i18n.language === "ar" ? "ar-MA" : "fr-MA") })}
@@ -84,18 +88,25 @@ export default function RequestDetailScreen() {
             {request.images?.length ? <View style={styles.images}><Text semiBold>requestFlow.images</Text><ImageSlider images={request.images} /></View> : null}
           </View>
         ) : null}
-        {hasOffers ? <Text color={Colors.greenDark} style={styles.offerNotice}>{t("requestFlow.offersReady", { count: request.offersCount })}</Text> : null}
+        {hasOffers && !isExpired ? <Text color={Colors.greenDark} style={styles.offerNotice}>{t("requestFlow.offersReady", { count: request.offersCount })}</Text> : null}
         <View style={styles.spacer} />
       </ScrollView>
       <View style={styles.sticky}>
-        <Button
-          title={hasOffers ? "requestFlow.viewOffers" : "requestFlow.waitingOffers"}
-          disabled={!hasOffers}
-          onPress={() => router.push({
-            pathname: "/(client)/requests/[requestId]/offers",
-            params: { requestId: String(request.id) },
-          } as Href)}
-        />
+        {isExpired ? (
+          <Button
+            title="requestFlow.createNew"
+            onPress={() => router.push("/(client)/requests/CreateRequestScreen" as Href)}
+          />
+        ) : (
+          <Button
+            title={hasOffers ? "requestFlow.viewOffers" : "requestFlow.waitingOffers"}
+            disabled={!hasOffers}
+            onPress={() => router.push({
+              pathname: "/(client)/requests/[requestId]/offers",
+              params: { requestId: String(request.id) },
+            } as Href)}
+          />
+        )}
       </View>
     </Screen>
   );
@@ -105,6 +116,7 @@ const styles = StyleSheet.create({
   centered: { justifyContent: "center", alignItems: "center" },
   content: { padding: 16, paddingBottom: 100 },
   expiry: { marginTop: 4 },
+  status: { marginTop: 6 },
   sectionTitle: { marginTop: 22, marginBottom: 10 },
   item: { padding: 12, marginBottom: 8, borderRadius: 8, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderLight, gap: 3 },
   images: { marginTop: 14, gap: 8 },

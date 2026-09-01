@@ -228,6 +228,8 @@ export default function OverviewScreen(): React.ReactElement {
     (bucket) => bucket[currentMetricOption.seriesKey],
   ) ?? [];
   const currentValue = chartValues[chartValues.length - 1] ?? 0;
+  const firstBucketLabel = dashboardSeries?.buckets[0]?.label;
+  const lastBucketLabel = dashboardSeries?.buckets[dashboardSeries.buckets.length - 1]?.label;
   const isMonetary = activeMetric === 'revenue30d' || activeMetric === 'pendingPayout';
 
   const formatValue = (v: number) =>
@@ -332,7 +334,9 @@ export default function OverviewScreen(): React.ReactElement {
             </Text>
           )}
           <Text type="small" color={Colors.gray}>
-            {t('partner.overview.dateRange')}
+            {firstBucketLabel && lastBucketLabel
+              ? t('partner.overview.dateRangeDynamic', { from: firstBucketLabel, to: lastBucketLabel })
+              : t('partner.overview.dateRangeUnavailable')}
           </Text>
         </View>
 

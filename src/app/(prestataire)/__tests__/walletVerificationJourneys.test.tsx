@@ -3,10 +3,13 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import {
   confirmWithdrawal,
   getPrestataireWallet,
+  getWithdrawals,
   requestWithdrawal,
 } from "@/api/resources/prestataire";
 import i18n from "@/localization/i18n";
+import { ApiClientError } from "@/api/types";
 import PrestataireWalletVerificationScreen from "../profile/wallet/verification";
+import PrestataireWalletScreen from "../profile/wallet";
 import PrestataireWithdrawSuccessScreen from "../profile/wallet/success";
 import PrestataireWithdrawScreen from "../profile/wallet/withdraw";
 
@@ -32,26 +35,29 @@ jest.mock("@/context/AuthContext", () => ({
 jest.mock("@/api/resources/prestataire", () => ({
   confirmWithdrawal: jest.fn(),
   getPrestataireWallet: jest.fn(),
+  getWithdrawals: jest.fn(),
   requestWithdrawal: jest.fn(),
 }));
 jest.mock("@/components/screens/shared/PhoneVerificationComponent", () => {
   const React = require("react");
   const { Pressable, Text } = require("react-native");
-  return function MockVerification({ validate, phoneNumber, showResend }: {
+  return function MockVerification({ validate, phoneNumber, showResend, error }: {
     validate: (valid: boolean, code: string) => Promise<void>;
     phoneNumber: string;
     showResend?: boolean;
+    error?: string | null;
   }) {
     return React.createElement(Pressable, {
       accessibilityRole: "button",
       accessibilityLabel: `verify-${phoneNumber}`,
       onPress: () => validate(true, "123456"),
-    }, React.createElement(Text, null, String(showResend)));
+    }, React.createElement(Text, null, String(showResend)), error ? React.createElement(Text, null, error) : null);
   };
 });
 
 const mockConfirmWithdrawal = confirmWithdrawal as jest.MockedFunction<typeof confirmWithdrawal>;
 const mockGetPrestataireWallet = getPrestataireWallet as jest.MockedFunction<typeof getPrestataireWallet>;
+const mockGetWithdrawals = getWithdrawals as jest.MockedFunction<typeof getWithdrawals>;
 const mockRequestWithdrawal = requestWithdrawal as jest.MockedFunction<typeof requestWithdrawal>;
 
 beforeEach(async () => {
@@ -91,6 +97,23 @@ beforeEach(async () => {
     success: true,
     data: { balance: 6230, pendingPayout: 1450, transactions: [] },
   });
+  mockGetWithdrawals.mockResolvedValue({
+    success: true,
+    data: [{
+      id: 51,
+      userId: 14,
+      amount: 100,
+      bankIban: null,
+      bankName: null,
+      method: "cash",
+      status: "processing",
+      adminNotes: null,
+      processedAt: null,
+      createdAt: "2026-08-02T00:00:00.000Z",
+      updatedAt: "2026-08-02T00:00:00.000Z",
+    }],
+    pagination: { currentPage: 1, lastPage: 1, perPage: 20, total: 1, from: 1, to: 1 },
+  });
   mockRequestWithdrawal.mockResolvedValue({
     success: true,
     data: {
@@ -128,6 +151,34 @@ it('submits the advertised localized amount without truncating thousands', async
   });
 });
 
+it("shows withdrawal processing states alongside the wallet history", async () => {
+  const screen = render(<PrestataireWalletScreen />);
+
+  expect(await screen.findByText(i18n.t("partner.wallet.withdrawalsTitle"))).toBeTruthy();
+  expect(screen.getByText(i18n.t("partner.wallet.withdrawalStatus.processing"))).toBeTruthy();
+  expect(mockGetWithdrawals).toHaveBeenCalledTimes(1);
+});
+
+it("localizes known wallet ledger references in Arabic without rewriting unknown descriptions", async () => {
+  await i18n.changeLanguage("ar");
+  mockGetPrestataireWallet.mockResolvedValueOnce({
+    success: true,
+    data: {
+      balance: 6230,
+      pendingPayout: 1450,
+      transactions: [
+        { id: 1, userId: 14, type: "credit", amount: 300, reference: "PO-81", description: "Paiement commande", createdAt: "2026-08-02T00:00:00.000Z" },
+        { id: 2, userId: 14, type: "debit", amount: 25, reference: "QA-KEEP", description: "QA durable", createdAt: "2026-08-01T00:00:00.000Z" },
+      ],
+    },
+  });
+  const screen = render(<PrestataireWalletScreen />);
+
+  expect(await screen.findByText(i18n.t("partner.wallet.transaction.orderPayment"))).toBeTruthy();
+  expect(screen.queryByText("Paiement commande")).toBeNull();
+  expect(screen.getByText("QA durable")).toBeTruthy();
+});
+
 it('blocks withdrawal submission when the wallet balance cannot be verified', async () => {
   mockGetPrestataireWallet.mockRejectedValueOnce(new Error('offline'));
   const screen = render(<PrestataireWithdrawScreen />);
@@ -153,6 +204,18 @@ it("confirms the owned withdrawal once through Laravel and uses the session phon
     pathname: "/(prestataire)/profile/wallet/success",
     params: { withdrawalId: "51" },
   });
+});
+
+it("localizes a rejected withdrawal OTP instead of exposing the backend English message", async () => {
+  mockConfirmWithdrawal.mockRejectedValueOnce(new ApiClientError("The verification code is invalid.", 422, {
+    code: ["The verification code is invalid."],
+  }));
+  const screen = render(<PrestataireWalletVerificationScreen />);
+
+  fireEvent.press(screen.getByRole("button", { name: "verify-+212600000102" }));
+
+  expect(await screen.findByText(i18n.t("auth.otp.invalid"))).toBeTruthy();
+  expect(screen.queryByText("The verification code is invalid.")).toBeNull();
 });
 
 it("rejects an invalid withdrawal deep link before any API call", async () => {

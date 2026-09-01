@@ -36,8 +36,9 @@ import Colors from '@/constants/Colors';
 
 import {
   getPrestataireWallet,
+  getWithdrawals,
 } from '@/api/resources/prestataire';
-import type { PrestataireWallet, BalanceTransaction } from '@/interfaces/Wallet';
+import type { PrestataireWallet, BalanceTransaction, Withdrawal } from '@/interfaces/Wallet';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -73,11 +74,15 @@ interface TransactionRowProps {
 }
 
 function TransactionRow({ item, isArabic, locale, processing = false }: TransactionRowProps): React.ReactElement {
+  const { t } = useTranslation();
   const isCredit = item.type === 'credit';
   const sign = isCredit ? '+' : '-';
   const amountColor = isCredit ? Colors.greenDark : Colors.red;
-  const desc =
-    item.description ?? item.reference ?? '—';
+  const desc = item.reference?.startsWith('PO-')
+    ? t('partner.wallet.transaction.orderPayment')
+    : item.reference?.startsWith('WDL-')
+      ? t('partner.wallet.transaction.withdrawal')
+      : item.description ?? item.reference ?? '—';
 
   return (
     <View
@@ -134,6 +139,7 @@ export default function PrestataireWalletScreen(): React.ReactElement {
 
   // Data
   const [wallet, setWallet] = useState<PrestataireWallet | null>(null);
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -147,10 +153,14 @@ export default function PrestataireWalletScreen(): React.ReactElement {
     setLoading(true);
     setError(null);
     try {
-      const walletRes = await getPrestataireWallet();
+      const [walletRes, withdrawalsRes] = await Promise.all([
+        getPrestataireWallet(),
+        getWithdrawals(),
+      ]);
       if (walletRes.success && walletRes.data && !Array.isArray(walletRes.data)) {
         setWallet(walletRes.data as PrestataireWallet);
       }
+      setWithdrawals(withdrawalsRes.data);
     } catch {
       setError(t('partner.wallet.loadError'));
     } finally {
@@ -291,6 +301,25 @@ export default function PrestataireWalletScreen(): React.ReactElement {
                 />
               </View>
             </View>
+
+            {withdrawals.length > 0 ? (
+              <View style={styles.withdrawalsCard}>
+                <Text type="subTitle" bold style={styles.withdrawalsTitle}>
+                  {t('partner.wallet.withdrawalsTitle')}
+                </Text>
+                {withdrawals.map((withdrawal) => (
+                  <View key={withdrawal.id} flexDirection="row" alignItems="center" style={styles.withdrawalRow}>
+                    <View flex>
+                      <Text type="label" translate={false}>{formatAmount(withdrawal.amount, locale)} Dhs</Text>
+                      <Text type="small" color={Colors.gray} translate={false}>{formatShortDate(withdrawal.createdAt, locale)}</Text>
+                    </View>
+                    <Text type="small" semiBold color={withdrawal.status === 'rejected' ? Colors.error : Colors.brand}>
+                      {t(`partner.wallet.withdrawalStatus.${withdrawal.status}`)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
 
             {/* ── Transactions section header ────────────────────── */}
             <Text type="subTitle" bold style={styles.sectionTitle}>
@@ -455,6 +484,22 @@ const styles = StyleSheet.create({
   retirerWrapper: {
     marginTop: 12,
     alignSelf: 'flex-end',
+  },
+  withdrawalsCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 10,
+    backgroundColor: Colors.white,
+  },
+  withdrawalsTitle: {
+    marginBottom: 8,
+    color: Colors.brand,
+  },
+  withdrawalRow: {
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.backgroundGray,
   },
 
   // Section header

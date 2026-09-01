@@ -308,6 +308,7 @@ export default function PrestataireOrderDetailScreen(): React.ReactElement {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {/* ── Image placeholder (first item image) ─────────────── */}
         <View style={styles.imagePlaceholder}>

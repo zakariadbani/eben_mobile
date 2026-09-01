@@ -3,15 +3,14 @@ import { Image, StyleSheet } from "react-native";
 import type { FormikHelpers } from "formik";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "expo-router";
-import { ApiClientError } from "@/api/types";
 import Screen from "@/components/common/Screen";
 import { Text } from "@/components/common/Text";
 import View from "@/components/common/View";
 import LoginForm from "@/components/screens/shared/LoginForm";
 import Colors from "@/constants/Colors";
 import { normalizeMoroccanPhone } from "@/helpers/phoneHelper";
+import { getLoginErrorKey } from "@/helpers/loginErrorKey";
 import {
-  AuthRoleMismatchError,
   Role,
   useSession,
 } from "@/context/AuthContext";
@@ -43,15 +42,7 @@ const PrestataireSignInScreen = () => {
         router.replace("/(prestataire)/dashboard");
       }
     } catch (loginError) {
-      setError(
-        t(
-          loginError instanceof ApiClientError
-            ? "auth.login.error"
-            : loginError instanceof AuthRoleMismatchError
-              ? "auth.prestataire.login.roleMismatch"
-              : "auth.error.generic",
-        ),
-      );
+      setError(t(getLoginErrorKey(loginError, "auth.prestataire.login.roleMismatch")));
     }
   };
 

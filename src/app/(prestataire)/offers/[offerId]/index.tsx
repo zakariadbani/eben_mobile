@@ -406,6 +406,19 @@ export default function PrestataireOfferDetailScreen(): React.ReactElement {
           </View>
         ) : null}
 
+        {offer.status === 'rejected' ? (
+          <View style={styles.ctaBox}>
+            <Button
+              title="partner.offerDetail.ctaResend"
+              variant="primary"
+              onPress={() => router.push({
+                pathname: `/(prestataire)/offers/${offer.requestId}/fill`,
+                params: { mode: 'resend', existingOfferId: String(offer.id) },
+              } as never)}
+            />
+          </View>
+        ) : null}
+
         {/* ── Other offers strip ────────────────────────────── */}
         {otherOffers.length > 0 ? (
           <View style={styles.otherSection}>

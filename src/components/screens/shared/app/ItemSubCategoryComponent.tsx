@@ -111,10 +111,10 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
           <Text type="label" semiBold style={styles.title} numberOfLines={2}>
             {displayTitle}
           </Text>
-          {showState && (
+          {showState && item.condition != null && (
             <Text type="small" color={Colors.gray} translate={false}>
               {t("requestList.condition", {
-                condition: t(item.condition ?? "Occasion"),
+                condition: t(item.condition),
               })}
             </Text>
           )}
@@ -128,9 +128,9 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
               {t("requestList.quantity", { count: 1 })}
             </Text>
           )}
-          {showPrice && (
+          {showPrice && item.price != null && (
             <Text type="label" semiBold color={Colors.brand}>
-              {item.price != null ? `${item.price} dhs` : "2,999 dhs"}
+              {`${item.price} dhs`}
             </Text>
           )}
         </View>

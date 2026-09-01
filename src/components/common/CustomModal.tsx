@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Modal, StyleSheet, ViewStyle } from "react-native";
 import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
@@ -24,6 +24,7 @@ interface CustomModalProps {
   primaryButton?: ButtonProps; // Primary button props (optional)
   secondaryButton?: ButtonProps; // Secondary button props (optional)
   variant?: "white" | "black" | string; // Default to primary
+  onClose?: () => void; // Notified on native dismiss (Android back / swipe)
 }
 
 const CustomModal: React.FC<CustomModalProps> = ({
@@ -33,17 +34,18 @@ const CustomModal: React.FC<CustomModalProps> = ({
   primaryButton,
   secondaryButton,
   variant = "white", // Default to primary variant
+  onClose,
 }) => {
-  const [isVisible, setIsVisible] = useState(visible);
-
-  // Sync local state with the prop 'visible'
-  useEffect(() => {
-    setIsVisible(visible);
-  }, [visible]);
-
-  // Default close function that hides the modal
+  // `visible` is the single source of truth — the native <Modal> mirrors it
+  // directly. A previous version tracked its own `isVisible` mirror state
+  // that only followed `visible` via a useEffect and could only be closed
+  // locally (onRequestClose set the local mirror to false without telling
+  // the parent). Once desynced from the parent's state that way, calling
+  // setVisible(true) again from the parent was a no-op (same prop value,
+  // no re-render), so the modal could never reopen. Driving the Modal
+  // straight off the prop makes that class of bug impossible.
   const handleClose = () => {
-    setIsVisible(false);
+    onClose?.();
   };
 
   // Define theme colors in a map for both background and text colors
@@ -65,7 +67,7 @@ const CustomModal: React.FC<CustomModalProps> = ({
     <Modal
       animationType="slide"
       transparent={true}
-      visible={isVisible}
+      visible={visible}
       onRequestClose={handleClose}
     >
       <View style={styles.modalBackground}>

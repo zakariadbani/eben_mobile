@@ -348,6 +348,11 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
                         setMethod(item.id);
                         setMethodOpen(false);
                         if (methodError) setMethodError(null);
+                        // A prior submission may have left a method-specific
+                        // server error here (e.g. an invalid RIB for
+                        // "Virement bancaire") — it no longer applies once
+                        // the method changes, so clear it.
+                        if (submitError) setSubmitError(null);
                       }}
                     >
                       <Text

@@ -36,6 +36,10 @@ jest.mock("expo-router", () => ({
   Tabs: { Screen: () => null },
   useRouter: () => mockRouter,
   useLocalSearchParams: () => mockParams,
+  useFocusEffect: (callback: () => void) => {
+    const ReactModule = require("react") as typeof React;
+    ReactModule.useEffect(callback, [callback]);
+  },
 }));
 jest.mock("@/api", () => ({
   getPrestataireStats: (...args: unknown[]) => mockGetStats(...args),
@@ -232,6 +236,8 @@ it("renders every overview metric from the current server series and requests a 
 
   await waitFor(() => expect(mockGetSeries).toHaveBeenCalledWith("7j"));
   expect((await screen.findAllByText("602")).length).toBeGreaterThan(0);
+  expect(screen.getByText(i18n.t("partner.overview.dateRangeDynamic", { from: "A", to: "B" }))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("partner.overview.dateRange"))).toBeNull();
 
   const selections = [
     ["partner.overview.metricReceived", "302"],

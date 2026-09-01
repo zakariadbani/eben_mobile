@@ -594,6 +594,7 @@ const ProductDetailScreen: React.FC = () => {
 
       <CustomModal
         visible={showPurchaseModal}
+        onClose={() => setShowPurchaseModal(false)}
         title={t("Ajouter au panier")}
         primaryButton={{
           title: addToBasketLoading ? t("Ajout...") : t("Confirm"),
@@ -622,6 +623,7 @@ const ProductDetailScreen: React.FC = () => {
       {/* ── Success modal ────────────────────────────────────── */}
       <CustomModal
         visible={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
         title={t("Ajouté au panier !")}
         primaryButton={{
           title: t("Voir le panier"),

@@ -74,7 +74,11 @@ const HomeScreen: React.FC = () => {
       setCategories(roots);
       setStockProducts(stockResponse?.data ?? []);
       setRecentProducts(recentResponse?.data ?? []);
-      setRequests(requestResponse?.data.slice(0, 2) ?? []);
+      setRequests(
+        requestResponse?.data
+          .filter((request) => ['pending', 'offers_received', 'validated'].includes(request.status))
+          .slice(0, 2) ?? [],
+      );
       setState("ready");
     } catch {
       setState("error");

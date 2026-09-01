@@ -171,6 +171,8 @@ it('shows the live profile identity without unsupported local privacy toggles', 
   expect(screen.queryByText(i18n.t('partner.profile.notifPush'))).toBeNull();
   expect(screen.getByRole('button', { name: i18n.t('partner.notifications.title') })).toBeTruthy();
   expect(screen.queryByText(i18n.t('partner.profile.doNotTrack'))).toBeNull();
+  expect(screen.queryByText('EBEN Solutions SARL © 2022')).toBeNull();
+  expect(screen.getByText(`EBEN Solutions SARL © ${new Date().getFullYear()}`)).toBeTruthy();
 });
 
 it('uploads an owned avatar path and refreshes the persisted session identity', async () => {
@@ -190,12 +192,12 @@ it('marks every loaded Prestataire notification read from the reachable header a
   expect(screen.queryByText(i18n.t('partner.notifications.cta.details'))).toBeNull();
 });
 
-it('marks one notification read from its row without an unsupported navigation CTA', async () => {
+it('marks one payment notification read and opens its referenced partner order', async () => {
   const screen = render(<NotificationsScreen />);
   await screen.findByText('Paiement live');
   fireEvent.press(screen.getByRole('button', { name: 'Paiement live' }));
   await waitFor(() => expect(mockMarkRead).toHaveBeenCalledWith(5));
-  expect(mockPush).not.toHaveBeenCalled();
+  expect(mockPush).toHaveBeenCalledWith('/(prestataire)/orders/8');
 });
 
 it('renders live offer history in Arabic without prototype query overrides', async () => {

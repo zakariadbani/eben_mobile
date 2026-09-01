@@ -15,6 +15,7 @@
   "auth.login.noAccount": "Je n'ai pas de compte.",
   "auth.login.signUp": "S'inscrire !",
   "auth.login.error": "Connexion impossible. Vérifiez vos informations et réessayez.",
+  "auth.login.error429": "Trop de tentatives. Veuillez réessayer dans quelques instants.",
   "auth.login.roleMismatch": "Ce compte n'est pas un compte Client.",
   "auth.register.submit": "S'inscrire",
   "auth.register.submitting": "Inscription...",
@@ -283,7 +284,7 @@
   "Expirera dans 23h": "Expirera dans 23h",
   "Une erreur est survenue. Veuillez réessayer.": "Une erreur est survenue. Veuillez réessayer.",
   "Réduction": "Réduction",
-  "TVA 20%": "TVA 20%",
+  "TVA 20%": "Dont TVA (20%)",
 
   "garage.title": "Mon garage",
   "garage.empty": "La liste est vide",
@@ -422,7 +423,7 @@
   "partner.dashboard.missedCount": "Demandes manquées",
   "partner.dashboard.salesMonth": "Ventes en mai 2022",
   "partner.dashboard.seeMore": "Voir plus",
-  "partner.dashboard.supportTitle": "3ndk chi sou2al??",
+  "partner.dashboard.supportTitle": "Une question ?",
   "partner.dashboard.supportBody": "Vous pouvez nous appeler de 8h à 19h du lundi au vendredi au numéro suivant :",
   "partner.dashboard.supportCall": "Appeler le support",
   "partner.dashboard.supportPhone": "+212 6 61 39 39 71",
@@ -470,6 +471,7 @@
   "partner.offerDetail.price": "Prix",
   "partner.offerDetail.audioNote": "Note audio",
   "partner.offerDetail.ctaShip": "Expédier",
+  "partner.offerDetail.ctaResend": "Renvoyer cette offre",
   "partner.offerDetail.otherOffers": "Vos autres offres",
   "partner.offerDetail.statusPending": "En attente de réponse",
   "partner.offerDetail.statusAccepted": "Acceptée - Expédier",
@@ -641,6 +643,14 @@
   "partner.wallet.processingNote": "Il faut compter entre 24 et 48 heures pour traiter le paiement.",
   "partner.wallet.withdraw": "Retirer",
   "partner.wallet.historyTitle": "Historique de mes transactions",
+  "partner.wallet.withdrawalsTitle": "Mes demandes de retrait",
+  "partner.wallet.withdrawalStatus.awaiting_verification": "Vérification requise",
+  "partner.wallet.withdrawalStatus.pending": "En attente",
+  "partner.wallet.withdrawalStatus.processing": "En cours de traitement",
+  "partner.wallet.withdrawalStatus.completed": "Terminé",
+  "partner.wallet.withdrawalStatus.rejected": "Refusé",
+  "partner.wallet.transaction.orderPayment": "Paiement de commande",
+  "partner.wallet.transaction.withdrawal": "Demande de retrait",
   "partner.wallet.noTransactions": "Aucune transaction pour le moment",
   "partner.wallet.loadError": "Impossible de charger le portefeuille",
   "partner.wallet.retry": "Réessayer",
@@ -711,7 +721,8 @@
   "partner.overview.period6m": "6 mois",
   "partner.overview.period1y": "1 ans",
   "partner.overview.periodMax": "MAX",
-  "partner.overview.dateRange": "Demandes envoyées entre (Juin 6, 2022 et Juin 11, 2022)",
+  "partner.overview.dateRangeDynamic": "Du {{from}} au {{to}}",
+  "partner.overview.dateRangeUnavailable": "Période indisponible",
   "partner.overview.loadError": "Impossible de charger les aperçus",
   "partner.overview.retry": "Réessayer",
   "partner.overview.seriesLoadError": "Impossible de charger le graphique",
@@ -929,6 +940,7 @@
   "requestFlow.viewOffers": "Voir les offres",
   "requestFlow.viewRequest": "Voir la demande",
   "requestFlow.waitingOffers": "En attente des offres",
+  "requestFlow.createNew": "Créer une nouvelle demande",
   "requestFlow.offersTitle": "Offres reçues",
   "requestFlow.offersEmpty": "Aucune offre reçue",
   "requestFlow.offerNotFound": "Offre introuvable",
@@ -943,6 +955,7 @@
   "requestFlow.acceptOffer": "Accepter cette offre",
   "requestFlow.accepting": "Acceptation...",
   "requestFlow.acceptError": "Impossible d'accepter cette offre",
+  "requestFlow.offerRequestClosed": "Cette demande est terminée. L'offre ne peut plus être acceptée.",
   "requestFlow.status.pending": "En attente",
   "requestFlow.status.validated": "Validée",
   "requestFlow.status.selected": "Sélectionnée",
@@ -955,6 +968,12 @@
   ,"requestFlow.requestStatus.ordered": "Commandée"
   ,"requestFlow.requestStatus.expired": "Expirée"
   ,"requestFlow.requestStatus.cancelled": "Annulée"
+  ,"commerce.cart.remainingPartsTitle": "Des pièces restent sans offre"
+  ,"commerce.cart.remainingPartsBody": "{{count}} pièce(s) demandée(s) ne sont pas encore dans votre panier."
+  ,"commerce.cart.continueShopping": "Voir les pièces restantes"
+  ,"commerce.cart.checkoutAnyway": "Commander ce panier"
+  ,"commerce.cart.preflightError": "Impossible de vérifier les pièces restantes. Réessayez."
+  ,"commerce.cart.checking": "Vérification..."
   ,"commerce.success.viewOrders": "Afficher mes commandes"
   ,"commerce.success.confirmation": "Félicitations ! Votre commande a été passée."
   ,"commerce.success.orderNumber": "Nº Commande : {{reference}}"
@@ -971,7 +990,7 @@
   ,"commerce.success.deliveryDate": "Date prévue de la livraison"
   ,"commerce.success.subtotal": "Sous-total des articles TTC"
   ,"commerce.success.discount": "Réduction"
-  ,"commerce.success.tax": "TVA"
+  ,"commerce.success.tax": "Dont TVA (20%)"
   ,"commerce.success.home": "Accueil"
   ,"commerce.success.loadError": "Impossible de charger la commande"
   ,"commerce.success.retry": "Réessayer"
@@ -1083,7 +1102,7 @@
   ,"settings.orders.cancelBody": "Voulez-vous annuler cette commande ?"
   ,"settings.orders.cancelError": "Impossible d’annuler cette commande"
   ,"settings.orders.subtotal": "Sous-total"
-  ,"settings.orders.tax": "TVA"
+  ,"settings.orders.tax": "Dont TVA (20%)"
   ,"settings.orders.tracking": "Suivi : {{id}}"
   ,"settings.orders.reference": "Réf. : {{reference}}"
   ,"settings.orders.summary": "Résumé de la commande"

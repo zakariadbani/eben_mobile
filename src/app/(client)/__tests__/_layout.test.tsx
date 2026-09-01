@@ -6,13 +6,16 @@ import ClientLayout from "../_layout";
 const mockPush = jest.fn();
 let mockSession: { username: string; role: string } | null = null;
 let mockScreenOptions: Record<string, { header?: unknown }> = {};
+let mockTabsOptions: Record<string, unknown> = {};
+let mockLanguage = "fr";
 let mockProfileListeners: {
   tabPress: (event: { preventDefault: () => void }) => void;
 };
 
 jest.mock("expo-router", () => {
   const ReactRuntime = require("react");
-  const Tabs = function MockTabs({ children }: { children: React.ReactNode }) {
+  const Tabs = function MockTabs({ children, screenOptions }: { children: React.ReactNode; screenOptions?: Record<string, unknown> }) {
+    mockTabsOptions = screenOptions ?? {};
     return ReactRuntime.createElement(ReactRuntime.Fragment, null, children);
   };
 
@@ -40,7 +43,7 @@ jest.mock("expo-router", () => {
 jest.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string) => key,
-    i18n: { language: "fr" },
+    i18n: { language: mockLanguage },
   }),
 }));
 
@@ -100,6 +103,8 @@ describe("Client Profile tab", () => {
     jest.clearAllMocks();
     mockSession = null;
     mockScreenOptions = {};
+    mockTabsOptions = {};
+    mockLanguage = "fr";
   });
 
   it("shows a back header on pushed product screens", () => {
@@ -148,5 +153,17 @@ describe("Client Profile tab", () => {
 
     expect(preventDefault).not.toHaveBeenCalled();
     expect(screen.queryByText("guestAuth.title")).toBeNull();
+  });
+
+  it("mirrors the physical tab order in Arabic", () => {
+    mockLanguage = "ar";
+    render(<ClientLayout />);
+
+    expect(mockTabsOptions.tabBarStyle).toEqual(expect.arrayContaining([
+      expect.objectContaining({ transform: [{ scaleX: -1 }] }),
+    ]));
+    expect(mockTabsOptions.tabBarItemStyle).toEqual(expect.arrayContaining([
+      expect.objectContaining({ transform: [{ scaleX: -1 }] }),
+    ]));
   });
 });

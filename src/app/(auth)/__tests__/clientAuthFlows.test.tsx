@@ -209,6 +209,19 @@ it('shows a localized login error and does not navigate', async () => {
   expect(mockReplace).not.toHaveBeenCalled();
 });
 
+it('shows a distinct throttle message for a 429 login response', async () => {
+  mockLogin.mockRejectedValueOnce(new ApiClientError('Too Many Attempts', 429));
+  const screen = render(<ClientLoginScreen />);
+
+  fireEvent.changeText(screen.getByPlaceholderText(i18n.t('auth.fields.phonePlaceholder')), '0600000101');
+  fireEvent.changeText(screen.getByPlaceholderText('......'), 'wrong-pass');
+  fireEvent.press(screen.getByRole('button', { name: i18n.t('auth.login.submit') }));
+
+  expect(await screen.findByText(i18n.t('auth.login.error429'))).toBeTruthy();
+  expect(screen.queryByText(i18n.t('auth.login.error'))).toBeNull();
+  expect(mockReplace).not.toHaveBeenCalled();
+});
+
 it('shows the role mismatch message only for a typed role mismatch', async () => {
   mockLogin.mockRejectedValueOnce(new AuthRoleMismatchError(Role.CLIENT, Role.PRESTATAIRE));
   const screen = render(<ClientLoginScreen />);

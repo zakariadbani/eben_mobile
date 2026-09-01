@@ -96,6 +96,9 @@ memory/
 .planning/
 .custom-screenshot-replica/
 /.codex-remote-attachments/
+/.codex-qa-device/
+/.superpowers/
+/docs/superpowers/
 
 # AI review artifacts
 .grill/

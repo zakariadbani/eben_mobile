@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   ImageBackground,
@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { useTranslation } from "react-i18next";
-import { Href, useRouter } from "expo-router";
+import { Href, useFocusEffect, useRouter } from "expo-router";
 
 import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
@@ -88,10 +88,12 @@ const Dashboard: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    void loadStats();
-    void loadOffers();
-  }, [loadOffers, loadStats]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadStats();
+      void loadOffers();
+    }, [loadOffers, loadStats]),
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
