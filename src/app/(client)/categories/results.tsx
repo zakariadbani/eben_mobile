@@ -126,7 +126,7 @@ function productResult(product: Product): ResultItem {
     title: product.title,
     titleAr: product.titleAr,
     articleNumber: product.articleNumber,
-    price: product.promoPrice ?? product.price,
+    price: product.promoPrice != null && product.promoPrice > 0 ? product.promoPrice : product.price,
     image: product.images[0] ?? null,
     isProduct: true,
   };
@@ -264,7 +264,7 @@ const CategoryResultsScreen: React.FC = () => {
         styleContainer={styles.resultCard}
         actionButton={condition === "occasion" && item.isProduct ? {
           variant: "primary",
-          title: t("Ajouter"),
+          title: t("Ajoutez à la liste"),
           onPress: () => requireClient(
             `/(client)/requests/CreateRequestScreen?categoryId=${categoryId}&productId=${item.id}`,
             () => router.push({

@@ -10,6 +10,7 @@ import { addToBasket, addToWishlist, applyCoupon, getBasket, getProduct, getRequ
 import { getAddresses } from '@/api/resources/addresses';
 import { getOrder, placeOrder } from '@/api/resources/orders';
 import { getProfile } from '@/api/resources/users';
+import { CartContext } from '@/context/CartContext';
 import CartScreen from '../cart';
 import CheckoutScreen from '../payment';
 import OrderSuccessScreen from '../payment/success';
@@ -133,6 +134,31 @@ const mockGetProfile = getProfile as jest.MockedFunction<typeof getProfile>;
 const mockPlaceOrder = placeOrder as jest.MockedFunction<typeof placeOrder>;
 const mockGetOrder = getOrder as jest.MockedFunction<typeof getOrder>;
 
+// ponytail: CartScreen/CheckoutScreen call useCart() (throws outside a
+// provider) — this is a lightweight stand-in for CartProvider, skipping the
+// real provider's mount-time auto-refresh so it doesn't double the
+// apiGetBasket call-count assertions below.
+function CartTestProvider({ children }: { children: React.ReactNode }) {
+  const [basket, setBasket] = React.useState<Basket | null>(null);
+  const refresh = React.useCallback(async () => {
+    try {
+      const response = await getBasket();
+      setBasket(response.data);
+    } catch {
+      // mirrors CartContext's own swallow-on-failure refresh
+    }
+  }, []);
+  const itemCount = basket?.items?.reduce((n, i) => n + i.quantity, 0) ?? 0;
+  return (
+    <CartContext.Provider value={{ basket, setBasket, refresh, itemCount }}>
+      {children}
+    </CartContext.Provider>
+  );
+}
+function renderWithCart(ui: React.ReactElement) {
+  return render(<CartTestProvider>{ui}</CartTestProvider>);
+}
+
 const item = { id: 501, basketId: 19, offerId: 71, categoryId: 12, quantity: 2, unitPrice: 50, createdAt: '2026-01-01', updatedAt: '2026-01-01' };
 const basket: Basket = { id: 19, userId: 5, requestId: null, subtotal: 101.11, discountAmount: 7.22, shippingFee: 13.33, taxAmount: 19.44, total: 126.66, createdAt: '2026-01-01', updatedAt: '2026-01-01', items: [item] };
 const changedBasket: Basket = { ...basket, subtotal: 151.11, taxAmount: 29.44, total: 186.66, items: [{ ...item, quantity: 3 }] };
@@ -156,7 +182,7 @@ beforeEach(async () => {
       expiresAt: '2026-09-02T00:00:00.000Z', createdAt: '2026-01-01', updatedAt: '2026-01-01',
       items: [
         { id: 1, requestId: 73, categoryId: 12, quantity: 1, condition: 'occasion', notes: null, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
-        { id: 2, requestId: 73, categoryId: 13, quantity: 1, condition: 'occasion', notes: null, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+        { id: 2, requestId: 73, categoryId: 13, quantity: 1, condition: 'occasion', notes: null, createdAt: '2026-01-01', updatedAt: '2026-01-01', categoryTitle: 'Pare-chocs avant' },
       ],
     },
   });
@@ -178,7 +204,7 @@ beforeEach(async () => {
 });
 
 it('renders server basket amounts and reconciles quantity/remove mutations from returned envelopes', async () => {
-  const screen = render(<CartScreen />);
+  const screen = renderWithCart(<CartScreen />);
   expect(await screen.findByText('126,66 Dhs')).toBeTruthy();
   expect(screen.getByText('101,11 Dhs')).toBeTruthy();
   expect(screen.getByText('−7,22 Dhs')).toBeTruthy();
@@ -196,7 +222,7 @@ it('renders server basket amounts and reconciles quantity/remove mutations from 
 it('reloads the canonical basket when the cart regains focus', async () => {
   const emptyBasket = { ...basket, items: [] };
   apiGetBasket.mockResolvedValueOnce({ success: true, data: emptyBasket }).mockResolvedValueOnce({ success: true, data: basket });
-  const screen = render(<CartScreen />);
+  const screen = renderWithCart(<CartScreen />);
   expect(await screen.findByText('Votre panier est vide')).toBeTruthy();
   await act(async () => { mockFocusCallback?.(); });
   expect(await screen.findByText('126,66 Dhs')).toBeTruthy();
@@ -205,7 +231,7 @@ it('reloads the canonical basket when the cart regains focus', async () => {
 
 it('shows only the recovery action when the basket is empty', async () => {
   apiGetBasket.mockResolvedValueOnce({ success: true, data: { ...basket, items: [] } });
-  const screen = render(<CartScreen />);
+  const screen = renderWithCart(<CartScreen />);
 
   expect(await screen.findByText('Votre panier est vide')).toBeTruthy();
   expect(screen.queryByTestId('basket-total')).toBeNull();
@@ -214,25 +240,52 @@ it('shows only the recovery action when the basket is empty', async () => {
 
 it('warns before checking out a request basket with unselected parts', async () => {
   apiGetBasket.mockResolvedValueOnce({ success: true, data: { ...basket, requestId: 73 } });
-  const screen = render(<CartScreen />);
+  const screen = renderWithCart(<CartScreen />);
   const checkout = await screen.findByRole('button', { name: 'Caisse de sortie' });
 
   fireEvent.press(checkout);
 
   expect(await screen.findByText(i18n.t('commerce.cart.remainingPartsTitle'))).toBeTruthy();
-  expect(screen.getByText(i18n.t('commerce.cart.remainingPartsBody', { count: 1 }))).toBeTruthy();
+  expect(screen.getByText(i18n.t('commerce.cart.remainingPartsBody'))).toBeTruthy();
+  expect(screen.getByText(i18n.t('commerce.cart.remainingPartsOffers', { names: 'Pare-chocs avant' }))).toBeTruthy();
   expect(mockPush).not.toHaveBeenCalledWith('/(client)/payment');
   fireEvent.press(screen.getByRole('button', { name: i18n.t('commerce.cart.continueShopping') }));
   expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({
     pathname: '/(client)/requests/[requestId]',
     params: { requestId: '73' },
   }));
+  expect(screen.queryByText(i18n.t('commerce.cart.remainingPartsTitle'))).toBeNull();
+});
+
+it('shows the remaining-parts modal even when the missing request item has no category title', async () => {
+  apiGetBasket.mockResolvedValueOnce({ success: true, data: { ...basket, requestId: 73 } });
+  apiGetRequest.mockResolvedValueOnce({
+    success: true,
+    data: {
+      id: 73, reference: 'REQ-73', userId: 5, vehicleId: 1, addressId: null, notes: null,
+      status: 'validated', aiValidationTag: null, aiValidationReason: null, offersCount: 2,
+      expiresAt: '2026-09-02T00:00:00.000Z', createdAt: '2026-01-01', updatedAt: '2026-01-01',
+      items: [
+        { id: 1, requestId: 73, categoryId: 12, quantity: 1, condition: 'occasion', notes: null, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+        { id: 2, requestId: 73, categoryId: 14, quantity: 1, condition: 'occasion', notes: null, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+      ],
+    },
+  });
+  const screen = renderWithCart(<CartScreen />);
+  const checkout = await screen.findByRole('button', { name: 'Caisse de sortie' });
+
+  fireEvent.press(checkout);
+
+  expect(await screen.findByText(i18n.t('commerce.cart.remainingPartsTitle'))).toBeTruthy();
+  expect(screen.getByText(i18n.t('commerce.cart.remainingPartsBody'))).toBeTruthy();
+  expect(screen.queryByText(/Vous avez encore des offres de/)).toBeNull();
+  expect(mockPush).not.toHaveBeenCalledWith('/(client)/payment');
 });
 
 
 it('reloads the canonical basket after a valid coupon instead of deriving totals locally', async () => {
   apiGetBasket.mockResolvedValueOnce({ success: true, data: basket }).mockResolvedValueOnce({ success: true, data: changedBasket });
-  const screen = render(<CartScreen />);
+  const screen = renderWithCart(<CartScreen />);
   await screen.findByTestId('basket-total');
   fireEvent.changeText(screen.getByPlaceholderText(i18n.t('Code promo')), ' LIVE ');
   fireEvent.press(screen.getByRole('button', { name: i18n.t('Appliquer') }));
@@ -242,7 +295,7 @@ it('reloads the canonical basket after a valid coupon instead of deriving totals
 });
 
 it('shows the checkout profile summary and opens the profile editor', async () => {
-  const screen = render(<CheckoutScreen />);
+  const screen = renderWithCart(<CheckoutScreen />);
 
   expect(await screen.findByText('Client Test')).toBeTruthy();
   expect(screen.getByText('0612345678')).toBeTruthy();
@@ -256,7 +309,7 @@ it('submits COD once with a visible server-default address and routes only the o
     data: [nonDefault(7), nonDefault(8), address],
     pagination: { ...pagination, total: 3, from: 1, to: 3 },
   });
-  const screen = render(<CheckoutScreen />);
+  const screen = renderWithCart(<CheckoutScreen />);
   expect(await screen.findByText('126,66 Dhs')).toBeTruthy();
   expect(screen.getByTestId('selected-address').props.children).toBe('9');
   expect(screen.getByTestId('visible-addresses').props.children).toContain('9');
@@ -277,7 +330,7 @@ it('surfaces Laravel checkout validation errors and keeps the order retryable', 
   mockPlaceOrder
     .mockRejectedValueOnce(new ApiClientError('Validation failed', 422, { addressId: ['Adresse invalide'] }))
     .mockResolvedValueOnce({ success: true, data: order });
-  const screen = render(<CheckoutScreen />);
+  const screen = renderWithCart(<CheckoutScreen />);
   const submit = await screen.findByRole('button', { name: i18n.t('Effectuer mon achat') });
   fireEvent.press(submit);
   expect(await screen.findByText('Adresse invalide')).toBeTruthy();
@@ -287,13 +340,13 @@ it('surfaces Laravel checkout validation errors and keeps the order retryable', 
 
 it('requires an address and exposes a retry after live checkout loading fails', async () => {
   mockGetAddresses.mockResolvedValueOnce({ success: true, data: [], pagination });
-  let screen = render(<CheckoutScreen />);
+  let screen = renderWithCart(<CheckoutScreen />);
   expect(await screen.findByText(i18n.t('addresses.empty'))).toBeTruthy();
   expect(screen.getByRole('button', { name: i18n.t('Effectuer mon achat') }).props.accessibilityState.disabled).toBe(true);
   screen.unmount();
 
   checkoutGetBasket.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ success: true, data: basket });
-  screen = render(<CheckoutScreen />);
+  screen = renderWithCart(<CheckoutScreen />);
   const retry = await screen.findByRole('button', { name: i18n.t('checkout.retry', 'Réessayer') });
   fireEvent.press(retry);
   expect(await screen.findByText('126,66 Dhs')).toBeTruthy();

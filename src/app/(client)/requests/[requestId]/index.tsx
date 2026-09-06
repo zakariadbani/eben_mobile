@@ -8,15 +8,29 @@ import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
 import Button from "@/components/common/Button";
 import ImageSlider from "@/components/common/ImageSlider";
+import ProgressStepperComponent from "@/components/screens/shared/app/ProgressStepperComponent";
 import Colors from "@/constants/Colors";
 import { getRequest } from "@/api/resources/requests";
-import type { Request } from "@/interfaces/Request";
+import { useCountdown } from "@/helpers/countdown";
+import type { Request, RequestStatus } from "@/interfaces/Request";
 
 function positiveId(value: string | undefined): number | null {
   if (!value || !/^\d+$/.test(value)) return null;
   const id = Number(value);
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
+
+// Maps a request's backend status to the client-facing 4-step progress
+// stepper. null = terminal/no-progress statuses that don't show a stepper.
+const REQUEST_STEP: Record<RequestStatus, number | null> = {
+  draft: 0,
+  pending: 0,
+  offers_received: 1,
+  validated: 2,
+  ordered: 3,
+  expired: null,
+  cancelled: null,
+};
 
 export default function RequestDetailScreen() {
   const { t, i18n } = useTranslation();
@@ -26,6 +40,7 @@ export default function RequestDetailScreen() {
   const requestId = positiveId(params.requestId);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [request, setRequest] = useState<Request | null>(null);
+  const countdown = useCountdown(request?.expiresAt ?? null, t("Expiré"));
 
   const load = useCallback(async () => {
     if (requestId === null) { setState("error"); return; }
@@ -58,18 +73,45 @@ export default function RequestDetailScreen() {
   }
 
   const hasOffers = request.offersCount > 0;
-  const isExpired = request.status === "expired";
+  const isExpired = request.status === "expired"
+    || (request.expiresAt != null
+      && Date.parse(request.expiresAt) <= Date.now()
+      && !["validated", "ordered", "cancelled"].includes(request.status));
+  const step = REQUEST_STEP[request.status];
+  // ponytail: ring only while the 24h offer window applies (pending/offers_received);
+  // once an offer is accepted (validated) the deadline moves to the basket
+  const showCountdownRing = !isExpired
+    && request.expiresAt != null
+    && (request.status === "pending" || request.status === "offers_received");
   return (
     <Screen whatsapp={false}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text type="headerTitle" semiBold>{t("requestFlow.requestReference", { reference: request.reference })}</Text>
         <Text type="label" color={isExpired ? Colors.error : Colors.gray} style={styles.status}>
-          {t(`requestFlow.requestStatus.${request.status}`)}
+          {t(`requestFlow.requestStatus.${isExpired ? "expired" : request.status}`)}
         </Text>
         {request.expiresAt ? (
           <Text type="small" color={Colors.gray} style={styles.expiry}>
             {t("requestFlow.expires", { value: new Date(request.expiresAt).toLocaleString(i18n.language === "ar" ? "ar-MA" : "fr-MA") })}
           </Text>
+        ) : null}
+        {step !== null ? (
+          <ProgressStepperComponent
+            steps={[t("Envoyé"), t("Commandez"), t("Paiement"), t("Traitement")]}
+            currentStep={step}
+          />
+        ) : null}
+        {showCountdownRing ? (
+          <View alignItems="center" style={styles.ringSection}>
+            {/* ponytail: plain border ring, upgrade to an svg arc once react-native-svg is verified */}
+            <View style={styles.ring} alignItems="center" justifyContent="center">
+              <Text type="headerTitle" semiBold translate={false}>{countdown}</Text>
+              <Text type="small" color={Colors.gray}>{t("Restant")}</Text>
+            </View>
+            <Text center color={Colors.error} style={styles.ringWarning}>
+              {t("Veuillez remplir votre commande avant le délai d'expiration")}
+            </Text>
+          </View>
         ) : null}
         <Text type="subTitle" semiBold style={styles.sectionTitle}>requestFlow.parts</Text>
         {(request.items ?? []).length === 0 ? <Text color={Colors.gray}>requestFlow.noParts</Text> : null}
@@ -123,4 +165,7 @@ const styles = StyleSheet.create({
   offerNotice: { marginTop: 20 },
   spacer: { height: 50 },
   sticky: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 16, backgroundColor: Colors.white },
+  ringSection: { marginTop: 20 },
+  ring: { width: 180, height: 180, borderRadius: 90, borderWidth: 8, borderColor: Colors.primary, marginBottom: 12 },
+  ringWarning: { marginTop: 4, paddingHorizontal: 12 },
 });

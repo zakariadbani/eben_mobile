@@ -107,7 +107,10 @@ it('returns the category tree envelope unchanged', async () => {
   const response = { success: true, data: [{ id: 1, children: [] }] };
   get.mockResolvedValue(response);
 
-  await expect(getCategoryTree()).resolves.toBe(response);
+  await expect(getCategoryTree()).resolves.toEqual({
+    success: true,
+    data: [{ id: 1, children: [] }],
+  });
   expect(get).toHaveBeenCalledWith('/categories/tree');
 });
 

@@ -34,12 +34,12 @@ const ARCHIVED_REQUEST_STATUSES = new Set<RequestStatus>(['ordered', 'expired', 
 
 function getStatusConfig(
   status: RequestStatus,
-  isAr: boolean,
+  t: (key: string) => string,
 ): { label: string; color: string; background: string; isReady: boolean; isClosed: boolean } {
   switch (status) {
     case 'offers_received':
       return {
-        label: isAr ? 'جاهز!' : 'Ready!',
+        label: t('Ready!'),
         color: Colors.greenDark,
         background: Colors.green + '33',
         isReady: true,
@@ -49,16 +49,32 @@ function getStatusConfig(
     case 'cancelled':
     case 'ordered':
       return {
-        label: isAr ? 'مغلق' : 'Fermé',
+        label: t('Fermé'),
         color: Colors.white,
         background: Colors.grayMidDark,
         isReady: false,
         isClosed: true,
       };
+    case 'draft':
+      return {
+        label: t('requestFlow.requestStatus.draft'),
+        color: Colors.grayMidDark,
+        background: Colors.backgroundGray,
+        isReady: false,
+        isClosed: false,
+      };
+    case 'validated':
+      return {
+        label: t('requestFlow.requestStatus.validated'),
+        color: Colors.grayMidDark,
+        background: Colors.backgroundGray,
+        isReady: false,
+        isClosed: false,
+      };
     case 'pending':
     default:
       return {
-        label: isAr ? 'قيد الانتظار' : 'En attente',
+        label: t('En attente'),
         color: Colors.grayMidDark,
         background: Colors.backgroundGray,
         isReady: false,
@@ -179,7 +195,7 @@ interface ArchivedOfferCardProps {
 const ArchivedOfferCard: React.FC<ArchivedOfferCardProps> = ({ request, onPress }) => {
   const { i18n, t } = useTranslation();
   const isAr = i18n.language === 'ar';
-  const cfg = getStatusConfig(request.status, isAr);
+  const cfg = getStatusConfig(request.status, t);
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75} style={styles.card}>
@@ -200,7 +216,7 @@ const ArchivedOfferCard: React.FC<ArchivedOfferCardProps> = ({ request, onPress 
             </Text>
             {cfg.isReady && (
               <Text type="small" semiBold color={Colors.greenDark} translate={false}>
-                {isAr ? 'جاهز!' : 'Ready!'}
+                {t('Ready!')}
               </Text>
             )}
           </View>
@@ -233,7 +249,7 @@ const ArchivedOfferCard: React.FC<ArchivedOfferCardProps> = ({ request, onPress 
         {/* Trailing */}
         {cfg.isReady ? (
           <Button
-            title={isAr ? 'تحقق من الأسعار' : 'Vérifier les prix'}
+            title="Vérifier les prix"
             variant="primary"
             rightIcon={isAr ? "arrow-left" : "arrow-right"}
             iconType="standard"
@@ -246,7 +262,7 @@ const ArchivedOfferCard: React.FC<ArchivedOfferCardProps> = ({ request, onPress 
         ) : cfg.isClosed ? (
           <TouchableOpacity onPress={onPress} style={[styles.detailsBtn, isAr && styles.rowRtl]} activeOpacity={0.8}>
             <Text type="small" semiBold color={Colors.grayMidDark} translate={false}>
-              {isAr ? 'التفاصيل' : 'Détails'}
+              {t('Détails')}
             </Text>
             <Icon name={isAr ? "arrow-left" : "arrow-right"} size={12} iconColor={Colors.grayMidDark} type="Feather" />
           </TouchableOpacity>
@@ -437,11 +453,10 @@ const ArchivedOffersScreen: React.FC = () => {
           bordless: true,
         }}
       >
-        <Text type="headerTitle" semiBold color={Colors.brand} translate={false}>
-          {isAr ? 'الفلاتر' : 'Filters'}
+        <Text type="headerTitle" semiBold color={Colors.brand}>
+          {"Filters"}
         </Text>
         {availableStatuses.map((status) => {
-          const cfg = getStatusConfig(status, isAr);
           const checked = pendingStatuses.has(status);
           return (
             <TouchableOpacity
@@ -451,7 +466,7 @@ const ArchivedOffersScreen: React.FC = () => {
               style={styles.filterRow}
             >
               <Text type="label" color={Colors.brand} translate={false}>
-                {cfg.label}
+                {t(`requestFlow.requestStatus.${status}`)}
               </Text>
               <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
                 {checked && (

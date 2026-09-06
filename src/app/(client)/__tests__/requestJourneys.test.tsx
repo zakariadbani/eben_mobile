@@ -8,11 +8,14 @@ import {
   acceptOffer,
   createRequest,
   getOffer,
+  getOffers,
   getRequest,
   getRequests,
   sendRequest,
 } from "@/api/resources/requests";
+import { getVehicle } from "@/api/resources/vehicles";
 import { ApiClientError } from "@/api/types";
+import { CartContext } from "@/context/CartContext";
 import CreateRequestScreen from "../requests/CreateRequestScreen";
 import RequestListScreen from "../requests";
 import VerificationScreen from "../requests/verification";
@@ -75,6 +78,7 @@ jest.mock("@/api/resources/categories", () => ({ getCategoryTree: jest.fn() }));
 jest.mock("@/api/resources/vehicles", () => ({
   CLIENT_SELECTED_VEHICLE_ID_STORAGE_KEY: "selectedVehicleId",
   getVehicles: jest.fn(),
+  getVehicle: jest.fn(),
 }));
 jest.mock("@/api/resources/uploads", () => ({ uploadLocalImages: jest.fn() }));
 jest.mock("@/api/resources/requests", () => ({
@@ -117,7 +121,26 @@ const mockGetRequest = getRequest as jest.MockedFunction<typeof getRequest>;
 const mockGetRequests = getRequests as jest.MockedFunction<typeof getRequests>;
 const mockSendRequest = sendRequest as jest.MockedFunction<typeof sendRequest>;
 const mockGetOffer = getOffer as jest.MockedFunction<typeof getOffer>;
+const mockGetOffers = getOffers as jest.MockedFunction<typeof getOffers>;
+const mockGetVehicle = getVehicle as jest.MockedFunction<typeof getVehicle>;
 const mockAcceptOffer = acceptOffer as jest.MockedFunction<typeof acceptOffer>;
+
+// ponytail: OfferDetailScreen calls useCart() (throws outside a provider) —
+// this is a lightweight stand-in for CartProvider that skips the real
+// provider's useSession()-gated auto-refresh, so this router-level suite
+// doesn't also need an AuthContext mock just to satisfy the cart context.
+function CartTestProvider({ children }: { children: React.ReactNode }) {
+  const [basket, setBasket] = React.useState<Basket | null>(null);
+  const itemCount = basket?.items?.reduce((n, i) => n + i.quantity, 0) ?? 0;
+  return (
+    <CartContext.Provider value={{ basket, setBasket, refresh: async () => {}, itemCount }}>
+      {children}
+    </CartContext.Provider>
+  );
+}
+function renderWithCart(ui: React.ReactElement) {
+  return render(<CartTestProvider>{ui}</CartTestProvider>);
+}
 
 const pagination = { currentPage: 1, lastPage: 1, perPage: 20, total: 1, from: 1, to: 1 };
 const leaf = {
@@ -160,6 +183,8 @@ beforeEach(async () => {
   mockGetRequests.mockResolvedValue({ success: true, data: [], pagination: { ...pagination, total: 0, from: null, to: null } });
   mockSendRequest.mockResolvedValue({ success: true, data: { id: 73, reference: "REQ-73", status: "pending" } });
   mockGetOffer.mockResolvedValue({ success: true, data: offer });
+  mockGetOffers.mockResolvedValue({ success: true, data: [offer], pagination });
+  mockGetVehicle.mockResolvedValue({ success: true, data: vehicle });
   const basket = {
     id: 19, userId: 5, requestId: 73,
     subtotal: 240, discountAmount: 0, shippingFee: 0, taxAmount: 48, total: 288,
@@ -176,11 +201,13 @@ it("uploads local attachments and creates a draft with selected server vehicle a
   fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.addPart", { name: "Plaquettes" }) }));
   fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.addImage") }));
   await screen.findByLabelText("file:///part.jpg");
+  expect(screen.getByLabelText(i18n.t("Diminuer la quantité")).props.accessibilityState.disabled).toBe(true);
+  fireEvent.press(screen.getByLabelText(i18n.t("Augmenter la quantité")));
   fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.verify") }));
 
   await waitFor(() => expect(mockCreateRequest).toHaveBeenCalledWith({
     vehicleId: 42,
-    items: [{ categoryId: 12, quantity: 1, condition: "occasion" }],
+    items: [{ categoryId: 12, quantity: 2, condition: "occasion" }],
     notes: null,
     images: ["tmp/mobile/5/image.jpg"],
   }));
@@ -266,6 +293,29 @@ it("keeps unvalidated offer counts from enabling the request offers action", asy
   expect(screen.UNSAFE_queryAllByType(WhatsappBtn)).toHaveLength(0);
 });
 
+it("shows the request stepper at the matching step for an in-progress request", async () => {
+  mockParams = { requestId: "73" };
+  mockGetRequest.mockResolvedValueOnce({
+    success: true,
+    data: { ...request, status: "offers_received", offersCount: 1, expiresAt: "2026-09-10T00:00:00.000Z" },
+  });
+  const screen = render(<RequestDetailScreen />);
+
+  expect(await screen.findByLabelText(`${i18n.t("Commandez")}, 2/4`)).toBeTruthy();
+});
+
+it("hides the stepper for an expired request", async () => {
+  mockParams = { requestId: "73" };
+  mockGetRequest.mockResolvedValueOnce({
+    success: true,
+    data: { ...request, status: "expired", offersCount: 0, expiresAt: "2026-08-01T00:00:00.000Z" },
+  });
+  const screen = render(<RequestDetailScreen />);
+
+  await screen.findByText(i18n.t("requestFlow.requestStatus.expired"));
+  expect(screen.queryByLabelText(/1\/4/)).toBeNull();
+});
+
 it("shows an expired request as terminal and offers a truthful new-request path", async () => {
   mockParams = { requestId: "73" };
   mockGetRequest.mockResolvedValueOnce({
@@ -278,6 +328,34 @@ it("shows an expired request as terminal and offers a truthful new-request path"
   expect(screen.queryByRole("button", { name: i18n.t("requestFlow.waitingOffers") })).toBeNull();
   fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.createNew") }));
   expect(mockPush).toHaveBeenCalledWith("/(client)/requests/CreateRequestScreen");
+});
+
+it("treats a stale non-expired status past its deadline as expired", async () => {
+  mockParams = { requestId: "73" };
+  mockGetRequest.mockResolvedValueOnce({
+    success: true,
+    data: { ...request, status: "pending", offersCount: 0, expiresAt: "2020-01-01T00:00:00.000Z" },
+  });
+  const screen = render(<RequestDetailScreen />);
+
+  expect(await screen.findByText(i18n.t("requestFlow.requestStatus.expired"))).toBeTruthy();
+  expect(screen.queryByRole("button", { name: i18n.t("requestFlow.waitingOffers") })).toBeNull();
+});
+
+it("keeps a validated request in progress even past its original deadline", async () => {
+  mockParams = { requestId: "73" };
+  mockGetRequest.mockResolvedValueOnce({
+    success: true,
+    data: { ...request, status: "validated", offersCount: 1, expiresAt: "2020-01-01T00:00:00.000Z" },
+  });
+  const screen = render(<RequestDetailScreen />);
+
+  expect(await screen.findByText(i18n.t("requestFlow.requestStatus.validated"))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("requestFlow.requestStatus.expired"))).toBeNull();
+  expect(screen.getByRole("button", { name: i18n.t("requestFlow.viewOffers") })).toBeTruthy();
+  expect(await screen.findByLabelText(`${i18n.t("Paiement")}, 3/4`)).toBeTruthy();
+  expect(screen.queryByText(i18n.t("Restant"))).toBeNull();
+  expect(screen.queryByText(i18n.t("Expiré"))).toBeNull();
 });
 
 it("shows only closed requests in archived offers", async () => {
@@ -352,7 +430,7 @@ it("loads request success from the owned server request and rejects forged route
 
 it("accepts a validated offer once and routes with the returned basket state", async () => {
   mockParams = { requestId: "73", offerId: "88" };
-  const screen = render(<OfferDetailScreen />);
+  const screen = renderWithCart(<OfferDetailScreen />);
 
   const accept = await screen.findByRole("button", { name: i18n.t("requestFlow.acceptOffer") });
   fireEvent.press(accept);
@@ -369,11 +447,53 @@ it("accepts a validated offer once and routes with the returned basket state", a
 it("disables a leftover validated offer after its parent request is ordered", async () => {
   mockParams = { requestId: "73", offerId: "88" };
   mockGetRequest.mockResolvedValueOnce({ success: true, data: { ...request, status: "ordered" } });
-  const screen = render(<OfferDetailScreen />);
+  const screen = renderWithCart(<OfferDetailScreen />);
 
   const accept = await screen.findByRole("button", { name: i18n.t("requestFlow.acceptOffer") });
   expect(accept.props.accessibilityState.disabled).toBe(true);
   expect(screen.getByText(i18n.t("requestFlow.offerRequestClosed"))).toBeTruthy();
   fireEvent.press(accept);
   expect(mockAcceptOffer).not.toHaveBeenCalled();
+});
+
+it("shows vehicle compatibility and navigates to a sibling offer", async () => {
+  mockParams = { requestId: "73", offerId: "88" };
+  const siblingOffer = { ...offer, id: 89, reference: "OFF-89" };
+  mockGetOffers.mockResolvedValueOnce({ success: true, data: [offer, siblingOffer], pagination });
+  const screen = renderWithCart(<OfferDetailScreen />);
+
+  expect(await screen.findByText(
+    i18n.t("Compatible avec votre {{vehicle}}", { vehicle: "Dacia Logan 2021" }),
+  )).toBeTruthy();
+
+  fireEvent.press(await screen.findByRole("button", { name: i18n.t("requestFlow.reference", { value: "OFF-89" }) }));
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: "/(client)/requests/[requestId]/offers/[offerId]",
+    params: { requestId: "73", offerId: "89" },
+  });
+});
+
+it("ignores a stale first-offer response after a fast sibling-offer hop", async () => {
+  mockParams = { requestId: "73", offerId: "88" };
+  mockGetOffers.mockResolvedValue({ success: true, data: [], pagination });
+  let resolveFirst!: (value: Awaited<ReturnType<typeof getOffer>>) => void;
+  const firstOfferPromise = new Promise<Awaited<ReturnType<typeof getOffer>>>((resolve) => { resolveFirst = resolve; });
+  const siblingOffer = { ...offer, id: 89, reference: "OFF-89" };
+  mockGetOffer
+    .mockReturnValueOnce(firstOfferPromise)
+    .mockResolvedValueOnce({ success: true, data: siblingOffer });
+
+  const screen = renderWithCart(<OfferDetailScreen />);
+
+  mockParams = { requestId: "73", offerId: "89" };
+  screen.rerender(<CartTestProvider><OfferDetailScreen /></CartTestProvider>);
+
+  expect(await screen.findByText(i18n.t("requestFlow.reference", { value: "OFF-89" }))).toBeTruthy();
+
+  resolveFirst({ success: true, data: offer });
+  await waitFor(() => expect(screen.getByText(i18n.t("requestFlow.reference", { value: "OFF-89" }))).toBeTruthy());
+  expect(screen.queryByText(i18n.t("requestFlow.reference", { value: "OFF-88" }))).toBeNull();
+
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.acceptOffer") }));
+  await waitFor(() => expect(mockAcceptOffer).toHaveBeenCalledWith(89));
 });

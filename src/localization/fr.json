@@ -333,6 +333,8 @@
 
   "wishlist.screen.title": "Ma liste de souhaits",
   "wishlist.empty": "La liste est vide",
+  "Retirer de la liste de souhaits": "Retirer de la liste de souhaits",
+  "Ajouter à la liste de souhaits": "Ajouter à la liste de souhaits",
   "article(s)": "article(s)",
 
   "about.mission.title": "NOTRE MISSION",
@@ -853,6 +855,7 @@
   "partner.offers.filter.rejected": "Rejeté",
   "partner.offers.filter.reset": "Réinitialiser",
   "partner.offers.filter.apply": "Appliquer",
+  "Filters": "Filtres",
   "partner.offers.unknownPart": "Pièce automobile",
   "partner.offers.action": "Préparer",
   "partner.offers.quantityOne": "Qty 1",
@@ -968,10 +971,11 @@
   ,"requestFlow.requestStatus.ordered": "Commandée"
   ,"requestFlow.requestStatus.expired": "Expirée"
   ,"requestFlow.requestStatus.cancelled": "Annulée"
-  ,"commerce.cart.remainingPartsTitle": "Des pièces restent sans offre"
-  ,"commerce.cart.remainingPartsBody": "{{count}} pièce(s) demandée(s) ne sont pas encore dans votre panier."
-  ,"commerce.cart.continueShopping": "Voir les pièces restantes"
-  ,"commerce.cart.checkoutAnyway": "Commander ce panier"
+  ,"commerce.cart.remainingPartsTitle": "Vous avez encore d'autres produits"
+  ,"commerce.cart.remainingPartsBody": "Vous avez encore d'autres produits que vous n'avez pas ajoutés à votre panier."
+  ,"commerce.cart.remainingPartsOffers": "Vous avez encore des offres de : {{names}}"
+  ,"commerce.cart.continueShopping": "Continuer l'achat"
+  ,"commerce.cart.checkoutAnyway": "Aller au paiement"
   ,"commerce.cart.preflightError": "Impossible de vérifier les pièces restantes. Réessayez."
   ,"commerce.cart.checking": "Vérification..."
   ,"commerce.success.viewOrders": "Afficher mes commandes"
@@ -1119,6 +1123,32 @@
   ,"settings.orders.step.processing": "Traitement"
   ,"settings.orders.step.shipped": "Expédition"
   ,"settings.orders.step.delivered": "Livré"
+  ,"settings.orders.status.pending.label": "En attente"
+  ,"settings.orders.status.pending.desc": "Nous attendons le paiement"
+  ,"settings.orders.status.pending.cta": "Payez"
+  ,"settings.orders.status.confirmed.label": "Confirmée"
+  ,"settings.orders.status.confirmed.desc": "Votre commande est en cours de traitement"
+  ,"settings.orders.status.confirmed.cta": "Suivi de l'ordre"
+  ,"settings.orders.status.processing.label": "En traitement"
+  ,"settings.orders.status.processing.desc": "Votre commande est en cours de traitement"
+  ,"settings.orders.status.processing.cta": "Suivi de l'ordre"
+  ,"settings.orders.status.shipped.label": "En route"
+  ,"settings.orders.status.shipped.desc": "Votre commande est en route"
+  ,"settings.orders.status.shipped.cta": "Suivi de l'ordre"
+  ,"settings.orders.status.delivered.label": "Livré"
+  ,"settings.orders.status.delivered.desc": "Votre commande a été livrée"
+  ,"settings.orders.status.delivered.cta": "Suivi de l'ordre"
+  ,"settings.orders.status.cancelled.label": "Annulée"
+  ,"settings.orders.status.cancelled.desc": "Votre commande a été annulée"
+  ,"settings.orders.status.cancelled.cta": "Détails"
+  ,"settings.orders.status.refunded.label": "Remboursée"
+  ,"settings.orders.status.refunded.desc": "Votre commande a été remboursée"
+  ,"settings.orders.status.refunded.cta": "Détails"
+  ,"settings.orders.paymentMethod.cod": "Paiement à la livraison"
+  ,"settings.orders.paymentMethod.visa": "Carte bancaire"
+  ,"settings.orders.paymentMethod.virement": "Virement bancaire"
+  ,"settings.orders.paymentMethod.cache_plus": "Cash Plus"
+  ,"settings.orders.paymentMethod.balance": "Solde portefeuille"
   ,"settings.archived.loadError": "Impossible de charger les offres archivées"
   ,"settings.profile.verifyPhoneTitle": "Vérifier le nouveau numéro"
   ,"settings.profile.noPendingPhoneVerification": "Aucun changement de numéro n’est en attente de vérification."
@@ -1223,4 +1253,20 @@
   ,"\u00c9t\u00e9": "\u00c9t\u00e9"
   ,"Hiver": "Hiver"
   ,"Toutes saisons": "Toutes saisons"
+  ,"Ferm\u00e9": "Ferm\u00e9"
+  ,"Ajoutez \u00e0 la liste": "Ajoutez \u00e0 la liste"
+  ,"Ready!": "Ready!"
+  ,"V\u00e9rifier les prix": "V\u00e9rifier les prix"
+  ,"Dont TVA (20%)": "Dont TVA (20%)"
+  ,"Expir\u00e9": "Expir\u00e9"
+  ,"Envoy\u00e9": "Envoy\u00e9"
+  ,"Commandez": "Commandez"
+  ,"Vous \u00eates actuellement en train d'acheter:": "Vous \u00eates actuellement en train d'acheter:"
+  ,"Vos autres voitures": "Vos autres voitures"
+  ,"Acheter sans voiture": "Acheter sans voiture"
+  ,"G\u00e9rez vos voitures": "G\u00e9rez vos voitures"
+  ,"Compatible avec votre {{vehicle}}": "Compatible avec votre {{vehicle}}"
+  ,"D\u00e9tails de l'offre": "D\u00e9tails de l'offre"
+  ,"En attente de votre commande": "En attente de votre commande"
+  ,"Vos autres offres": "Vos autres offres"
 }

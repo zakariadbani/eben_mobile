@@ -1,11 +1,13 @@
 import React from "react";
-import { act, fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 
 import ClientLayout from "../_layout";
+import { getBasket } from "@/api";
+import type { Basket } from "@/interfaces/Basket";
 
 const mockPush = jest.fn();
 let mockSession: { username: string; role: string } | null = null;
-let mockScreenOptions: Record<string, { header?: unknown }> = {};
+let mockScreenOptions: Record<string, { header?: unknown; tabBarBadge?: number }> = {};
 let mockTabsOptions: Record<string, unknown> = {};
 let mockLanguage = "fr";
 let mockProfileListeners: {
@@ -26,7 +28,7 @@ jest.mock("expo-router", () => {
   }: {
     name: string;
     listeners?: typeof mockProfileListeners;
-    options?: { header?: unknown };
+    options?: { header?: unknown; tabBarBadge?: number };
   }) {
     if (name === "settings/index" && listeners) mockProfileListeners = listeners;
     mockScreenOptions[name] = options ?? {};
@@ -48,11 +50,15 @@ jest.mock("react-i18next", () => ({
 }));
 
 jest.mock("@/context/AuthContext", () => ({
+  Role: { CLIENT: "client", PRESTATAIRE: "prestataire" },
   useSession: () => ({
     session: mockSession,
     username: mockSession?.username ?? null,
+    role: mockSession?.role ?? "guest",
   }),
 }));
+
+jest.mock("@/api", () => ({ getBasket: jest.fn() }));
 
 jest.mock("@/components/common/ConfirmModal", () => {
   const ReactRuntime = require("react");
@@ -97,6 +103,8 @@ jest.mock("@/components/common/ConfirmModal", () => {
         : null,
   };
 });
+
+const mockGetBasket = getBasket as jest.MockedFunction<typeof getBasket>;
 
 describe("Client Profile tab", () => {
   beforeEach(() => {
@@ -165,5 +173,38 @@ describe("Client Profile tab", () => {
     expect(mockTabsOptions.tabBarItemStyle).toEqual(expect.arrayContaining([
       expect.objectContaining({ transform: [{ scaleX: -1 }] }),
     ]));
+  });
+
+  it("shows the cart item count as a tab badge for a signed-in client", async () => {
+    mockSession = { username: "client", role: "client" };
+    const basket: Basket = {
+      id: 1, userId: 5, requestId: null, subtotal: 0, discountAmount: 0, shippingFee: 0, taxAmount: 0, total: 0,
+      createdAt: "2026-01-01", updatedAt: "2026-01-01",
+      items: [{ id: 1, basketId: 1, offerId: 1, categoryId: 1, quantity: 3, unitPrice: 10, createdAt: "2026-01-01", updatedAt: "2026-01-01" }],
+    };
+    mockGetBasket.mockResolvedValue({ success: true, data: basket });
+
+    render(<ClientLayout />);
+
+    await waitFor(() => expect(mockScreenOptions["cart/index"]?.tabBarBadge).toBe(3));
+  });
+
+  it("shows no cart tab badge for a signed-in client with an empty basket", async () => {
+    mockSession = { username: "client", role: "client" };
+    const emptyBasket: Basket = {
+      id: 2, userId: 5, requestId: null, subtotal: 0, discountAmount: 0, shippingFee: 0, taxAmount: 0, total: 0,
+      createdAt: "2026-01-01", updatedAt: "2026-01-01",
+      items: [],
+    };
+    let resolveBasket!: (value: Awaited<ReturnType<typeof getBasket>>) => void;
+    mockGetBasket.mockReturnValue(new Promise((resolve) => { resolveBasket = resolve; }));
+
+    render(<ClientLayout />);
+    await act(async () => {
+      resolveBasket({ success: true, data: emptyBasket });
+      await Promise.resolve();
+    });
+
+    expect(mockScreenOptions["cart/index"]?.tabBarBadge).toBeUndefined();
   });
 });

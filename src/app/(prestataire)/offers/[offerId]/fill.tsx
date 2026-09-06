@@ -59,6 +59,7 @@ import {
 } from '@/api/resources/prestataire';
 import { uploadLocalImages } from '@/api/resources/uploads';
 import { ApiClientError } from '@/api/types';
+import { useCountdown } from '@/helpers/countdown';
 import type { Request, RequestItem } from '@/interfaces/Request';
 import type { PrestataireOffer } from '@/interfaces/Offer';
 
@@ -93,18 +94,6 @@ function mapOfferLineErrors(errors: Record<string, string[]>): OfferLineErrors {
 }
 
 // ── Condition picker items ─────────────────────────────────────────────────────
-
-// ── Countdown helper ──────────────────────────────────────────────────────────
-
-function formatCountdown(expiresAt: string | null, expiredLabel: string): string {
-  if (!expiresAt) return '—';
-  const diff = new Date(expiresAt).getTime() - Date.now();
-  if (diff <= 0) return expiredLabel;
-  const totalSeconds = Math.floor(diff / 1000);
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  return `${String(h).padStart(2, '0')}h${String(m).padStart(2, '0')}min`;
-}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -162,8 +151,12 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   // Resend state
   const [resendingOffer, setResendingOffer] = useState(false);
 
-  // Countdown ticker
-  const [countdownLabel, setCountdownLabel] = useState('');
+  // Countdown ticker — refreshed every second via the shared helper.
+  const countdownLabel = useCountdown(request?.expiresAt ?? null, t('partner.offer.statusExpired'), 1000);
+  // ponytail: formatCountdown's own "—" placeholder is for callers with no
+  // guard; this screen always had a blank timer for a missing deadline, so
+  // override just the render text instead of changing the shared helper.
+  const countdownDisplay = request?.expiresAt ? countdownLabel : '';
 
   useEffect(() => {
     if (state === 'decline') setDeclineVisible(true);
@@ -231,15 +224,6 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  // Countdown ticker — refresh every second
-  useEffect(() => {
-    if (!request?.expiresAt) return;
-    const tick = () => setCountdownLabel(formatCountdown(request.expiresAt, t('partner.offer.statusExpired')));
-    tick();
-    const interval = setInterval(tick, 1000);
-    return () => clearInterval(interval);
-  }, [request?.expiresAt, t]);
 
   // ── Line helpers ───────────────────────────────────────────────────────────
 
@@ -507,7 +491,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                   color={countdownLabel === t('partner.offer.statusExpired') ? Colors.grayMidDark : Colors.noticeUnread}
                   translate={false}
                 >
-                  {countdownLabel}
+                  {countdownDisplay}
                 </Text>
                 <Text
                   type="small"

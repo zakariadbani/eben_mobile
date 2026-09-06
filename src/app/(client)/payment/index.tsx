@@ -14,6 +14,7 @@ import { getBasket } from '@/api/resources/basket';
 import { getAddresses } from '@/api/resources/addresses';
 import { placeOrder } from '@/api/resources/orders';
 import { getProfile } from '@/api/resources/users';
+import { useCart } from '@/context/CartContext';
 import type { Basket } from '@/interfaces/Basket';
 import type { Address } from '@/interfaces/Address';
 import type { PaymentMethodType } from '@/interfaces/Order';
@@ -32,6 +33,7 @@ function requestMessage(error: unknown, fallback: string): string {
 export default function CheckoutScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const { refresh: refreshCart } = useCart();
   const [basket, setBasket] = useState<Basket | null>(null);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
@@ -107,6 +109,7 @@ export default function CheckoutScreen() {
         paymentMethod: 'cod',
         notes: null,
       });
+      void refreshCart();
       router.replace({
         pathname: '/(client)/payment/success',
         params: {
@@ -119,7 +122,7 @@ export default function CheckoutScreen() {
       placingRef.current = false;
       setPlacing(false);
     }
-  }, [canSubmit, router, selectedAddressId, t]);
+  }, [canSubmit, refreshCart, router, selectedAddressId, t]);
 
   if (loading) {
     return <Screen><View style={styles.centered} flex><ActivityIndicator size="large" color={Colors.primary} /></View></Screen>;

@@ -9,7 +9,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { Href, useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import View from '@/components/common/View';
 import Screen from '@/components/common/Screen';
@@ -186,6 +186,25 @@ const ClientMenuScreen: React.FC = () => {
     },
 
     // ── Mentions légales ──────────────────────────────────────────────────────
+    {
+      type: 'header' as const,
+      title: t('settings.legalSection'),
+    },
+    {
+      icon: 'liste',
+      title: t('settings.terms'),
+      onPress: () => router.push({ pathname: '/(client)/settings/pages/Legal', params: { section: 'terms' } } as Href),
+    },
+    {
+      icon: 'logo',
+      title: t('settings.privacy'),
+      onPress: () => router.push({ pathname: '/(client)/settings/pages/Legal', params: { section: 'privacy' } } as Href),
+    },
+    {
+      icon: 'orders',
+      title: t('settings.returns'),
+      onPress: () => router.push({ pathname: '/(client)/settings/pages/Legal', params: { section: 'returns' } } as Href),
+    },
   ];
 
   const handleLogout = async () => {

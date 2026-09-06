@@ -14,6 +14,7 @@ import GoBack from "@/components/common/GoBack";
 import { Text } from "@/components/common/Text";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { useSession } from "@/context/AuthContext";
+import { CartProvider, useCart } from "@/context/CartContext";
 import { clientAuthHref } from "@/constants/clientReturnTo";
 
 // Minimal type alias so tabBarIcon/tabBarLabel callbacks are typed without
@@ -63,6 +64,10 @@ const TAB_BAR_STYLE = StyleSheet.create({
   },
   itemRtl: {
     transform: [{ scaleX: -1 }],
+  },
+  badge: {
+    backgroundColor: Colors.primary,
+    color: Colors.brand,
   },
 });
 
@@ -192,10 +197,11 @@ const ClientHomeHeader: React.FC = () => {
 // ---------------------------------------------------------------------------
 // Layout
 // ---------------------------------------------------------------------------
-export default function ClientLayout() {
+function ClientTabs() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === "ar";
   const { session } = useSession();
+  const { itemCount } = useCart();
   const router = useRouter();
   const [guestAuthVisible, setGuestAuthVisible] = useState(false);
 
@@ -324,12 +330,12 @@ export default function ClientLayout() {
       <Tabs.Screen
         name="categories/index"
         options={{
-          title: t("Chercher"),
+          title: t("Recherche"),
           tabBarIcon: ({ focused }: FocusedParam) => (
             <TabBarIcon name="search" focused={focused} />
           ),
           tabBarLabel: ({ focused }: FocusedParam) => (
-            <TabBarLabel focused={focused} label={t("Chercher")} />
+            <TabBarLabel focused={focused} label={t("Recherche")} />
           ),
           header: mainHeaderFn,
         }}
@@ -473,6 +479,8 @@ export default function ClientLayout() {
           tabBarLabel: ({ focused }: FocusedParam) => (
             <TabBarLabel focused={focused} label={t("Panier")} />
           ),
+          tabBarBadge: itemCount > 0 ? itemCount : undefined,
+          tabBarBadgeStyle: TAB_BAR_STYLE.badge,
         }}
       />
 
@@ -614,7 +622,7 @@ export default function ClientLayout() {
       />
       <Tabs.Screen
         name="settings/pages/Legal"
-        options={{ title: t("Termes et conditions"), tabBarButton: () => null, header: darkHeader }}
+        options={{ title: t("settings.terms"), tabBarButton: () => null, header: darkHeader }}
       />
       <Tabs.Screen
         name="settings/language/index"
@@ -652,5 +660,15 @@ export default function ClientLayout() {
         </View>
       </ConfirmModal>
     </>
+  );
+}
+
+// CartProvider must sit above ClientTabs so the Cart tab badge (useCart() in
+// ClientTabs) reads a shared basket instead of each screen keeping its own.
+export default function ClientLayout() {
+  return (
+    <CartProvider>
+      <ClientTabs />
+    </CartProvider>
   );
 }

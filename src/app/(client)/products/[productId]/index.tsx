@@ -350,7 +350,7 @@ const ProductDetailScreen: React.FC = () => {
   const displayWarranty = isArabic ? product.warrantyAr : product.warranty;
   const displayCategoryName = isArabic ? product.categoryNameAr : product.categoryName;
 
-  const hasPromo = product.promoPrice !== undefined && product.promoPrice !== null;
+  const hasPromo = product.promoPrice !== undefined && product.promoPrice !== null && product.promoPrice > 0;
   const activePrice = hasPromo ? product.promoPrice! : product.price;
 
   return (

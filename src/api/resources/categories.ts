@@ -16,7 +16,7 @@ function bustCategoryImage(cat: Category): Category {
       : img;
   return {
     ...cat,
-    image: busted,
+    ...(busted !== undefined ? { image: busted } : {}),
     children: cat.children ? cat.children.map(bustCategoryImage) : cat.children,
   };
 }

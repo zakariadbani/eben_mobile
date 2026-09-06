@@ -43,10 +43,10 @@ const priceBasket = (basket: Basket): Basket => {
     (sum, item) => sum + item.unitPrice * item.quantity,
     0,
   ));
-  const taxAmount = roundMoney((subtotal - basket.discountAmount + basket.shippingFee) * 0.2);
+  const taxable = Math.max(0, roundMoney(subtotal - basket.discountAmount + basket.shippingFee));
   basket.subtotal = subtotal;
-  basket.taxAmount = taxAmount;
-  basket.total = roundMoney(subtotal - basket.discountAmount + basket.shippingFee + taxAmount);
+  basket.taxAmount = roundMoney(taxable - taxable / 1.2);   // embedded VAT, informational
+  basket.total = taxable;                                    // subtotal − discount + shipping, all TTC
   return basket;
 };
 const one = <T>(data: T): ApiResponse<T> => ({ success: true, data });

@@ -12,6 +12,8 @@ import {
   getProductsByCategory,
   getRequests,
   getReviews,
+  getWishlist,
+  removeWishlistItem,
   searchAllPneumatics,
 } from "@/api";
 import { Role, useSession } from "@/context/AuthContext";
@@ -61,6 +63,8 @@ jest.mock("@/api", () => ({
   getProductsByCategory: jest.fn(),
   getRequests: jest.fn(),
   getReviews: jest.fn(),
+  getWishlist: jest.fn(),
+  removeWishlistItem: jest.fn(),
   searchAllPneumatics: jest.fn(),
 }));
 jest.mock("@/context/AuthContext", () => ({
@@ -77,6 +81,9 @@ const mockGetProduct = getProduct as jest.MockedFunction<typeof getProduct>;
 const mockGetReviews = getReviews as jest.MockedFunction<typeof getReviews>;
 const mockSearchAllPneumatics = searchAllPneumatics as jest.MockedFunction<typeof searchAllPneumatics>;
 const mockGetRequests = getRequests as jest.MockedFunction<typeof getRequests>;
+const mockGetWishlist = getWishlist as jest.MockedFunction<typeof getWishlist>;
+const mockAddToWishlist = addToWishlist as jest.MockedFunction<typeof addToWishlist>;
+const mockRemoveWishlistItem = removeWishlistItem as jest.MockedFunction<typeof removeWishlistItem>;
 
 const rootCategory = {
   id: 10,
@@ -133,6 +140,7 @@ beforeEach(async () => {
   mockGetReviews.mockResolvedValue({ success: true, data: [], pagination });
   mockSearchAllPneumatics.mockResolvedValue({ success: true, data: [], pagination });
   mockGetRequests.mockResolvedValue({ success: true, data: [], pagination });
+  mockGetWishlist.mockResolvedValue({ success: true, data: [], pagination });
 });
 
 it("loads public home catalog data without requesting private Client summaries for a guest", async () => {
@@ -210,6 +218,58 @@ it("keeps terminal requests out of the active Home carousel", async () => {
   expect(await screen.findByText(i18n.t("home.reference", { value: "REQ-ACTIVE" }))).toBeTruthy();
   expect(screen.queryByText(i18n.t("home.reference", { value: "REQ-ORDERED" }))).toBeNull();
   expect(screen.queryByText(i18n.t("home.reference", { value: "REQ-EXPIRED" }))).toBeNull();
+});
+
+it("shows a promo badge with the struck original price and fills every card sharing the tapped heart's category", async () => {
+  mockedUseSession.mockReturnValue({ role: Role.CLIENT } as ReturnType<typeof useSession>);
+  const productB = { ...product, id: 92, title: "Disques live", titleAr: "أقراص حية" };
+  mockGetProducts.mockResolvedValueOnce({
+    success: true,
+    data: [{ ...product, price: 100, promoPrice: 75 }, productB],
+    pagination,
+  });
+  mockAddToWishlist.mockResolvedValueOnce({
+    success: true,
+    data: { id: 501, userId: 1, categoryId: 12, pneumaticId: null, createdAt: "2026-01-01" },
+  });
+  mockRemoveWishlistItem.mockResolvedValueOnce({ success: true, data: { id: 501 } });
+
+  const screen = render(<HomeScreen />);
+  await screen.findAllByText("Plaquettes live");
+
+  expect(screen.getByText("-25%")).toBeTruthy();
+  expect(screen.getByText("100,00 Dhs")).toBeTruthy();
+
+  const hearts = screen.getAllByLabelText(i18n.t("Ajouter à la liste de souhaits"));
+  expect(hearts).toHaveLength(2);
+  fireEvent.press(hearts[0]);
+  await waitFor(() => expect(mockAddToWishlist).toHaveBeenCalledTimes(1));
+  expect(mockAddToWishlist).toHaveBeenCalledWith(91);
+
+  // Both cards share categoryId 12 (WishlistItem has no productId) — the
+  // wishlist entry fills every card in the category, not just the tapped one.
+  const filledHearts = await screen.findAllByLabelText(i18n.t("Retirer de la liste de souhaits"));
+  expect(filledHearts).toHaveLength(2);
+  expect(screen.queryAllByLabelText(i18n.t("Ajouter à la liste de souhaits"))).toHaveLength(0);
+
+  fireEvent.press(filledHearts[0]);
+  await waitFor(() => expect(mockRemoveWishlistItem).toHaveBeenCalledWith(501));
+  expect(await screen.findAllByLabelText(i18n.t("Ajouter à la liste de souhaits"))).toHaveLength(2);
+  expect(screen.queryAllByLabelText(i18n.t("Retirer de la liste de souhaits"))).toHaveLength(0);
+});
+
+it("renders the regular price when promoPrice is zero instead of a false discount", async () => {
+  mockedUseSession.mockReturnValue({ role: Role.CLIENT } as ReturnType<typeof useSession>);
+  mockGetProducts.mockResolvedValueOnce({
+    success: true,
+    data: [{ ...product, price: 100, promoPrice: 0 }],
+    pagination,
+  });
+
+  const screen = render(<HomeScreen />);
+
+  expect(await screen.findByText(i18n.t("home.price", { value: "100,00" }))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("home.price", { value: "0,00" }))).toBeNull();
 });
 
 it("renders category loading, live data, and retry after a failed read", async () => {

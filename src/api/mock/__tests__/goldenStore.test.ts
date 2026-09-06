@@ -72,12 +72,12 @@ describe('mock golden path', () => {
     const selectedIds = partnerOffers.map(({ id }) => id).sort((a, b) => a - b);
     const basket = await getBasket();
     expect(basket.data.items?.map(({ offerId }) => offerId).sort((a, b) => a - b)).toEqual(selectedIds);
-    expect(basket.data).toMatchObject({ subtotal: 268.24, taxAmount: 53.65, total: 321.89 });
+    expect(basket.data).toMatchObject({ subtotal: 268.24, taxAmount: 44.71, total: 268.24 });
     await expect(shipOffer(selectedIds[0]!, { trackingNumber: 'TOO-EARLY' }))
       .rejects.toThrow('Confirmed order item not found');
 
     const placed = await placeOrder({ addressId: 1, paymentMethod: 'cod' });
-    expect(placed.data).toMatchObject({ subtotal: 268.24, total: 321.89, status: 'confirmed' });
+    expect(placed.data).toMatchObject({ subtotal: 268.24, total: 268.24, status: 'confirmed' });
     expect((await getRequest(created.data.id)).data.status).toBe('ordered');
     expect((await getBasket()).data.items).toEqual([]);
 
@@ -193,6 +193,16 @@ describe('mock golden path', () => {
     expect((await removeBasketItem(item.id)).data.items?.some(({ id }) => id === item.id)).toBe(false);
     await expect(addToBasket(999999, 1)).rejects.toThrow('not found');
     await expect(getRequest(999999)).rejects.toThrow('not found');
+  });
+
+  it('prices a non-zero discount and shipping fee into total and rounded VAT consistently', async () => {
+    getMockState().basket.discountAmount = 20;
+    getMockState().basket.shippingFee = 15;
+    const added = await addToBasket(1002, 1);
+    const { subtotal, discountAmount, shippingFee, total, taxAmount } = added.data;
+    const taxable = Math.round((subtotal - discountAmount + shippingFee) * 100) / 100;
+    expect(total).toBe(taxable);
+    expect(taxAmount).toBe(Math.round((taxable - taxable / 1.2) * 100) / 100);
   });
 
   it('persists and confirms an owned withdrawal with boundary validation', async () => {

@@ -271,8 +271,28 @@ export default function CreateRequestScreen() {
           <View style={styles.details} gap={10}>
             <Text type="subTitle" semiBold>requestFlow.addedParts</Text>
             {draftItems.map((item) => (
-              <View key={item.categoryId} style={styles.summaryRow}>
-                <Text translate={false}>{isArabic ? item.titleAr : item.title}</Text>
+              <View key={item.categoryId} flexDirection="row" alignItems="center" gap={8} style={styles.summaryRow}>
+                <Text translate={false} flex>{isArabic ? item.titleAr : item.title}</Text>
+                <View flexDirection="row" alignItems="center" gap={4}>
+                  <TouchableOpacity
+                    style={[styles.stepBtn, item.quantity <= 1 && styles.stepBtnDisabled]}
+                    onPress={() => setDraftItems((current) => current.map((entry) => entry.categoryId === item.categoryId ? { ...entry, quantity: Math.max(1, entry.quantity - 1) } : entry))}
+                    disabled={item.quantity <= 1}
+                    accessibilityLabel={t("Diminuer la quantité")}
+                  >
+                    <Text semiBold translate={false}>−</Text>
+                  </TouchableOpacity>
+                  <View style={styles.qtyBox}>
+                    <Text semiBold center translate={false}>{String(item.quantity)}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.stepBtn}
+                    onPress={() => setDraftItems((current) => current.map((entry) => entry.categoryId === item.categoryId ? { ...entry, quantity: entry.quantity + 1 } : entry))}
+                    accessibilityLabel={t("Augmenter la quantité")}
+                  >
+                    <Text semiBold translate={false}>+</Text>
+                  </TouchableOpacity>
+                </View>
                 <Button title="requestFlow.removePart" fit variant="pink" onPress={() => setDraftItems((current) => current.filter((entry) => entry.categoryId !== item.categoryId))} />
               </View>
             ))}
@@ -308,6 +328,9 @@ const styles = StyleSheet.create({
   card: { padding: 14, borderRadius: 8, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderLight },
   details: { marginTop: 24 },
   summaryRow: { padding: 10, borderRadius: 8, backgroundColor: Colors.backgroundGray },
+  stepBtn: { width: 28, height: 28, borderRadius: 4, borderWidth: 1, borderColor: Colors.borderLight, backgroundColor: Colors.white, justifyContent: "center", alignItems: "center" },
+  stepBtnDisabled: { opacity: 0.4 },
+  qtyBox: { width: 32, height: 28, borderRadius: 4, borderWidth: 1, borderColor: Colors.borderLight, justifyContent: "center", alignItems: "center", backgroundColor: Colors.white },
   spacer: { height: 100 },
   sendBar: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 16, backgroundColor: Colors.white },
 });

@@ -83,6 +83,7 @@ const allowedRoutes: Record<AllowedRole, string[]> = {
     "(client)/settings/notifications/index",
     "(client)/settings/wishlist/index",
     "(client)/settings/pages/About",
+    "(client)/settings/pages/Legal",
     "(client)/settings/language/index",
   ],
 

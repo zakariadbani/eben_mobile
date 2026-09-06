@@ -35,93 +35,69 @@ import Button from '@/components/common/Button';
 const ORDER_STATUS_CONFIG: Record<
   OrderStatus,
   {
-    labelFr: string;
-    labelAr: string;
+    labelKey: string;
+    descKey: string;
+    ctaKey: string;
     color: string;
     background: string;
     icon: string;
-    descFr: string;
-    descAr: string;
-    ctaLabelFr: string;
-    ctaLabelAr: string;
   }
 > = {
   pending: {
-    labelFr: 'En attente',
-    labelAr: 'قيد الانتظار',
+    labelKey: 'settings.orders.status.pending.label',
+    descKey: 'settings.orders.status.pending.desc',
+    ctaKey: 'settings.orders.status.pending.cta',
     color: Colors.orange,
     background: '#FEF3C7',
     icon: 'credit-card',
-    descFr: 'Nous attendons le paiement',
-    descAr: 'نحن بانتظار الدفع',
-    ctaLabelFr: 'Payez',
-    ctaLabelAr: 'ادفع',
   },
   confirmed: {
-    labelFr: 'Confirmée',
-    labelAr: 'مؤكدة',
+    labelKey: 'settings.orders.status.confirmed.label',
+    descKey: 'settings.orders.status.confirmed.desc',
+    ctaKey: 'settings.orders.status.confirmed.cta',
     color: Colors.blue,
     background: '#DBEAFE',
     icon: 'check-circle',
-    descFr: 'Votre commande est en cours de traitement',
-    descAr: 'طلبك قيد المعالجة',
-    ctaLabelFr: "Suivi de l'ordre",
-    ctaLabelAr: 'تتبع الطلب',
   },
   processing: {
-    labelFr: 'En traitement',
-    labelAr: 'قيد المعالجة',
+    labelKey: 'settings.orders.status.processing.label',
+    descKey: 'settings.orders.status.processing.desc',
+    ctaKey: 'settings.orders.status.processing.cta',
     color: Colors.processMedium,
     background: '#EEF2FF',
     icon: 'package',
-    descFr: 'Votre commande est en cours de traitement',
-    descAr: 'طلبك قيد المعالجة',
-    ctaLabelFr: "Suivi de l'ordre",
-    ctaLabelAr: 'تتبع الطلب',
   },
   shipped: {
-    labelFr: 'En route',
-    labelAr: 'في الطريق',
+    labelKey: 'settings.orders.status.shipped.label',
+    descKey: 'settings.orders.status.shipped.desc',
+    ctaKey: 'settings.orders.status.shipped.cta',
     color: Colors.greenDark,
     background: Colors.green + '33',
     icon: 'truck',
-    descFr: 'Votre commande est en route',
-    descAr: 'طلبك في الطريق',
-    ctaLabelFr: "Suivi de l'ordre",
-    ctaLabelAr: 'تتبع الطلب',
   },
   delivered: {
-    labelFr: 'Livré',
-    labelAr: 'تم التسليم',
+    labelKey: 'settings.orders.status.delivered.label',
+    descKey: 'settings.orders.status.delivered.desc',
+    ctaKey: 'settings.orders.status.delivered.cta',
     color: Colors.greenDark,
     background: Colors.green + '33',
     icon: 'check-square',
-    descFr: 'Votre commande a été livrée',
-    descAr: 'تم تسليم طلبك',
-    ctaLabelFr: "Suivi de l'ordre",
-    ctaLabelAr: 'تتبع الطلب',
   },
   cancelled: {
-    labelFr: 'Annulée',
-    labelAr: 'ملغاة',
+    labelKey: 'settings.orders.status.cancelled.label',
+    descKey: 'settings.orders.status.cancelled.desc',
+    ctaKey: 'settings.orders.status.cancelled.cta',
     color: Colors.red,
     background: '#FEE2E2',
     icon: 'x-circle',
-    descFr: 'Votre commande a été annulée',
-    descAr: 'تم إلغاء طلبك',
-    ctaLabelFr: 'Détails',
-    ctaLabelAr: 'التفاصيل',
   },
   refunded: {
-    labelFr: 'Remboursée',
-    labelAr: 'مُستردة',
+    labelKey: 'settings.orders.status.refunded.label',
+    descKey: 'settings.orders.status.refunded.desc',
+    ctaKey: 'settings.orders.status.refunded.cta',
     color: Colors.grayMidDark,
     background: Colors.backgroundGray,
     icon: 'rotate-ccw',
-    descFr: 'Votre commande a été remboursée',
-    descAr: 'تم استرداد مبلغ طلبك',
-    ctaLabelFr: 'Détails',
-    ctaLabelAr: 'التفاصيل',
   },
 };
 
@@ -185,7 +161,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onPress }) => {
 
           {/* Status description */}
           <Text type="small" color={Colors.grayMidDark} translate={false}>
-            {isAr ? cfg.descAr : cfg.descFr}
+            {t(cfg.descKey)}
           </Text>
 
           {/* Date — green per Figma */}
@@ -197,13 +173,13 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onPress }) => {
           <View flexDirection="row" alignItems="center" justifyContent="space-between" style={isAr ? styles.rowRtl : undefined}>
             <View style={[styles.statusBadge, { backgroundColor: cfg.background }]}>
               <Text type="small" color={cfg.color} translate={false}>
-                {isAr ? cfg.labelAr : cfg.labelFr}
+                {t(cfg.labelKey)}
               </Text>
             </View>
             {/* Yellow CTA button bottom-right */}
             <TouchableOpacity onPress={onPress} style={styles.ctaBtn} activeOpacity={0.8}>
               <Text type="small" semiBold color={Colors.brand} translate={false}>
-                {isAr ? cfg.ctaLabelAr : cfg.ctaLabelFr}
+                {t(cfg.ctaKey)}
               </Text>
             </TouchableOpacity>
           </View>
@@ -486,7 +462,7 @@ const OrdersListScreen: React.FC = () => {
         </Text>
         {availableStatuses.map((status) => {
           const cfg = ORDER_STATUS_CONFIG[status];
-          const label = isAr ? cfg.labelAr : cfg.labelFr;
+          const label = t(cfg.labelKey);
           const checked = pendingStatuses.has(status);
           return (
             <TouchableOpacity

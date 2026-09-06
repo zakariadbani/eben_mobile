@@ -6,13 +6,17 @@
  * with a numbered ToC and full article text.
  */
 
-import React from "react";
+import React, { useEffect } from "react";
 import { StyleSheet } from "react-native";
+import { useLocalSearchParams } from "expo-router";
+import { useNavigation } from "@react-navigation/core";
+import { useTranslation } from "react-i18next";
 
 import Screen from "@/components/common/Screen";
 import { Text } from "@/components/common/Text";
 import View from "@/components/common/View";
 import Colors from "@/constants/Colors";
+import LegalUnavailableScreen from "@/components/screens/shared/LegalUnavailableScreen";
 
 // ─── Static legal content ────────────────────────────────────────────────────
 
@@ -29,7 +33,7 @@ const tocItems = [
   "10.Utilisation du site Web et des applications mobiles",
   "11.Propriété intellectuelle (Copyright) et marques déposées",
   "12.Confidentialité des données",
-  "13.Diligence raisonnable et droit d'audit du rôle de Jumia en tant que place de marché (Marketplace)",
+  "13.Diligence raisonnable et droit d'audit du rôle de EBEN en tant que place de marché (Marketplace)",
   "14.Limitations et exclusions de responsabilité",
   "15.Indemnisation",
   "16.Violation des présentes conditions générales",
@@ -45,15 +49,36 @@ const tocItems = [
   "26.Coordonnées de notre société et notifications",
 ];
 
-const intro = `1.1. "Jumia" est le nom commercial des sociétés du groupe Jumia énumérées à l'annexe 1. Chaque société du groupe Jumia ("Jumia" ou "nous") exploite une plateforme de commerce électronique composée d'un site web et d'une application mobile ("marketplace"), ainsi qu'une infrastructure de logistique, de traitement et de paiement, pour la vente et l'achat de produits de consommation et de services ("produits") sur le territoire qui lui est attribué, tel que défini à l'annexe 1 ("Territoire").
+const intro = `1.1. "EBEN" est le nom commercial des sociétés du groupe EBEN énumérées à l'annexe 1. Chaque société du groupe EBEN ("EBEN" ou "nous") exploite une plateforme de commerce électronique composée d'un site web et d'une application mobile ("marketplace"), ainsi qu'une infrastructure de logistique, de traitement et de paiement, pour la vente et l'achat de produits de consommation et de services ("produits") sur le territoire qui lui est attribué, tel que défini à l'annexe 1 ("Territoire").
 
 1.2. Ces Conditions Générales s'appliquent aux acheteurs et aux vendeurs sur la Marketplace et régissent leur utilisation de la Marketplace et de tous les services associés.
 
 1.3. En utilisant notre Marketplace, vous acceptez ces Conditions Générales dans leur intégralité. Si vous n'êtes pas d'accord avec ces Conditions Générales ou avec tout autre document auquel il est fait référence dans ces Conditions Générales, vous devez immédiatement cesser d'utiliser notre Marketplace.`;
 
+type LegalSection = "terms" | "privacy" | "returns";
+
+const SECTION_TITLE_KEYS: Record<LegalSection, string> = {
+  terms: "settings.terms",
+  privacy: "settings.privacy",
+  returns: "settings.returns",
+};
+
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 const LegalScreen: React.FC = () => {
+  const { section: rawSection } = useLocalSearchParams<{ section?: string }>();
+  const section: LegalSection = rawSection === "privacy" || rawSection === "returns" ? rawSection : "terms";
+  const navigation = useNavigation();
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    navigation.setOptions({ title: t(SECTION_TITLE_KEYS[section]) });
+  }, [navigation, section, t]);
+
+  if (section !== "terms") {
+    return <LegalUnavailableScreen />;
+  }
+
   return (
     <Screen scrollable>
       <View style={styles.content}>

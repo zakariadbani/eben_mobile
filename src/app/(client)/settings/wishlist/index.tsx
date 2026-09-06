@@ -6,9 +6,9 @@
  * the product/category detail on tap.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, View as RNView } from "react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import Screen from "@/components/common/Screen";
@@ -49,10 +49,15 @@ const WishlistScreen: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const removingIds = useRef(new Set<number>());
+  const hasItemsRef = useRef(false);
+  hasItemsRef.current = items.length > 0;
   const visibleItems = items;
 
   const load = useCallback(async () => {
-    setLoading(true);
+    // ponytail: skip the spinner on refocus when items are already showing
+    // (mirrors cart/index.tsx) — refresh silently instead of flashing the
+    // spinner over data we already have.
+    if (!hasItemsRef.current) setLoading(true);
     setError(null);
     try {
       const res = await getWishlist();
@@ -64,9 +69,11 @@ const WishlistScreen: React.FC = () => {
     }
   }, [t]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   const handleRemove = useCallback(async (wishlistItemId: number) => {
     if (removingIds.current.has(wishlistItemId)) return;

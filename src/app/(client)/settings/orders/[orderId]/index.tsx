@@ -39,19 +39,6 @@ function stepIndexForStatus(status: OrderStatus): number {
   return map[status] ?? 0;
 }
 
-// ── Payment method label ─────────────────────────────────────────────────────
-
-function paymentMethodLabel(method: Order['paymentMethod'], isAr: boolean): string {
-  const map: Record<Order['paymentMethod'], { fr: string; ar: string }> = {
-    cod: { fr: 'Paiement à la livraison', ar: 'الدفع عند التسليم' },
-    visa: { fr: 'Carte bancaire', ar: 'بطاقة بنكية' },
-    virement: { fr: 'Virement bancaire', ar: 'تحويل بنكي' },
-    cache_plus: { fr: 'Cash Plus', ar: 'كاش بلس' },
-    balance: { fr: 'Solde portefeuille', ar: 'رصيد المحفظة' },
-  };
-  return (isAr ? map[method]?.ar : map[method]?.fr) ?? method;
-}
-
 // ── Item row ─────────────────────────────────────────────────────────────────
 
 interface OrderItemRowProps {
@@ -274,7 +261,7 @@ const OrderDetailScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
               <Text type="small" color={Colors.grayMidDark} translate={false}>
-                {t('settings.orders.method', { method: paymentMethodLabel(order.paymentMethod, isAr) })}
+                {t('settings.orders.method', { method: t(`settings.orders.paymentMethod.${order.paymentMethod}`) })}
               </Text>
               <Text type="small" color={Colors.grayMidDark} translate={false}>
                 {t('settings.orders.reference', { reference: order.reference })}

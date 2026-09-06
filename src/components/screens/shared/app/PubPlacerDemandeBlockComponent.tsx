@@ -1,10 +1,8 @@
 import React from "react";
 import { StyleSheet, ImageBackground } from "react-native";
-import { useRouter } from "expo-router";
 import Colors from "@/constants/Colors";
 import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
-import Button from "@/components/common/Button";
 import CustomIcon from "@/components/common/CustomIcon";
 
 // ponytail: originals are ~7 MB each — no resize tool installed; downscale when sharp/jimp is added
@@ -22,14 +20,14 @@ const BG_IMAGE = require("@/assets/img/imagePub.jpeg");
  *
  * NOTE: Background image asset `src/assets/images/backgrounds/pub-placer-demande.jpg`
  * is not yet in the asset folder. Using Colors.brand as placeholder.
+ *
+ * The CTA below is decorative only (plain View + Text, not a Button/pressable):
+ * every call site wraps this whole block in its own TouchableOpacity with
+ * pointerEvents="none" on the inner content, so a nested pressable here was
+ * both dead (touches never reached it) and caused a
+ * "<button> cannot appear as a descendant of <button>" warning on web.
  */
 const PubPlacerDemandeBlockComponent: React.FC = () => {
-  const router = useRouter();
-
-  const handlePress = () => {
-    router.push("/(client)/requests/CreateRequestScreen" as never);
-  };
-
   return (
     <View style={styles.container}>
       <ImageBackground source={BG_IMAGE} style={styles.card} imageStyle={styles.cardImage}>
@@ -43,12 +41,11 @@ const PubPlacerDemandeBlockComponent: React.FC = () => {
         <Text type="text" style={styles.subtitle}>
           catalog.requestPromo.body
         </Text>
-        <Button
-          title="Placer une demande"
-          variant="primary"
-          onPress={handlePress}
-          style={styles.ctaButton}
-        />
+        <View style={styles.ctaButton} flexDirection="row" alignItems="center" justifyContent="center">
+          <Text type="defaultTwo" semiBold style={styles.ctaButtonText}>
+            Placer une demande
+          </Text>
+        </View>
       </ImageBackground>
     </View>
   );
@@ -84,7 +81,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   ctaButton: {
-    // full width is default
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary,
+    width: "100%",
+    paddingVertical: 10,
+  },
+  ctaButtonText: {
+    marginHorizontal: 8,
+    color: Colors.brand,
   },
 });
 

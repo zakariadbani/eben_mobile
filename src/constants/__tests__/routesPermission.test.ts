@@ -10,11 +10,12 @@ describe("route permissions", () => {
     ["guest profile edit", undefined, "(client)/settings/profile/index"],
     ["guest request list", undefined, "(client)/requests/index"],
     ["guest cart", undefined, "(client)/cart/index"],
+    ["guest legal", undefined, "(client)/settings/pages/Legal"],
     ["guest unavailable legal", undefined, "(auth)/legal"],
     ["guest unavailable waitlist", undefined, "(auth)/prestataire/waitlist"],
-    ["client unapproved legal", "client" as const, "(client)/settings/pages/Legal"],
     ["client", "client" as const, "(prestataire)/dashboard"],
     ["prestataire", "prestataire" as const, "(client)/settings/index"],
+    ["prestataire legal", "prestataire" as const, "(client)/settings/pages/Legal"],
     ["prestataire preview", "prestataire" as const, "(client)/index"],
   ])("denies %s access to %s", (_name, role, route) => {
     expect(canAccessRoute(route, role)).toBe(false);
@@ -40,6 +41,7 @@ describe("route permissions", () => {
     expect(canAccessRoute("(client)/settings/index", "client")).toBe(true);
     expect(canAccessRoute("(client)/settings", "client")).toBe(true);
     expect(canAccessRoute("(client)/requests/[requestId]", "client")).toBe(true);
+    expect(canAccessRoute("(client)/settings/pages/Legal", "client")).toBe(true);
     expect(canAccessRoute("(auth)/prestataire/forgot-password")).toBe(true);
     expect(
       canAccessRoute("(prestataire)/dashboard", "prestataire"),

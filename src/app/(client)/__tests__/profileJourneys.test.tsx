@@ -15,6 +15,7 @@ import NotificationsScreen from '../settings/notifications';
 import WishlistScreen from '../settings/wishlist';
 import PaymentScreen from '../settings/payment';
 import OrderDetailScreen from '../settings/orders/[orderId]';
+import OrdersListScreen from '../settings/orders';
 import { getAddresses } from '@/api/resources/addresses';
 import { getNotifications } from '@/api/resources/notifications';
 import { getOrders } from '@/api/resources/orders';
@@ -205,6 +206,32 @@ it('cancels an owned pending order only after confirmation and renders the retur
   const arabicScreen = render(<OrderDetailScreen />);
   expect(await arabicScreen.findByText(i18n.t('settings.orders.step.cod'))).toBeTruthy();
   expect(arabicScreen.queryByText(i18n.t('settings.orders.step.paid'))).toBeNull();
+});
+
+it('renders order status copy through the shared i18n namespace in French and Arabic', async () => {
+  const deliveredOrder = {
+    id: 91, reference: 'ORD-91', userId: 5, addressId: 9, couponId: null,
+    subtotal: 100, discountAmount: 0, shippingFee: 10, taxAmount: 20, total: 130,
+    status: 'delivered', paymentMethod: 'cod', paymentStatus: 'completed', notes: null,
+    confirmedBy: null, confirmedAt: null, createdAt: '2026-01-01', updatedAt: '2026-01-01', items: [],
+  } as const;
+  mockGet.mockResolvedValueOnce({ success: true, data: [deliveredOrder], pagination });
+  const screen = render(<OrdersListScreen />);
+  expect(await screen.findByText(i18n.t('settings.orders.status.delivered.label'))).toBeTruthy();
+  screen.unmount();
+
+  await i18n.changeLanguage('ar');
+  mockGet.mockResolvedValueOnce({ success: true, data: [deliveredOrder], pagination });
+  const arabicScreen = render(<OrdersListScreen />);
+  expect(await arabicScreen.findByText(i18n.t('settings.orders.status.delivered.label'))).toBeTruthy();
+});
+
+it('keeps the settings.orders.* namespace in parity between French and Arabic', () => {
+  const frTranslations = require('@/localization/fr.json') as Record<string, unknown>;
+  const arTranslations = require('@/localization/ar.json') as Record<string, unknown>;
+  const ordersKeys = (json: Record<string, unknown>) =>
+    Object.keys(json).filter((key) => key.startsWith('settings.orders.')).sort();
+  expect(ordersKeys(frTranslations)).toEqual(ordersKeys(arTranslations));
 });
 
 it('renders the Arabic settings journey from canonical profile data and localized row labels', async () => {

@@ -11,9 +11,10 @@ import TextInput from '@/components/common/TextInput';
 import EmptyListComponent from '@/components/screens/shared/app/EmptyListComponent';
 import ItemBasketComponent from '@/components/screens/shared/app/ItemBasketComponent';
 import { applyCoupon, getBasket, getRequest, removeBasketItem, updateBasketItem } from '@/api';
-import type { Basket, BasketItem } from '@/interfaces/Basket';
+import type { BasketItem } from '@/interfaces/Basket';
 import Colors from '@/constants/Colors';
 import { useConfirmation } from '@/context/ConfirmationContext';
+import { useCart } from '@/context/CartContext';
 
 function formatPrice(amount: number): string {
   return `${amount.toLocaleString('fr-MA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Dhs`;
@@ -23,8 +24,8 @@ const CartScreen: React.FC = () => {
   const router = useRouter();
   const { t, i18n } = useTranslation();
   const { showConfirmation } = useConfirmation();
-  const [basket, setBasket] = useState<Basket | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { basket, setBasket } = useCart();
+  const [loading, setLoading] = useState(() => !basket);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
   const [mutationError, setMutationError] = useState<string | null>(null);
@@ -33,23 +34,29 @@ const CartScreen: React.FC = () => {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponSuccess, setCouponSuccess] = useState(false);
-  const [remainingParts, setRemainingParts] = useState(0);
+  const [remainingParts, setRemainingParts] = useState<string[]>([]);
+  const [showRemaining, setShowRemaining] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
   const activeItems = useRef(new Set<number>());
   const couponActive = useRef(false);
+  const hasBasketRef = useRef(!!basket);
+  hasBasketRef.current = !!basket;
   const isArabic = i18n.language === 'ar';
 
   useFocusEffect(useCallback(() => {
     void retryKey; // Retry invalidates this focus callback.
     let mounted = true;
-    setLoading(true);
+    // ponytail: skip the spinner on refocus when a basket is already in context
+    // (e.g. right after accept() called setBasket) — refresh silently instead
+    // of flashing the spinner over data we already have.
+    if (!hasBasketRef.current) setLoading(true);
     setLoadError(null);
     getBasket()
       .then(({ data }) => { if (mounted) setBasket(data); })
       .catch(() => { if (mounted) setLoadError(t('Une erreur est survenue. Veuillez réessayer.')); })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
-  }, [retryKey, t]));
+  }, [retryKey, setBasket, t]));
 
   const updateQuantity = useCallback(async (item: BasketItem, quantity: number) => {
     if (quantity < 1 || activeItems.current.has(item.id)) return;
@@ -63,7 +70,7 @@ const CartScreen: React.FC = () => {
     } finally {
       activeItems.current.delete(item.id);
     }
-  }, [t]);
+  }, [setBasket, t]);
 
   const removeItem = useCallback((item: BasketItem) => {
     showConfirmation('', '', () => {
@@ -75,7 +82,7 @@ const CartScreen: React.FC = () => {
         .catch(() => setMutationError(t('Une erreur est survenue. Veuillez réessayer.')))
         .finally(() => activeItems.current.delete(item.id));
     });
-  }, [showConfirmation, t]);
+  }, [setBasket, showConfirmation, t]);
 
   const applyCode = useCallback(async () => {
     const code = couponCode.trim();
@@ -100,10 +107,11 @@ const CartScreen: React.FC = () => {
       couponActive.current = false;
       setCouponApplying(false);
     }
-  }, [couponCode, t]);
+  }, [couponCode, setBasket, t]);
 
   const continueToPayment = useCallback(() => {
-    setRemainingParts(0);
+    setShowRemaining(false);
+    setRemainingParts([]);
     router.push('/(client)/payment' as Href);
   }, [router]);
 
@@ -119,9 +127,11 @@ const CartScreen: React.FC = () => {
       const response = await getRequest(basket.requestId);
       if (!response.data.items) throw new Error('Request items unavailable');
       const selectedCategoryIds = new Set((basket.items ?? []).map((item) => item.categoryId));
-      const missingCount = response.data.items.filter((item) => !selectedCategoryIds.has(item.categoryId)).length;
-      if (missingCount > 0) {
-        setRemainingParts(missingCount);
+      const missing = response.data.items.filter((item) => !selectedCategoryIds.has(item.categoryId));
+      if (missing.length > 0) {
+        const names = missing.map((requestItem) => (isArabic && requestItem.categoryTitleAr ? requestItem.categoryTitleAr : requestItem.categoryTitle) ?? '').filter(Boolean);
+        setRemainingParts(Array.from(new Set(names)));
+        setShowRemaining(true);
       } else {
         continueToPayment();
       }
@@ -130,7 +140,7 @@ const CartScreen: React.FC = () => {
     } finally {
       setCheckingOut(false);
     }
-  }, [basket, checkingOut, continueToPayment, t]);
+  }, [basket, checkingOut, continueToPayment, isArabic, t]);
 
   if (loading) return <View flex style={styles.centered}><ActivityIndicator size="large" color={Colors.primary} /></View>;
   if (loadError) return <View flex style={styles.centered} gap={16}>
@@ -157,7 +167,6 @@ const CartScreen: React.FC = () => {
             image: item.categoryImage,
             unitPrice: item.unitPrice,
             quantity: item.quantity,
-            expiryLabel: t('Expirera dans 23h'),
           }}
           onIncrement={() => { void updateQuantity(item, item.quantity + 1); }}
           onDecrement={() => { void updateQuantity(item, item.quantity - 1); }}
@@ -175,7 +184,7 @@ const CartScreen: React.FC = () => {
       <Summary label="Sous-total des articles TTC" value={basket?.subtotal ?? 0} testID="basket-subtotal" />
       <Summary label="Réduction" value={basket?.discountAmount ?? 0} testID="basket-discount" negative />
       <Summary label="Frais de livraison" value={basket?.shippingFee ?? 0} testID="basket-shipping" />
-      <Summary label="TVA 20%" value={basket?.taxAmount ?? 0} testID="basket-tax" />
+      <Summary label="Dont TVA (20%)" value={basket?.taxAmount ?? 0} testID="basket-tax" />
       <View style={styles.divider} />
       <Summary label="Total" value={basket?.total ?? 0} testID="basket-total" total />
       <Button title={checkingOut ? t('commerce.cart.checking') : "Caisse de sortie"} onPress={() => { void checkout(); }} variant="primary" disabled={checkingOut} />
@@ -184,14 +193,20 @@ const CartScreen: React.FC = () => {
       <Text type="loginSubTitle" center>{t('Réduction appliquée')} : {formatPrice(couponDiscount)}</Text>
     </CustomModal>
     <CustomModal
-      visible={remainingParts > 0}
+      visible={showRemaining}
       title={t('commerce.cart.remainingPartsTitle')}
-      onClose={() => setRemainingParts(0)}
+      onClose={() => { setShowRemaining(false); setRemainingParts([]); }}
       primaryButton={{
+        title: t('commerce.cart.checkoutAnyway'),
+        onPress: continueToPayment,
+      }}
+      secondaryButton={{
         title: t('commerce.cart.continueShopping'),
+        variant: 'white',
         onPress: () => {
           const requestId = basket?.requestId;
-          setRemainingParts(0);
+          setShowRemaining(false);
+          setRemainingParts([]);
           if (requestId !== null && requestId !== undefined) {
             router.push({
               pathname: '/(client)/requests/[requestId]',
@@ -200,9 +215,9 @@ const CartScreen: React.FC = () => {
           }
         },
       }}
-      secondaryButton={{ title: t('commerce.cart.checkoutAnyway'), variant: 'white', onPress: continueToPayment }}
     >
-      <Text center>{t('commerce.cart.remainingPartsBody', { count: remainingParts })}</Text>
+      <Text center>{t('commerce.cart.remainingPartsBody')}</Text>
+      {remainingParts.length > 0 && <Text center>{t('commerce.cart.remainingPartsOffers', { names: remainingParts.join(', ') })}</Text>}
     </CustomModal>
   </View>;
 };

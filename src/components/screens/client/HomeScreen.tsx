@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -13,8 +13,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Href, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 
-import { getCategories, getCategoryTree, getProducts, getRequests } from "@/api";
+import { addToWishlist, getCategories, getCategoryTree, getProducts, getRequests, getWishlist, removeWishlistItem } from "@/api";
 import CustomIcon from "@/components/common/CustomIcon";
+import Icon from "@/components/common/Icon";
 import Screen from "@/components/common/Screen";
 import { Text } from "@/components/common/Text";
 import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
@@ -47,6 +48,10 @@ const HomeScreen: React.FC = () => {
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
   const [requests, setRequests] = useState<RequestSummary[]>([]);
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
+  // ponytail: hearts are category-scoped by contract (WishlistItem has no productId);
+  // per-product hearts need contract addition #13 — see structure/planning/figma-gaps-roadmap-mobile.md
+  const [wishlistMap, setWishlistMap] = useState<Map<number, number>>(new Map()); // categoryId -> wishlistItemId
+  const wishlistMutationRef = useRef(false);
   const push = (href: Href) => router.push(href);
 
   const requireClient = (href: string) => {
@@ -79,11 +84,53 @@ const HomeScreen: React.FC = () => {
           .filter((request) => ['pending', 'offers_received', 'validated'].includes(request.status))
           .slice(0, 2) ?? [],
       );
+      if (role === Role.CLIENT) {
+        try {
+          const wishlist = await getWishlist();
+          const seeded = new Map<number, number>();
+          for (const item of wishlist.data) {
+            if (item.categoryId !== null) seeded.set(item.categoryId, item.id);
+          }
+          setWishlistMap(seeded);
+        } catch {
+          // ponytail: seeding is best-effort — hearts just start empty on failure.
+        }
+      }
       setState("ready");
     } catch {
       setState("error");
     }
   }, [role]);
+
+  const handleWishlist = async (product: Product) => {
+    if (role !== Role.CLIENT) {
+      requireClient(`/(client)/products/${product.id}`);
+      return;
+    }
+    if (wishlistMutationRef.current) return;
+    wishlistMutationRef.current = true;
+    try {
+      const existingId = wishlistMap.get(product.categoryId);
+      if (existingId !== undefined) {
+        const response = await removeWishlistItem(existingId);
+        if (response.data.id === existingId) {
+          setWishlistMap((prev) => {
+            const next = new Map(prev);
+            next.delete(product.categoryId);
+            return next;
+          });
+        }
+      } else {
+        const response = await addToWishlist(product.id);
+        setWishlistMap((prev) => new Map(prev).set(product.categoryId, response.data.id));
+      }
+    } catch {
+      // ponytail: silent — Home heart is a quick-toggle convenience; the product page
+      // surfaces the same action with a visible error and retry path.
+    } finally {
+      wishlistMutationRef.current = false;
+    }
+  };
 
   useEffect(() => { void load(); }, [load]);
 
@@ -104,7 +151,7 @@ const HomeScreen: React.FC = () => {
     </View>
   );
 
-  const categoryCard = (category: Category, index: number) => {
+  const categoryCard = (category: Category) => {
     const source: ImageSourcePropType | undefined =
       typeof category.image === "string"
         ? { uri: category.image }
@@ -123,7 +170,7 @@ const HomeScreen: React.FC = () => {
           semiBold
           center
           numberOfLines={1}
-          style={[styles.categoryTitle, index === 0 && styles.uppercase]}
+          style={[styles.categoryTitle, styles.uppercase]}
           translate={false}
         >
           {isArabic ? category.titleAr : category.title}
@@ -170,7 +217,11 @@ const HomeScreen: React.FC = () => {
     );
   };
 
-  const productCard = (product: Product, recent = false) => (
+  const productCard = (product: Product, recent = false) => {
+    const promoPrice = product.promoPrice;
+    const hasPromo = promoPrice != null && promoPrice > 0 && promoPrice < product.price && product.price > 0;
+    const isWishlisted = wishlistMap.has(product.categoryId);
+    return (
     <TouchableOpacity
       key={product.id}
       onPress={() => push({ pathname: "/(client)/products/[productId]", params: { productId: String(product.id) } })}
@@ -178,7 +229,21 @@ const HomeScreen: React.FC = () => {
       accessibilityRole="button"
       accessibilityLabel={isArabic ? product.titleAr : product.title}
     >
-      {!recent ? <Text translate={false} style={styles.heart}>♡</Text> : null}
+      {!recent ? (
+        <TouchableOpacity
+          onPress={() => void handleWishlist(product)}
+          style={styles.heart}
+          accessibilityRole="button"
+          accessibilityLabel={t(isWishlisted ? "Retirer de la liste de souhaits" : "Ajouter à la liste de souhaits")}
+        >
+          <Icon
+            name={isWishlisted ? "heart" : "heart-o"}
+            type="FontAwesome"
+            size={24}
+            iconColor={isWishlisted ? Colors.primary : Colors.brand}
+          />
+        </TouchableOpacity>
+      ) : null}
       <Image
         source={product.images[0] ? { uri: product.images[0] } : fallbackProductImage}
         style={styles.productImage}
@@ -202,9 +267,21 @@ const HomeScreen: React.FC = () => {
         </View>
       ) : (
         <View style={styles.priceBlock}>
+          {hasPromo ? (
+            <View style={styles.promoRow}>
+              <Text type="small" style={styles.originalPrice} translate={false}>
+                {`${product.price.toLocaleString("fr-MA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Dhs`}
+              </Text>
+              <View style={styles.promoBadge}>
+                <Text type="small" color={Colors.white} translate={false}>
+                  {`-${Math.round((1 - promoPrice! / product.price) * 100)}%`}
+                </Text>
+              </View>
+            </View>
+          ) : null}
           <Text type="defaultTwo" semiBold center style={styles.price}>
             {t("home.price", {
-              value: (product.promoPrice ?? product.price).toLocaleString("fr-MA", {
+              value: (hasPromo ? promoPrice! : product.price).toLocaleString("fr-MA", {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               }),
@@ -214,7 +291,8 @@ const HomeScreen: React.FC = () => {
         </View>
       )}
     </TouchableOpacity>
-  );
+    );
+  };
 
   const productSlider = (products: Product[], recent = false) => (
     products.length === 0 ? <EmptyListComponent title={t("wishlist.empty")} /> : (
@@ -343,13 +421,16 @@ const styles = StyleSheet.create({
   stockSection: { marginBottom: 38 },
   productCard: { width: 145, height: 246, borderRadius: 6, backgroundColor: Colors.white, paddingHorizontal: 8, paddingTop: 8, paddingBottom: 8, shadowColor: Colors.gray, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.16, shadowRadius: 8, elevation: 4 },
   recentCard: { height: 246 },
-  heart: { position: "absolute", zIndex: 1, top: 5, right: 7, fontSize: 31, lineHeight: 33, color: Colors.brand },
+  heart: { position: "absolute", zIndex: 1, top: 5, right: 7, padding: 4 },
   productImage: { width: "100%", height: 82 },
   productInfo: { alignItems: "center" },
   article: { color: Colors.greyLight2, fontSize: 11, lineHeight: 15 },
   productCategory: { color: "#8C8C8C", fontSize: 12, lineHeight: 16, marginTop: 2 },
   productTitle: { color: Colors.grayDark, fontSize: 13, lineHeight: 17, marginTop: 7 },
   priceBlock: { marginTop: "auto" },
+  promoRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
+  originalPrice: { textDecorationLine: "line-through", color: Colors.gray },
+  promoBadge: { backgroundColor: Colors.greenDark, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   price: { fontSize: 16, lineHeight: 20 },
   shipping: { color: Colors.grayMidDark, fontSize: 10 },
   listButton: { marginTop: "auto", minHeight: 25, borderRadius: 3, backgroundColor: Colors.primary, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
