@@ -147,16 +147,16 @@ export default function CompanyScreen(): React.ReactElement {
     </CustomHeader>
   );
 
-  if (loading) return <Screen whatsapp={false}>{header}<View flex alignItems="center" justifyContent="center"><ActivityIndicator color={Colors.primary} size="large" /></View></Screen>;
+  if (loading) return <Screen whatsapp={false} edges={['bottom']}>{header}<View flex alignItems="center" justifyContent="center"><ActivityIndicator color={Colors.primary} size="large" /></View></Screen>;
   if (error || !company) return (
-    <Screen whatsapp={false}>{header}<View flex alignItems="center" justifyContent="center" p={24}>
+    <Screen whatsapp={false} edges={['bottom']}>{header}<View flex alignItems="center" justifyContent="center" p={24}>
       <Text type="label" color={Colors.grayMidDark} center>{t('partner.company.loadError')}</Text>
       <Button title={t('partner.company.retry')} onPress={() => { void load(); }} style={styles.retry} />
     </View></Screen>
   );
 
   return (
-    <Screen whatsapp scrollable={false}>
+    <Screen whatsapp scrollable={false} edges={['bottom']}>
       {header}
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <SectionCard title={t('partner.company.sectionAddress')} supportLabel={t('partner.company.modifyRequest')} onSupport={() => showSupport(t('partner.company.sectionAddress'))}>

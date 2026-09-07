@@ -8,16 +8,23 @@ import { Text } from "@/components/common/Text";
 import Button from "@/components/common/Button";
 import Colors from "@/constants/Colors";
 import { getRequests } from "@/api/resources/requests";
+import { Role, useSession } from "@/context/AuthContext";
+import { useRequestDraft } from "@/context/RequestDraftContext";
+import { clientAuthHref } from "@/constants/clientReturnTo";
 import type { RequestSummary } from "@/interfaces/Request";
 
 export default function RequestListScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const { role } = useSession();
+  const isGuest = role !== Role.CLIENT;
+  const { items: draftItems } = useRequestDraft();
+  const [state, setState] = useState<"loading" | "ready" | "error">(isGuest ? "ready" : "loading");
   const [requests, setRequests] = useState<RequestSummary[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (refresh = false) => {
+    if (isGuest) { setState("ready"); return; }
     if (refresh) setRefreshing(true); else setState("loading");
     try {
       const response = await getRequests();
@@ -28,9 +35,36 @@ export default function RequestListScreen() {
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [isGuest]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const draftBanner = draftItems.length > 0 ? (
+    <TouchableOpacity
+      accessibilityRole="button"
+      style={styles.draftBanner}
+      onPress={() => router.push("/(client)/requests/CreateRequestScreen" as Href)}
+    >
+      <Text semiBold>{t("requestFlow.draftBanner", { count: draftItems.length })}</Text>
+    </TouchableOpacity>
+  ) : null;
+
+  if (isGuest) {
+    return (
+      <Screen padding whatsapp={false}>
+        <View flex gap={16}>
+          {draftBanner}
+          <View flex style={styles.centered} gap={12}>
+            <Text center semiBold>requestFlow.requestsTitle</Text>
+            <Button
+              title="guestAuth.signIn"
+              onPress={() => router.push(clientAuthHref("/(auth)/ClientLoginScreen", "/(client)/requests"))}
+            />
+          </View>
+        </View>
+      </Screen>
+    );
+  }
 
   if (state === "loading") {
     return <Screen whatsapp={false}><View flex style={styles.centered}><ActivityIndicator color={Colors.primary} /></View></Screen>;
@@ -42,6 +76,7 @@ export default function RequestListScreen() {
   return (
     <Screen whatsapp={false}>
       <View style={styles.container}>
+        {draftBanner}
         <View flexDirection="row" alignItems="center" justifyContent="space-between" style={styles.header}>
           <Text type="headerTitle" semiBold>requestFlow.requestsTitle</Text>
           <Button title="requestFlow.create" fit onPress={() => router.push("/(client)/requests/CreateRequestScreen" as Href)} />
@@ -86,6 +121,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
   centered: { justifyContent: "center", alignItems: "center" },
   header: { marginBottom: 16, gap: 10 },
+  draftBanner: { padding: 14, marginBottom: 16, borderRadius: 8, backgroundColor: Colors.primary },
   list: { paddingBottom: 24 },
   emptyList: { flexGrow: 1, justifyContent: "center" },
   card: { padding: 14, marginBottom: 10, borderRadius: 8, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderLight },

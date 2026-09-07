@@ -16,6 +16,7 @@ import {
 } from "@/constants/routesPermission";
 import { ConfirmationProvider } from "@/context/ConfirmationContext";
 import { getClientReturnTo } from "@/constants/clientReturnTo";
+import { useInAppUpdate } from "@/hooks/useInAppUpdate";
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
@@ -30,6 +31,7 @@ export default function RootLayout() {
 }
 
 function RootLayoutContent() {
+  useInAppUpdate();
 
   // Load fonts
   // Font files present in src/assets/fonts/:

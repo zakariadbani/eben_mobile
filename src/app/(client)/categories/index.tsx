@@ -10,7 +10,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, Image, StyleSheet, TouchableOpacity, View as RNView } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import type { Href } from "expo-router";
 import { useTranslation } from "react-i18next";
 
@@ -21,17 +21,15 @@ import PubPlacerDemandeBlockComponent from "@/components/screens/shared/app/PubP
 import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
 import Colors from "@/constants/Colors";
 import { getCategories } from "@/api";
-import { Role, useSession } from "@/context/AuthContext";
-import { clientAuthHref } from "@/constants/clientReturnTo";
 import type { Category } from "@/interfaces/Category";
 import type { CategoryProps } from "@/interfaces/Category";
 
 /** The two browse modes driven by the condition selector. */
 export type BrowseCondition = "occasion" | "en_stock";
 
-const CONDITIONS: { key: BrowseCondition; labelFr: string }[] = [
-  { key: "occasion", labelFr: "Occasion" },
-  { key: "en_stock", labelFr: "En stock" },
+const CONDITIONS: { key: BrowseCondition; labelKey: string }[] = [
+  { key: "occasion", labelKey: "Occasion" },
+  { key: "en_stock", labelKey: "En stock" },
 ];
 
 /**
@@ -51,11 +49,21 @@ function toCategoryProps(cat: Category): CategoryProps {
 const CategoriesListScreen: React.FC = () => {
   const router = useRouter();
   const { t, i18n } = useTranslation();
-  const { role } = useSession();
+  const params = useLocalSearchParams<{ condition?: string }>();
 
-  const [condition, setCondition] = useState<BrowseCondition>("occasion");
+  const [condition, setCondition] = useState<BrowseCondition>(
+    params.condition === "en_stock" ? "en_stock" : "occasion",
+  );
   const [categories, setCategories] = useState<Category[]>([]);
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
+
+  // Seed/re-sync the toggle when a Home entry point carries an explicit
+  // condition param; a tab re-press with no params keeps the current toggle.
+  useEffect(() => {
+    if (params.condition === "en_stock" || params.condition === "occasion") {
+      setCondition(params.condition);
+    }
+  }, [params.condition]);
 
   const load = useCallback(async () => {
     setState("loading");
@@ -81,11 +89,9 @@ const CategoriesListScreen: React.FC = () => {
   };
 
   const handleRequestBanner = () => {
-    router.push((
-      role === Role.CLIENT
-        ? "/(client)/requests/CreateRequestScreen"
-        : clientAuthHref("/(auth)/ClientLoginScreen", "/(client)/requests/CreateRequestScreen")
-    ) as Href);
+    // CreateRequestScreen is public — guests build the draft locally and are
+    // only asked to log in at send, so this pushes directly for everyone.
+    router.push("/(client)/requests/CreateRequestScreen" as Href);
   };
 
   const renderItem = ({ item }: { item: Category }) => {
@@ -116,7 +122,7 @@ const CategoriesListScreen: React.FC = () => {
 
         {/* ── Condition selector (segmented toggle) ──────────── */}
         <View flexDirection="row" style={styles.toggleRow} gap={8}>
-          {CONDITIONS.map(({ key, labelFr }) => {
+          {CONDITIONS.map(({ key, labelKey }) => {
             const active = condition === key;
             return (
               <TouchableOpacity
@@ -134,7 +140,7 @@ const CategoriesListScreen: React.FC = () => {
                   style={active ? styles.toggleLabelActive : styles.toggleLabelInactive}
                   translate={false}
                 >
-                  {t(labelFr)}
+                  {t(labelKey)}
                 </Text>
               </TouchableOpacity>
             );

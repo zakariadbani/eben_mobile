@@ -26,10 +26,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  SafeAreaView,
   StatusBar,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Tabs, useFocusEffect, useRouter } from 'expo-router';
 
@@ -93,7 +93,7 @@ export default function PrestataireProfileScreen(): React.ReactElement {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={['top']} style={styles.safeArea}>
       <Tabs.Screen options={{ headerShown: false }} />
       <StatusBar backgroundColor={Colors.primary} barStyle="dark-content" />
 

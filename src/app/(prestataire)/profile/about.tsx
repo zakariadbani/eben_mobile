@@ -22,7 +22,7 @@ function AboutSection({ icon, title, body }: { icon: string; title: string; body
 export default function PrestataireAboutScreen(): React.ReactElement {
   const { t } = useTranslation();
   return (
-    <Screen scrollable whatsapp={false}>
+    <Screen scrollable whatsapp={false} edges={['bottom']}>
       <CustomHeader title={t('partner.about.title')} />
       <ImageBackground source={require('@/assets/images/backgrounds/about.png')} style={styles.hero} resizeMode="cover">
         <View style={styles.tint} />

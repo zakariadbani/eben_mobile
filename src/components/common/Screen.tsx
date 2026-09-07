@@ -1,6 +1,5 @@
 import React from "react";
 import {
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   View,
@@ -11,6 +10,7 @@ import {
   KeyboardAvoidingViewProps,
   ScrollView,
 } from "react-native";
+import { SafeAreaView, Edge } from "react-native-safe-area-context";
 import Colors from "@/constants/Colors";
 import WhatsappBtn from "@/components/common/WhatsappBtn";
 
@@ -28,6 +28,7 @@ interface ScreenProps {
   scrollable?: boolean; // Use ScrollView for scrolling content
   useSafeArea?: boolean; // Decide between SafeAreaView and View
   whatsapp?: boolean; // Decide between SafeAreaView and View
+  edges?: Edge[]; // Which safe-area edges to apply
 }
 
 export const Screen: React.FC<ScreenProps> = ({
@@ -44,13 +45,14 @@ export const Screen: React.FC<ScreenProps> = ({
   scrollable = false,
   useSafeArea = true,
   whatsapp = true,
+  edges = ["bottom"],
 }) => {
   // Choose between SafeAreaView and View
   const WrapperComponent = useSafeArea ? SafeAreaView : View;
   const ContainerComponent = avoidKeyboard ? KeyboardAvoidingView : View;
 
   return (
-    <WrapperComponent style={[styles.container, wrapperStyle]}>
+    <WrapperComponent {...(useSafeArea ? { edges } : {})} style={[styles.container, wrapperStyle]}>
       <StatusBar
         barStyle={statusBarStyle}
         backgroundColor={Platform.OS === "android" ? statusBarColor : undefined}

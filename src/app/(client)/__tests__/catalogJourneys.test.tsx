@@ -1,6 +1,6 @@
 import React from "react";
 import { ActivityIndicator } from "react-native";
-import { fireEvent, render, waitFor } from "@testing-library/react-native";
+import { fireEvent, render as rtlRender, waitFor } from "@testing-library/react-native";
 import {
   addToBasket,
   addToWishlist,
@@ -16,7 +16,9 @@ import {
   removeWishlistItem,
   searchAllPneumatics,
 } from "@/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Role, useSession } from "@/context/AuthContext";
+import { RequestDraftProvider } from "@/context/RequestDraftContext";
 import i18n from "@/localization/i18n";
 import HomeScreen from "@/components/screens/client/HomeScreen";
 import CategoriesListScreen from "../categories";
@@ -37,6 +39,19 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
 jest.mock("expo-linear-gradient", () => ({
   LinearGradient: ({ children }: { children?: React.ReactNode }) => children ?? null,
 }));
+const mockShowNotification = jest.fn();
+jest.mock("@/context/NotificationContext", () => ({
+  useNotification: () => ({ showNotification: mockShowNotification }),
+}));
+
+// Every screen in this suite now sits under the client (client)/_layout.tsx
+// RequestDraftProvider (occasion catalog rows + product detail mount the
+// "add to list" sheet unconditionally, toggling only its `visible` prop —
+// see CustomModal.tsx). Shadowing `render` keeps every existing call site
+// below working unchanged.
+function render(ui: React.ReactElement) {
+  return rtlRender(<RequestDraftProvider>{ui}</RequestDraftProvider>);
+}
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -107,6 +122,19 @@ const leafCategory = {
   slug: "plaquettes",
 };
 const categoryTree = [{ ...rootCategory, children: [{ ...rootCategory, id: 11, parentId: 10, level: 2 as const, children: [leafCategory] }] }];
+// A level-3 category sitting at the top level of the tree response, not
+// nested under any parent's `children` — simulates a stale/broken parent
+// chain: flattenCategories() still finds it (top-level entries count),
+// but findParent() cannot, since no node's `children` array contains it.
+const orphanLeafCategory = {
+  ...rootCategory,
+  id: 13,
+  parentId: 999,
+  level: 3 as const,
+  title: "Pièce orpheline",
+  titleAr: "قطعة يتيمة",
+  slug: "piece-orpheline",
+};
 const product = {
   id: 91,
   title: "Plaquettes live",
@@ -375,7 +403,10 @@ it("uses localized formal copy for the request promo", async () => {
   expect(screen.getByText(i18n.t("catalog.requestPromo.body"), { includeHiddenElements: true })).toBeTruthy();
 });
 it.each([
-  ["category list", () => <CategoriesListScreen />],
+  ["category list", () => {
+    mockParams = {};
+    return <CategoriesListScreen />;
+  }],
   ["category drill-down", () => {
     mockParams = { categoryId: "10", condition: "occasion" };
     return <CategoryDrillScreen />;
@@ -384,7 +415,7 @@ it.each([
     mockParams = { categoryId: "12", condition: "occasion" };
     return <CategoryResultsScreen />;
   }],
-])("gates the %s request banner for guests without creating a request", async (_name, screenFactory) => {
+])("pushes the %s guest request banner straight to CreateRequestScreen without a login redirect", async (_name, screenFactory) => {
   const screen = render(screenFactory());
   const nestedSharedAction = await screen.findByText(
     i18n.t("Placer une demande"),
@@ -393,14 +424,8 @@ it.each([
 
   fireEvent.press(nestedSharedAction);
 
-  expect(mockPush).toHaveBeenCalledWith({
-    pathname: "/(auth)/ClientLoginScreen",
-    params: {
-      returnTo: _name === "category drill-down"
-        ? "/(client)/requests/CreateRequestScreen?categoryId=10&condition=occasion"
-        : "/(client)/requests/CreateRequestScreen",
-    },
-  });
+  expect(mockPush).toHaveBeenCalledWith("/(client)/requests/CreateRequestScreen");
+  expect(mockPush).toHaveBeenCalledTimes(1);
   expect(createRequest).not.toHaveBeenCalled();
 });
 
@@ -507,7 +532,7 @@ it("uses a supported icon for half-star ratings", async () => {
   await screen.findByText("Plaquettes live");
   expect(screen.queryByText("⯨")).toBeNull();
 });
-it("uses cart language for occasion products so it is distinct from the wishlist", async () => {
+it("uses list-add language for occasion products instead of a basket purchase", async () => {
   mockParams = { productId: "91" };
   mockGetProduct.mockResolvedValueOnce({
     success: true,
@@ -515,8 +540,9 @@ it("uses cart language for occasion products so it is distinct from the wishlist
   });
   const screen = render(<ProductDetailScreen />);
 
-  expect(await screen.findByRole("button", { name: i18n.t("Ajouter au panier") })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: i18n.t("occasion.addToList") })).toBeNull();
+  expect(await screen.findByRole("button", { name: i18n.t("Ajoutez à la liste") })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: i18n.t("Ajouter au panier") })).toBeNull();
+  expect(screen.queryByText(`${product.price.toLocaleString("fr-MA")} Dhs TTC`)).toBeNull();
 });
 it("shows an honest empty-media state without photo-specific occasion guidance", async () => {
   mockParams = { productId: "91", state: "extra-info" };
@@ -572,4 +598,95 @@ it("allows a Client detail mutation to call the protected resource", async () =>
 
   fireEvent.press(screen.getByLabelText("Ajouter à la liste"));
   await waitFor(() => expect(addToWishlist).toHaveBeenCalledWith(91));
+});
+
+it("splits level-3 rows by condition instead of always jumping straight to results", async () => {
+  mockParams = { categoryId: "11", condition: "occasion" };
+  const occasionScreen = render(<CategoryDrillScreen />);
+  fireEvent.press(await occasionScreen.findByRole("button", { name: i18n.t("Ajoutez à la liste") }));
+  expect(mockPush).not.toHaveBeenCalled();
+  expect(mockGetProductsByCategory).not.toHaveBeenCalled();
+  occasionScreen.unmount();
+
+  mockParams = { categoryId: "11", condition: "en_stock" };
+  const stockScreen = render(<CategoryDrillScreen />);
+  fireEvent.press(await stockScreen.findByRole("button", { name: "arrow-right" }));
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: "/(client)/categories/results",
+    params: { categoryId: "12", condition: "en_stock" },
+  });
+});
+
+it("guest adds a level-3 category from the sheet without a login redirect", async () => {
+  mockParams = { categoryId: "11", condition: "occasion" };
+  const screen = render(<CategoryDrillScreen />);
+
+  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajoutez à la liste") }));
+  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajoutez") }));
+
+  expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Ajouté à la liste !"));
+  expect(await screen.findByRole("button", { name: i18n.t("Ajouté") })).toBeTruthy();
+  expect(mockPush).not.toHaveBeenCalled();
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+    "requestDraft",
+    expect.stringContaining("\"categoryId\":12"),
+  ));
+});
+
+it("adds a level-3 category from the sheet as a signed-in client, toasts, with no login redirect", async () => {
+  mockedUseSession.mockReturnValue({ role: Role.CLIENT } as ReturnType<typeof useSession>);
+  mockParams = { categoryId: "11", condition: "occasion" };
+  const screen = render(<CategoryDrillScreen />);
+
+  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajoutez à la liste") }));
+  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajoutez") }));
+
+  expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Ajouté à la liste !"));
+  expect(await screen.findByRole("button", { name: i18n.t("Ajouté") })).toBeTruthy();
+  expect(mockPush).not.toHaveBeenCalled();
+});
+
+it("lists an occasion product's category from product detail instead of adding to the basket", async () => {
+  mockParams = { productId: "91" };
+  mockGetProduct.mockResolvedValueOnce({ success: true, data: { ...product, condition: "occasion" } });
+  const screen = render(<ProductDetailScreen />);
+
+  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajoutez à la liste") }));
+  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajoutez") }));
+
+  await waitFor(() => expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Ajouté à la liste !")));
+  expect(addToBasket).not.toHaveBeenCalled();
+});
+
+it("carries the occasion condition from Home category cards", async () => {
+  mockedUseSession.mockReturnValue({ role: Role.CLIENT } as ReturnType<typeof useSession>);
+  const screen = render(<HomeScreen />);
+  await screen.findAllByText("Plaquettes live");
+
+  fireEvent.press(screen.getByText("Freins"));
+
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: "/(client)/categories/[categoryId]",
+    params: { categoryId: "10", condition: "occasion" },
+  });
+});
+
+it("does not redirect an occasion level-3 deep load to the priced results screen", async () => {
+  mockParams = { categoryId: "12", condition: "occasion" };
+  const screen = render(<CategoryDrillScreen />);
+
+  expect(await screen.findByRole("button", { name: i18n.t("Ajoutez à la liste") })).toBeTruthy();
+  expect(mockPush).not.toHaveBeenCalled();
+  expect(mockReplace).not.toHaveBeenCalled();
+});
+
+it("renders the leaf itself as an add-to-list row when its parent is absent from the tree", async () => {
+  mockGetCategoryTree.mockResolvedValueOnce({ success: true, data: [...categoryTree, orphanLeafCategory] });
+  mockParams = { categoryId: "13", condition: "occasion" };
+  const screen = render(<CategoryDrillScreen />);
+
+  expect(await screen.findByRole("button", { name: i18n.t("Ajoutez à la liste") })).toBeTruthy();
+  expect(screen.queryByText(i18n.t("Aucune catégorie disponible"))).toBeNull();
+  expect(mockPush).not.toHaveBeenCalled();
+  expect(mockReplace).not.toHaveBeenCalled();
 });

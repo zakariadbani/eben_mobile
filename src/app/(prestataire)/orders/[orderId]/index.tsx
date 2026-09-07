@@ -302,7 +302,7 @@ export default function PrestataireOrderDetailScreen(): React.ReactElement {
   // ── Render ─────────────────────────────────────────────────────────────────────
 
   return (
-    <Screen whatsapp={false} scrollable={false}>
+    <Screen whatsapp={false} scrollable={false} edges={['bottom']}>
       <CustomHeader title="partner.orders.detailTitle" />
       <ScrollView
         style={styles.scroll}

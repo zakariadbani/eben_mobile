@@ -255,7 +255,7 @@ export default function OverviewScreen(): React.ReactElement {
   );
 
   return (
-    <Screen whatsapp={false} scrollable={false}>
+    <Screen whatsapp={false} scrollable={false} edges={['bottom']}>
       {headerWithBell}
       <ScrollView
         style={styles.scroll}

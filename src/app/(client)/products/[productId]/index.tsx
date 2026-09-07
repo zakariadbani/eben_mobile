@@ -38,6 +38,8 @@ import { Text } from "@/components/common/Text";
 import Button from "@/components/common/Button";
 import CustomModal from "@/components/common/CustomModal";
 import Icon from "@/components/common/Icon";
+import QtyStepper from "@/components/common/QtyStepper";
+import AddToListSheet from "@/components/screens/client/requests/AddToListSheet";
 import Colors from "@/constants/Colors";
 import { clientAuthHref } from '@/constants/clientReturnTo';
 
@@ -45,51 +47,6 @@ import { getProduct, addToBasket, addToWishlist, getWishlist, removeWishlistItem
 import { Role, useSession } from "@/context/AuthContext";
 import type { Product } from "@/interfaces/Product";
 import type { Basket } from "@/interfaces/Basket";
-
-// ── Quantity stepper (inline — no dep on the shared Stepper which is progress steps) ──
-
-interface QtyStepperProps {
-  value: number;
-  min?: number;
-  max?: number;
-  onChange: (next: number) => void;
-}
-
-const QtyStepper: React.FC<QtyStepperProps> = ({
-  value,
-  min = 1,
-  max = 99,
-  onChange,
-}) => {
-  const decrement = () => { if (value > min) onChange(value - 1); };
-  const increment = () => { if (value < max) onChange(value + 1); };
-
-  return (
-    <View flexDirection="row" alignItems="center" gap={0} style={styles.qtyStepper}>
-      <TouchableOpacity
-        onPress={decrement}
-        style={[styles.qtyBtn, value <= min && styles.qtyBtnDisabled]}
-        activeOpacity={0.7}
-        accessibilityRole="button"
-      >
-        <Text type="text" bold style={styles.qtyBtnText}>−</Text>
-      </TouchableOpacity>
-      <View style={styles.qtyValueBox}>
-        <Text type="default" bold style={styles.qtyValue} translate={false}>
-          {String(value)}
-        </Text>
-      </View>
-      <TouchableOpacity
-        onPress={increment}
-        style={[styles.qtyBtn, value >= max && styles.qtyBtnDisabled]}
-        activeOpacity={0.7}
-        accessibilityRole="button"
-      >
-        <Text type="text" bold style={styles.qtyBtnText}>+</Text>
-      </TouchableOpacity>
-    </View>
-  );
-};
 
 // ── Star rating row ───────────────────────────────────────────────────────────
 
@@ -202,6 +159,7 @@ const ProductDetailScreen: React.FC = () => {
   const [actionError, setActionError] = useState<string | null>(null);
   const [showPurchaseModal, setShowPurchaseModal] = useState(requestedState === "purchase");
   const [showSuccessModal, setShowSuccessModal] = useState(requestedState === "success");
+  const [showListSheet, setShowListSheet] = useState(false);
   const basketMutation = useRef(false);
   const wishlistMutation = useRef(false);
 
@@ -289,12 +247,18 @@ const ProductDetailScreen: React.FC = () => {
   }, [product, productId, wishlistItemId, role, router, t]);
 
   const openPurchase = useCallback(() => {
+    if (product?.condition === "occasion") {
+      // Occasion: build a request draft (no SKU/price, no auth gate) instead
+      // of the en_stock basket purchase flow.
+      setShowListSheet(true);
+      return;
+    }
     if (role !== Role.CLIENT) {
       router.push(clientAuthHref("/(auth)/ClientLoginScreen", `/(client)/products/${productId}`));
       return;
     }
     setShowPurchaseModal(true);
-  }, [productId, role, router]);
+  }, [product, productId, role, router]);
 
   const handleReviewsPress = useCallback(() => {
     router.push({
@@ -424,35 +388,37 @@ const ProductDetailScreen: React.FC = () => {
             </Text>
           )}
 
-          {/* ── Price block ──────────────────────────────────── */}
-          <View style={styles.priceBlock}>
-            {hasPromo && (
-              <Text
-                type="label"
-                style={styles.originalPrice}
-                translate={false}
-              >
-                {`${product.price.toLocaleString("fr-MA")} Dhs TTC`}
-              </Text>
-            )}
-            <View flexDirection="row" alignItems="center" gap={8}>
-              <Text
-                type="subTitle"
-                bold
-                style={[styles.activePrice, hasPromo && styles.activePricePromo]}
-                translate={false}
-              >
-                {`${activePrice.toLocaleString("fr-MA")} Dhs TTC`}
-              </Text>
+          {/* ── Price block (en_stock only — occasion has no SKU price) ── */}
+          {!isOccasion && (
+            <View style={styles.priceBlock}>
               {hasPromo && (
-                <View style={styles.promoBadge}>
-                  <Text type="small" color={Colors.white} translate={false}>
-                    {t("Promo")}
-                  </Text>
-                </View>
+                <Text
+                  type="label"
+                  style={styles.originalPrice}
+                  translate={false}
+                >
+                  {`${product.price.toLocaleString("fr-MA")} Dhs TTC`}
+                </Text>
               )}
+              <View flexDirection="row" alignItems="center" gap={8}>
+                <Text
+                  type="subTitle"
+                  bold
+                  style={[styles.activePrice, hasPromo && styles.activePricePromo]}
+                  translate={false}
+                >
+                  {`${activePrice.toLocaleString("fr-MA")} Dhs TTC`}
+                </Text>
+                {hasPromo && (
+                  <View style={styles.promoBadge}>
+                    <Text type="small" color={Colors.white} translate={false}>
+                      {t("Promo")}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
-          </View>
+          )}
 
           {/* ── Stock (en_stock) ─────────────────────────────── */}
           {!isOccasion && product.stock !== undefined && (
@@ -575,16 +541,16 @@ const ProductDetailScreen: React.FC = () => {
           </Text>
         </TouchableOpacity>
 
-        {/* Qty + add button */}
+        {/* Qty + add button (occasion has no stepper here — quantity is set in the sheet) */}
         <View flexDirection="row" alignItems="center" gap={10} style={styles.basketRow}>
-          <QtyStepper value={qty} onChange={setQty} />
+          {!isOccasion ? <QtyStepper value={qty} onChange={setQty} /> : null}
           <View style={styles.addBtnWrapper}>
             <Button
-              title={addToBasketLoading ? t("Ajout...") : t("Ajouter au panier")}
+              title={addToBasketLoading ? t("Ajout...") : (isOccasion ? t("Ajoutez à la liste") : t("Ajouter au panier"))}
               variant="primary"
               onPress={openPurchase}
               style={styles.addBtn}
-              rightIcon="shopping-cart"
+              rightIcon={isOccasion ? undefined : "shopping-cart"}
               iconTypeName="FontAwesome5"
               sizeIcon={16}
             />
@@ -663,6 +629,11 @@ const ProductDetailScreen: React.FC = () => {
           )}
         </View>
       </CustomModal>
+
+      <AddToListSheet
+        item={showListSheet ? { categoryId: product.categoryId, title: product.categoryName, titleAr: product.categoryNameAr } : null}
+        onClose={() => setShowListSheet(false)}
+      />
     </Screen>
   );
 };
@@ -796,31 +767,6 @@ const styles = StyleSheet.create({
   basketRow: { flex: 1 },
   addBtnWrapper: { flex: 1 },
   addBtn: { paddingVertical: 12 },
-
-  // Qty stepper
-  qtyStepper: {
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: Colors.backgroundGray,
-    overflow: "hidden",
-  },
-  qtyBtn: {
-    width: 34,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: Colors.backgroundGray,
-  },
-  qtyBtnDisabled: { opacity: 0.4 },
-  qtyBtnText: { color: Colors.brand, lineHeight: 20 },
-  qtyValueBox: {
-    width: 38,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: Colors.white,
-  },
-  qtyValue: { color: Colors.brand },
 
   // Success modal
   successModalContent: { paddingVertical: 8, alignItems: "center", width: "100%" },

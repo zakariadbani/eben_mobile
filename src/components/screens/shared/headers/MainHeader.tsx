@@ -1,5 +1,6 @@
 import React from "react";
-import { StyleSheet, SafeAreaView, TouchableOpacity } from "react-native";
+import { StyleSheet, TouchableOpacity } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import Colors from "@/constants/Colors";
 import View from "@/components/common/View";
@@ -44,7 +45,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.container} flexDirection="row">
         {/* Left: greeting + hey icon */}
         <View flexDirection="row" alignItems="center" gap={8} style={styles.greetingBlock}>

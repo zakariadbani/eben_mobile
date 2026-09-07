@@ -180,6 +180,9 @@ const allowedRoutes: Record<AllowedRole, string[]> = {
     "(client)/categories/results",
     "(client)/search",
     "(client)/search/index",
+    // Guests build a request draft locally; login is only required at send.
+    "(client)/requests/index",
+    "(client)/requests/CreateRequestScreen",
     "(client)/requests/login-to-send",
     // Product browsing is guest-accessible
     "(client)/products/[productId]",

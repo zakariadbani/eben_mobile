@@ -55,7 +55,6 @@ const TAB_BAR_STYLE = StyleSheet.create({
   },
   dashboardHeaderInset: {
     backgroundColor: Colors.primary,
-    paddingTop: Platform.OS === "android" ? 32 : 0,
   },
   avatar: {
     width: 42,
@@ -90,12 +89,16 @@ const HIDDEN_TAB_BAR_STYLE = { display: "none" as const };
 const PartnerDashboardHeader: React.FC = () => {
   const router = useRouter();
   const { t, i18n } = useTranslation();
-  const { username } = useSession();
+  const { username, session } = useSession();
+  const avatar = session?.user.avatar;
   return (
     <View style={TAB_BAR_STYLE.dashboardHeaderInset}>
       <CustomHeader showBackButton={false}>
         <View style={[TAB_BAR_STYLE.headerRow, { flexDirection: i18n.language === "ar" ? "row-reverse" : "row" }]}>
-          <Image source={require("@/assets/img/avatar.jpg")} style={TAB_BAR_STYLE.avatar} />
+          <Image
+            source={avatar ? { uri: avatar } : require("@/assets/img/avatar.jpg")}
+            style={TAB_BAR_STYLE.avatar}
+          />
           <Text type="subTitleTwo" semiBold style={TAB_BAR_STYLE.greeting} numberOfLines={1}>
             {t("partner.profile.greeting", { name: username ?? t("partner.profile.partnerFallback") })}
           </Text>

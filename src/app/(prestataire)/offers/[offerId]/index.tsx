@@ -23,11 +23,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
@@ -221,9 +221,9 @@ export default function PrestataireOfferDetailScreen(): React.ReactElement {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <Screen whatsapp={false} scrollable={false}>
+    <Screen whatsapp={false} scrollable={false} edges={['bottom']}>
       {/* ── Inline header — back arrow + title + bell (Figma: "Offres envoyées - Détails") */}
-      <SafeAreaView style={styles.headerSafe}>
+      <SafeAreaView edges={['top']} style={styles.headerSafe}>
         <View style={styles.header} flexDirection="row" alignItems="center">
           <TouchableOpacity
             onPress={() => router.back()}

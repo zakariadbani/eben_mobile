@@ -8,7 +8,6 @@ describe("route permissions", () => {
     ["guest", undefined, "(prestataire)/dashboard"],
     ["guest profile", undefined, "(client)/settings/index"],
     ["guest profile edit", undefined, "(client)/settings/profile/index"],
-    ["guest request list", undefined, "(client)/requests/index"],
     ["guest cart", undefined, "(client)/cart/index"],
     ["guest legal", undefined, "(client)/settings/pages/Legal"],
     ["guest unavailable legal", undefined, "(auth)/legal"],
@@ -32,6 +31,8 @@ describe("route permissions", () => {
     ["(client)/search/index"],
     ["(client)/products/[productId]"],
     ["(client)/products/[productId]/reviews"],
+    ["(client)/requests/index"],
+    ["(client)/requests/CreateRequestScreen"],
     ["(client)/requests/login-to-send"],
   ])("allows guest preview of %s", (route) => {
     expect(canAccessRoute(route)).toBe(true);

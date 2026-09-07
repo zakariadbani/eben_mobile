@@ -152,7 +152,7 @@ export default function PrestataireOfferShipScreen(): React.ReactElement {
 
   if (error || !offer) {
     return (
-      <Screen whatsapp={false}>
+      <Screen whatsapp={false} edges={['bottom']}>
         <CustomHeader title="partner.offerDetail.title" />
         <View flex alignItems="center" justifyContent="center" gap={14} p={24}>
           <Text color={Colors.red} center>{t("partner.offerDetail.loadError")}</Text>
@@ -167,7 +167,7 @@ export default function PrestataireOfferShipScreen(): React.ReactElement {
   const canShip = offer.status === "selected" && offer.shippingEligible && !isShipped;
 
   return (
-    <Screen whatsapp={false} scrollable={false} backgroundColor={Colors.white}>
+    <Screen whatsapp={false} scrollable={false} backgroundColor={Colors.white} edges={['bottom']}>
       <CustomHeader title={isShipped ? "partner.ship.shippedDetailTitle" : "partner.ship.acceptedDetailTitle"} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {images.length > 0 ? (

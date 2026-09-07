@@ -18,7 +18,7 @@ import Colors from "@/constants/Colors";
 
 const LanguageScreen: React.FC = () => {
   return (
-    <Screen>
+    <Screen edges={['bottom']}>
       <CustomHeader title={"Langue"} />
 
       <View style={styles.container}>

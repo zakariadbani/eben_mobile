@@ -9,6 +9,7 @@ import { Text } from "@/components/common/Text";
 import Button from "@/components/common/Button";
 import TextInput from "@/components/common/TextInput";
 import ImageInputList from "@/components/common/ImageInputList";
+import QtyStepper from "@/components/common/QtyStepper";
 import Colors from "@/constants/Colors";
 import { getCategoryTree } from "@/api/resources/categories";
 import {
@@ -19,20 +20,14 @@ import { uploadLocalImages } from "@/api/resources/uploads";
 import { createRequest } from "@/api/resources/requests";
 import { ApiClientError } from "@/api/types";
 import { useStorageState } from "@/context/useStorageState";
+import { Role, useSession } from "@/context/AuthContext";
+import { useRequestDraft } from "@/context/RequestDraftContext";
 import type { Category } from "@/interfaces/Category";
 import type { PartCondition } from "@/interfaces/Request";
 import type { Vehicle } from "@/interfaces/Vehicle";
 
 type LoadState = "loading" | "ready" | "error";
 type Step = 0 | 1 | 2;
-
-interface DraftItem {
-  categoryId: number;
-  title: string;
-  titleAr: string;
-  quantity: number;
-  condition: PartCondition;
-}
 
 function positiveId(value: string | undefined): number | null {
   if (!value || !/^\d+$/.test(value)) return null;
@@ -60,9 +55,12 @@ export default function CreateRequestScreen() {
   const isArabic = i18n.language === "ar";
   const router = useRouter();
   const params = useLocalSearchParams<{ categoryId?: string; condition?: string }>();
+  const { role } = useSession();
+  const isGuest = role !== Role.CLIENT;
   const [[storageLoading, storedVehicleId]] = useStorageState<number>(
     CLIENT_SELECTED_VEHICLE_ID_STORAGE_KEY,
   );
+  const { loading: draftLoading, items: draftItems, setItems: setDraftItems } = useRequestDraft();
   const submittingRef = useRef(false);
 
   const [loadState, setLoadState] = useState<LoadState>("loading");
@@ -75,7 +73,6 @@ export default function CreateRequestScreen() {
   const [condition, setCondition] = useState<PartCondition>(
     params.condition === "en_stock" ? "en_stock" : "occasion",
   );
-  const [draftItems, setDraftItems] = useState<DraftItem[]>([]);
   const [note, setNote] = useState("");
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [uploadedPaths, setUploadedPaths] = useState<string[] | null>(null);
@@ -83,16 +80,16 @@ export default function CreateRequestScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (storageLoading) return;
+    if (storageLoading || draftLoading) return;
     setLoadState("loading");
     setError(null);
     try {
       const [categoryResponse, vehicleResponse] = await Promise.all([
         getCategoryTree(),
-        getVehicles(),
+        isGuest ? Promise.resolve(null) : getVehicles(),
       ]);
-      const liveVehicles = vehicleResponse.data;
-      const storedIsLive = storedVehicleId !== null
+      const liveVehicles = vehicleResponse?.data ?? [];
+      const storedIsLive = !isGuest && storedVehicleId !== null
         && Number.isSafeInteger(storedVehicleId)
         && storedVehicleId > 0
         && liveVehicles.some((vehicle) => vehicle.id === storedVehicleId);
@@ -111,6 +108,7 @@ export default function CreateRequestScreen() {
         if (!leaf) {
           setError(t("requestFlow.invalidCategory"));
         } else {
+          const prefillCondition: PartCondition = params.condition === "en_stock" ? "en_stock" : "occasion";
           setDraftItems((current) => current.some((item) => item.categoryId === leaf.id)
             ? current
             : [...current, {
@@ -118,7 +116,7 @@ export default function CreateRequestScreen() {
               title: leaf.title,
               titleAr: leaf.titleAr,
               quantity: 1,
-              condition: params.condition === "en_stock" ? "en_stock" : "occasion",
+              condition: prefillCondition,
             }]);
         }
       }
@@ -126,7 +124,7 @@ export default function CreateRequestScreen() {
     } catch {
       setLoadState("error");
     }
-  }, [params.categoryId, params.condition, storageLoading, storedVehicleId, t]);
+  }, [draftLoading, isGuest, params.categoryId, params.condition, setDraftItems, storageLoading, storedVehicleId, t]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -149,11 +147,6 @@ export default function CreateRequestScreen() {
         condition,
       }]);
     setStep(1);
-  };
-
-  const setDraftCondition = (nextCondition: PartCondition) => {
-    setCondition(nextCondition);
-    setDraftItems((current) => current.map((item) => ({ ...item, condition: nextCondition })));
   };
 
   const addImage = (uri: string) => {
@@ -184,6 +177,7 @@ export default function CreateRequestScreen() {
         notes: note.trim() || null,
         images: paths,
       });
+      setDraftItems([]);
       router.push({
         pathname: "/(client)/requests/verification",
         params: { requestId: String(response.data.id), reference: response.data.reference },
@@ -196,7 +190,7 @@ export default function CreateRequestScreen() {
     }
   };
 
-  if (loadState === "loading" || storageLoading) {
+  if (loadState === "loading" || storageLoading || draftLoading) {
     return <Screen whatsapp={false}><View flex style={styles.centered}><ActivityIndicator color={Colors.primary} /></View></Screen>;
   }
 
@@ -204,18 +198,7 @@ export default function CreateRequestScreen() {
     return <Screen padding whatsapp={false}><View flex style={styles.centered}><Text accessibilityRole="alert">requestFlow.loadError</Text><Button title="requestFlow.retry" onPress={() => void load()} /></View></Screen>;
   }
 
-  if (vehicles.length === 0) {
-    return (
-      <Screen padding whatsapp={false}>
-        <View flex style={styles.centered} gap={12}>
-          <Text center>requestFlow.emptyGarage</Text>
-          <Button title="requestFlow.addVehicle" onPress={() => router.push("/(client)/search/add-car" as Href)} />
-          <Button title="requestFlow.openGarage" variant="white" onPress={() => router.push("/(client)/settings/parking" as Href)} />
-        </View>
-      </Screen>
-    );
-  }
-
+  const emptyGarage = !isGuest && vehicles.length === 0;
   const choices = step === 0 ? level1 : step === 1 ? level2 : level3;
   return (
     <View style={styles.root}>
@@ -229,17 +212,22 @@ export default function CreateRequestScreen() {
           <Text type="headerTitle" semiBold>requestFlow.title</Text>
         </View>
 
-        <Text type="small" color={Colors.gray} style={styles.vehicleLabel}>
-          {t("requestFlow.vehicle", { value: vehicles.find((vehicle) => vehicle.id === vehicleId)?.nickname
-            ?? vehicles.find((vehicle) => vehicle.id === vehicleId)?.modelName
-            ?? vehicleId })}
-        </Text>
+        {!isGuest ? (
+          <Text type="small" color={Colors.gray} style={styles.vehicleLabel}>
+            {t("requestFlow.vehicle", { value: vehicles.find((vehicle) => vehicle.id === vehicleId)?.nickname
+              ?? vehicles.find((vehicle) => vehicle.id === vehicleId)?.modelName
+              ?? vehicleId })}
+          </Text>
+        ) : null}
 
         {error ? <Text accessibilityRole="alert" color={Colors.error} style={styles.error} translate={false}>{error}</Text> : null}
 
+        {/* Only applies to parts added via this screen's own drill from now on —
+            it no longer rewrites the condition of items already in the draft
+            (e.g. added earlier from the catalog's "add to list" sheet). */}
         <View flexDirection="row" gap={8} style={styles.conditionRow}>
-          <Button title="requestFlow.used" flex variant={condition === "occasion" ? "primary" : "white"} onPress={() => setDraftCondition("occasion")} />
-          <Button title="requestFlow.new" flex variant={condition === "en_stock" ? "primary" : "white"} onPress={() => setDraftCondition("en_stock")} />
+          <Button title="requestFlow.used" flex variant={condition === "occasion" ? "primary" : "white"} onPress={() => setCondition("occasion")} />
+          <Button title="requestFlow.new" flex variant={condition === "en_stock" ? "primary" : "white"} onPress={() => setCondition("en_stock")} />
         </View>
 
         <Text type="subTitle" semiBold style={styles.sectionTitle}>
@@ -272,27 +260,14 @@ export default function CreateRequestScreen() {
             <Text type="subTitle" semiBold>requestFlow.addedParts</Text>
             {draftItems.map((item) => (
               <View key={item.categoryId} flexDirection="row" alignItems="center" gap={8} style={styles.summaryRow}>
-                <Text translate={false} flex>{isArabic ? item.titleAr : item.title}</Text>
-                <View flexDirection="row" alignItems="center" gap={4}>
-                  <TouchableOpacity
-                    style={[styles.stepBtn, item.quantity <= 1 && styles.stepBtnDisabled]}
-                    onPress={() => setDraftItems((current) => current.map((entry) => entry.categoryId === item.categoryId ? { ...entry, quantity: Math.max(1, entry.quantity - 1) } : entry))}
-                    disabled={item.quantity <= 1}
-                    accessibilityLabel={t("Diminuer la quantité")}
-                  >
-                    <Text semiBold translate={false}>−</Text>
-                  </TouchableOpacity>
-                  <View style={styles.qtyBox}>
-                    <Text semiBold center translate={false}>{String(item.quantity)}</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.stepBtn}
-                    onPress={() => setDraftItems((current) => current.map((entry) => entry.categoryId === item.categoryId ? { ...entry, quantity: entry.quantity + 1 } : entry))}
-                    accessibilityLabel={t("Augmenter la quantité")}
-                  >
-                    <Text semiBold translate={false}>+</Text>
-                  </TouchableOpacity>
+                <View flex gap={2}>
+                  <Text translate={false}>{isArabic ? item.titleAr : item.title}</Text>
+                  <Text type="small" color={Colors.gray}>{t(`requestFlow.condition.${item.condition}`)}</Text>
                 </View>
+                <QtyStepper
+                  value={item.quantity}
+                  onChange={(next) => setDraftItems((current) => current.map((entry) => entry.categoryId === item.categoryId ? { ...entry, quantity: next } : entry))}
+                />
                 <Button title="requestFlow.removePart" fit variant="pink" onPress={() => setDraftItems((current) => current.filter((entry) => entry.categoryId !== item.categoryId))} />
               </View>
             ))}
@@ -309,9 +284,20 @@ export default function CreateRequestScreen() {
         ) : null}
         <View style={styles.spacer} />
       </Screen>
-      {draftItems.length > 0 ? (
+      {emptyGarage ? (
         <View style={styles.sendBar}>
-          <Button title={submitting ? "requestFlow.submitting" : "requestFlow.verify"} disabled={submitting} onPress={() => void submit()} />
+          <Button title="requestFlow.addVehicle" onPress={() => router.push("/(client)/search/add-car" as Href)} />
+        </View>
+      ) : draftItems.length > 0 ? (
+        <View style={styles.sendBar}>
+          <Button
+            title={submitting ? "requestFlow.submitting" : "requestFlow.verify"}
+            disabled={submitting}
+            onPress={() => {
+              if (isGuest) { router.push("/(client)/requests/login-to-send" as Href); return; }
+              void submit();
+            }}
+          />
         </View>
       ) : null}
     </View>
@@ -328,9 +314,6 @@ const styles = StyleSheet.create({
   card: { padding: 14, borderRadius: 8, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderLight },
   details: { marginTop: 24 },
   summaryRow: { padding: 10, borderRadius: 8, backgroundColor: Colors.backgroundGray },
-  stepBtn: { width: 28, height: 28, borderRadius: 4, borderWidth: 1, borderColor: Colors.borderLight, backgroundColor: Colors.white, justifyContent: "center", alignItems: "center" },
-  stepBtnDisabled: { opacity: 0.4 },
-  qtyBox: { width: 32, height: 28, borderRadius: 4, borderWidth: 1, borderColor: Colors.borderLight, justifyContent: "center", alignItems: "center", backgroundColor: Colors.white },
   spacer: { height: 100 },
   sendBar: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 16, backgroundColor: Colors.white },
 });

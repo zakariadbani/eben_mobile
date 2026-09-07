@@ -5,6 +5,19 @@ import ClientLayout from "../_layout";
 import { getBasket } from "@/api";
 import type { Basket } from "@/interfaces/Basket";
 
+// ClientLayout now also mounts RequestDraftProvider (AsyncStorage-backed).
+jest.mock("@react-native-async-storage/async-storage", () => ({
+  getItem: jest.fn().mockResolvedValue(null),
+  setItem: jest.fn().mockResolvedValue(undefined),
+}));
+
+// ClientTabs reads useSafeAreaInsets() directly (no <SafeAreaProvider> in
+// this render tree); the library's own jest mock resolves it to zeroed
+// insets instead of throwing "No safe area value available."
+jest.mock("react-native-safe-area-context", () =>
+  require("react-native-safe-area-context/jest/mock").default,
+);
+
 const mockPush = jest.fn();
 let mockSession: { username: string; role: string } | null = null;
 let mockScreenOptions: Record<string, { header?: unknown; tabBarBadge?: number }> = {};

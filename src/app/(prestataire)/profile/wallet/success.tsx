@@ -11,7 +11,7 @@ export default function PrestataireWithdrawSuccessScreen(): React.ReactElement {
   const router = useRouter();
   const navigation = useNavigation();
 
-  return <Screen padding whatsapp={false}>
+  return <Screen padding whatsapp={false} edges={['top', 'bottom']}>
     <View flex style={styles.content} gap={16}>
       <Text type="loginSubTitle" center>partner.withdraw.successTitle</Text>
       <Text center>partner.withdraw.successBody</Text>

@@ -6,8 +6,6 @@ import AudioPlayer from "../AudioPlayer";
 import ImageSlider from "../ImageSlider";
 import PickerInput from "../PickerInput";
 
-const mockCreateAsync = jest.fn();
-
 jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn().mockResolvedValue(null),
 }));
@@ -16,12 +14,12 @@ jest.mock("expo-router", () => ({
   useRouter: () => ({ push: jest.fn() }),
 }));
 
-jest.mock("expo-av", () => ({
-  Audio: {
-    Sound: {
-      createAsync: (...args: unknown[]) => mockCreateAsync(...args),
-    },
-  },
+jest.mock("expo-audio", () => ({
+  useAudioPlayer: () => ({ play: jest.fn(), pause: jest.fn(), seekTo: jest.fn() }),
+  useAudioPlayerStatus: () => ({
+    playing: false, isLoaded: true, currentTime: 0, duration: 0,
+    didJustFinish: false,
+  }),
 }));
 
 beforeEach(async () => {

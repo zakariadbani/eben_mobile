@@ -1,8 +1,8 @@
 import { Href, Tabs, useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Image, Platform, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Image, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   TabBarIcon,
@@ -16,6 +16,7 @@ import { Text } from "@/components/common/Text";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { useSession } from "@/context/AuthContext";
 import { CartProvider, useCart } from "@/context/CartContext";
+import { RequestDraftProvider } from "@/context/RequestDraftContext";
 import { clientAuthHref } from "@/constants/clientReturnTo";
 
 // Minimal type alias so tabBarIcon/tabBarLabel callbacks are typed without
@@ -142,7 +143,7 @@ const TyreSearchHeader: React.FC = () => {
   const rtl = i18n.language === "ar";
 
   return (
-    <SafeAreaView style={styles.tyreHeader}>
+    <SafeAreaView edges={['top']} style={styles.tyreHeader}>
       <View style={[styles.tyreHeaderTitleRow, rtl && styles.rowRtl]}>
         <GoBack iconColor={Colors.brand} />
         <Text type="headerTitle" style={styles.tyreHeaderTitle}>
@@ -162,18 +163,23 @@ const TyreSearchHeader: React.FC = () => {
 
 const ClientHomeHeader: React.FC = () => {
   const { t, i18n } = useTranslation();
-  const { username } = useSession();
+  const { username, session } = useSession();
+  const avatar = session?.user.avatar;
   const router = useRouter();
   const displayName = username
     ? username.charAt(0).toUpperCase() + username.slice(1)
     : "";
   const rtl = i18n.language === "ar";
+  const insets = useSafeAreaInsets();
 
   return (
-    <SafeAreaView style={styles.homeSafeArea}>
+    <View style={[styles.homeSafeArea, { paddingTop: insets.top }]}>
       <View style={[styles.homeHeader, rtl && styles.homeHeaderRtl]}>
         <View style={[styles.homeGreeting, rtl && styles.homeGreetingRtl]}>
-          <Image source={require("@/assets/img/avatar.jpg")} style={styles.homeAvatar} />
+          <Image
+            source={avatar ? { uri: avatar } : require("@/assets/img/avatar.jpg")}
+            style={styles.homeAvatar}
+          />
           <Text type="headerTitle" style={styles.homeGreetingText}>
             {displayName ? `${t("Hey")} ${displayName}` : t("Hey")}
           </Text>
@@ -190,7 +196,7 @@ const ClientHomeHeader: React.FC = () => {
           <CustomIcon name="notif" size={30} />
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 // ---------------------------------------------------------------------------
@@ -674,7 +680,9 @@ function ClientTabs() {
 export default function ClientLayout() {
   return (
     <CartProvider>
-      <ClientTabs />
+      <RequestDraftProvider>
+        <ClientTabs />
+      </RequestDraftProvider>
     </CartProvider>
   );
 }

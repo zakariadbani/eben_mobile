@@ -9,8 +9,11 @@
  * Drill strategy:
  *   - Level 1 → this screen renders level-2 children as a grid (ItemCategoryComponent).
  *   - Level 2 → this screen renders level-3 children as a vertical list
- *               (ItemSubCategoryComponent with arrow → indicator).
- *   - Level 3 (leaf) → immediately redirects to the results screen.
+ *               (ItemSubCategoryComponent with arrow → indicator in en_stock;
+ *               an "add to list" CTA opening AddToListSheet in occasion).
+ *   - Level 3 (leaf), en_stock → immediately redirects to the results screen.
+ *   - Level 3 (leaf), occasion → no results screen (no generic-parts catalog);
+ *     renders the leaf's parent drill instead of stranding the user.
  *
  * Condition and the breadcrumb path (parentTitle) are carried via router params.
  */
@@ -29,10 +32,10 @@ import ItemSubCategoryComponent from "@/components/screens/shared/app/ItemSubCat
 import SliderBlockComponent from "@/components/screens/shared/app/SliderBlockComponent";
 import PubPlacerDemandeBlockComponent from "@/components/screens/shared/app/PubPlacerDemandeBlockComponent";
 import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
+import AddToListSheet from "@/components/screens/client/requests/AddToListSheet";
 import Colors from "@/constants/Colors";
 import { getCategoryTree } from "@/api";
-import { Role, useSession } from "@/context/AuthContext";
-import { clientAuthHref } from "@/constants/clientReturnTo";
+import { useRequestDraft } from "@/context/RequestDraftContext";
 import type { Category } from "@/interfaces/Category";
 import type { CategoryProps } from "@/interfaces/Category";
 import type { SubCategoryItem } from "@/components/screens/shared/app/ItemSubCategoryComponent";
@@ -69,10 +72,25 @@ function flattenCategories(categories: Category[]): Category[] {
   ]);
 }
 
+/**
+ * Finds the category whose `children` contains `childId`, walking the tree
+ * structure itself rather than trusting each node's own `parentId` — the
+ * generic-parts (occasion) blocker fix needs the *immediate* drill parent of
+ * a level-3 leaf, and deriving it from the fetched tree is robust regardless
+ * of what a stale/leaf `parentId` happens to point at.
+ */
+function findParent(categories: Category[], childId: number): Category | undefined {
+  for (const category of categories) {
+    if ((category.children ?? []).some((child) => child.id === childId)) return category;
+    const nested = findParent(category.children ?? [], childId);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
 const CategoryDrillScreen: React.FC = () => {
   const router = useRouter();
   const { i18n, t } = useTranslation();
-  const { role } = useSession();
   const isArabic = i18n.language === "ar";
 
   // expo-router useLocalSearchParams returns Record<string, string | string[]>.
@@ -93,6 +111,14 @@ const CategoryDrillScreen: React.FC = () => {
   const [children, setChildren] = useState<Category[]>([]);
   const [levelOneCategories, setLevelOneCategories] = useState<Category[]>([]);
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
+  // True only when a level-3 leaf's parent could not be resolved from the
+  // tree (stale/broken chain) — the leaf itself is then rendered as a single
+  // add-to-list row instead of the empty state. Decoupled from `current`'s
+  // own level so it can't be confused with the (unrelated) en_stock redirect
+  // path, which also briefly sets `current` to a level-3 leaf.
+  const [leafFallback, setLeafFallback] = useState(false);
+  const [sheetItem, setSheetItem] = useState<{ categoryId: number; title: string; titleAr: string } | null>(null);
+  const { items: draftItems } = useRequestDraft();
 
   const validCategoryId = Number.isSafeInteger(categoryId) && categoryId > 0;
   const validCondition =
@@ -107,23 +133,44 @@ const CategoryDrillScreen: React.FC = () => {
     }
     setState("loading");
     try {
+    setLeafFallback(false);
     const response = await getCategoryTree();
     const flat = flattenCategories(response.data);
-    const found = flat.find((c) => c.id === categoryId);
-    setCurrent(found);
+    let found = flat.find((c) => c.id === categoryId);
+    let isLeafFallback = false;
 
-    if (found) {
-      // If this is a level-3 leaf, redirect straight to results.
-      if (found.level === 3) {
-        setState("ready");
+    if (found && found.level === 3) {
+      if (condition === "en_stock") {
+        // Level-3 leaf in en_stock mode: redirect straight to priced results.
+        // Keep state at "loading" (already set above) through the replace —
+        // flipping to "ready" here briefly rendered the empty state (no
+        // children set) before navigation away, flashing "Aucune catégorie
+        // disponible".
+        setCurrent(found);
         router.replace({
           pathname: "/(client)/categories/results",
           params: { categoryId: String(categoryId), condition },
         } as never);
         return;
       }
+      // Occasion mode has no results CTA for a bare leaf (BLOCKER FIX) — show
+      // the leaf's parent drill instead of stranding the user on a priced
+      // list with no way to add the generic part to their request. When the
+      // parent itself cannot be resolved from the tree (stale/broken chain),
+      // fall back to rendering the leaf as a single add-to-list row rather
+      // than the empty state.
+      const parent = findParent(response.data, found.id);
+      if (parent) {
+        found = parent;
+      } else {
+        isLeafFallback = true;
+      }
+    }
 
-      const kids = found.children ?? flat.filter((c) => c.parentId === found.id);
+    setCurrent(found);
+    setLeafFallback(isLeafFallback);
+    if (found) {
+      const kids = isLeafFallback ? [found] : (found.children ?? flat.filter((c) => c.parentId === found.id));
       setChildren(kids);
     }
 
@@ -147,6 +194,12 @@ const CategoryDrillScreen: React.FC = () => {
 
   const handleChildPress = (child: Category) => {
     if (child.level === 3) {
+      if (condition === "occasion") {
+        // Generic part — add the category itself to the request draft, no
+        // product/results detour and no auth gate (guests can add too).
+        setSheetItem({ categoryId: child.id, title: child.title, titleAr: child.titleAr });
+        return;
+      }
       // Leaf — go straight to results.
       router.push({
         pathname: "/(client)/categories/results",
@@ -169,14 +222,9 @@ const CategoryDrillScreen: React.FC = () => {
   };
 
   const handleRequestBanner = () => {
-    router.push((
-      role === Role.CLIENT
-        ? "/(client)/requests/CreateRequestScreen"
-        : clientAuthHref(
-            "/(auth)/ClientLoginScreen",
-            `/(client)/requests/CreateRequestScreen?categoryId=${categoryId}&condition=${condition}`,
-          )
-    ) as Href);
+    // CreateRequestScreen is public — guests build the draft locally and are
+    // only asked to log in at send, so this pushes directly for everyone.
+    router.push("/(client)/requests/CreateRequestScreen" as Href);
   };
 
   // ── Render level-2 children as 2-column grid ──────────────────────────────
@@ -189,23 +237,31 @@ const CategoryDrillScreen: React.FC = () => {
     </View>
   );
 
-  // ── Render level-3 children as list rows with → arrow ─────────────────────
-  const renderListItem = ({ item }: { item: Category }) => (
-    <ItemSubCategoryComponent
-      item={toSubCategoryItem(item)}
-      actionButton={{
-        variant: "secondary",
-        rightIcon: "arrow-right",
-        iconType: "standard",
-        sizeIcon: 14,
-        onPress: () => handleChildPress(item),
-      }}
-      styleContainer={styles.listRow}
-    />
-  );
+  // ── Render level-3 children as list rows with → arrow (en_stock) or an
+  //    "add to list" CTA (occasion) ─────────────────────────────────────────
+  const renderListItem = ({ item }: { item: Category }) => {
+    const isAdded = condition === "occasion" && draftItems.some((draft) => draft.categoryId === item.id);
+    return (
+      <ItemSubCategoryComponent
+        item={toSubCategoryItem(item)}
+        actionButton={condition === "occasion"
+          ? (isAdded
+            ? { variant: "green", leftIcon: "check", title: t("Ajouté"), onPress: () => handleChildPress(item) }
+            : { variant: "primary", title: t("Ajoutez à la liste"), onPress: () => handleChildPress(item) })
+          : {
+            variant: "secondary",
+            rightIcon: "arrow-right",
+            iconType: "standard",
+            sizeIcon: 14,
+            onPress: () => handleChildPress(item),
+          }}
+        styleContainer={styles.listRow}
+      />
+    );
+  };
 
   const isLevelTwoDrill = current?.level === 1 && children.length > 0;
-  const isLevelThreeDrill = current?.level === 2 && children.length > 0;
+  const isLevelThreeDrill = (current?.level === 2 || leafFallback) && children.length > 0;
 
   if (state === "loading") {
     return <Screen whatsapp={false}><View flex alignItems="center"><ActivityIndicator color={Colors.primary} size="large" /></View></Screen>;
@@ -257,14 +313,14 @@ const CategoryDrillScreen: React.FC = () => {
 
         {/* ── Empty state ───────────────────────────────────── */}
         {!isLevelTwoDrill && !isLevelThreeDrill && (
-          <EmptyListComponent title="Aucune catégorie disponible" />
+          <EmptyListComponent title={t("Aucune catégorie disponible")} />
         )}
 
         {/* ── "Vous cherchez d'autres catégories ?" slider ──── */}
         {levelOneCategories.length > 0 && (
           <View style={styles.otherBlock}>
             <SliderBlockComponent<Category>
-              titleBlock="Vous cherchez d'autres catégories ?"
+              titleBlock={t("Vous cherchez d'autres catégories ?")}
               seeAllNavigate="/(client)/categories"
               data={levelOneCategories}
               renderItem={({ item }) => (
@@ -299,6 +355,7 @@ const CategoryDrillScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </View>
+      <AddToListSheet item={sheetItem} onClose={() => setSheetItem(null)} />
     </Screen>
   );
 };

@@ -354,7 +354,7 @@ export default function PrestataireOrdersHistoryScreen(): React.ReactElement {
   };
 
   return (
-    <Screen whatsapp={false} scrollable={false}>
+    <Screen whatsapp={false} scrollable={false} edges={['bottom']}>
       <View style={styles.wrapper}>
         {/* Yellow CustomHeader with back arrow */}
         <CustomHeader title={t("partner.ordersHistory.title")} />

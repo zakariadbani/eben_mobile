@@ -159,7 +159,11 @@ const HomeScreen: React.FC = () => {
     return (
       <TouchableOpacity
         key={category.id}
-        onPress={() => push(`/(client)/categories/${category.id}` as Href)}
+        // ponytail: home has no mode toggle; occasion = demande default
+        onPress={() => push({
+          pathname: "/(client)/categories/[categoryId]",
+          params: { categoryId: String(category.id), condition: "occasion" },
+        } as Href)}
         style={styles.categoryCard}
         accessibilityRole="button"
         accessibilityLabel={isArabic ? category.titleAr : category.title}
@@ -370,7 +374,7 @@ const HomeScreen: React.FC = () => {
           </View>
         </View>
 
-        <View style={styles.stockSection}>{sectionTitle("home.stockProducts", "/(client)/categories")}{productSlider(stockProducts)}</View>
+        <View style={styles.stockSection}>{sectionTitle("home.stockProducts", { pathname: "/(client)/categories", params: { condition: "en_stock" } } as Href)}{productSlider(stockProducts)}</View>
         {promo()}
         <View style={styles.recentSection}>{sectionTitle("home.recentProducts")}{productSlider(recentProducts, true)}</View>
         {promo(true)}

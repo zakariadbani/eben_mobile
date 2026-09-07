@@ -195,7 +195,7 @@ export default function PrestataireWalletScreen(): React.ReactElement {
 
   if (loading) {
     return (
-      <Screen whatsapp={false}>
+      <Screen whatsapp={false} edges={['top', 'bottom']}>
         <View style={styles.headerBar} flexDirection="row" alignItems="center">
           <TouchableOpacity
             onPress={() => router.back()}
@@ -218,7 +218,7 @@ export default function PrestataireWalletScreen(): React.ReactElement {
 
   if (error || !wallet) {
     return (
-      <Screen whatsapp={false} padding>
+      <Screen whatsapp={false} padding edges={['top', 'bottom']}>
         <View flex alignItems="center" justifyContent="center">
           <Text type="default" color={Colors.gray} center>
             {error ?? t('partner.wallet.loadError')}
@@ -234,7 +234,7 @@ export default function PrestataireWalletScreen(): React.ReactElement {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <Screen whatsapp={false} scrollable={false} avoidKeyboard={false}>
+    <Screen whatsapp={false} scrollable={false} avoidKeyboard={false} edges={['top', 'bottom']}>
       {/* ── Header bar ────────────────────────────────────── */}
       <View style={styles.headerBar} flexDirection="row" alignItems="center">
         <TouchableOpacity

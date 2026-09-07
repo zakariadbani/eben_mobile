@@ -1,6 +1,7 @@
 import React from "react";
-import { fireEvent, render, waitFor } from "@testing-library/react-native";
+import { fireEvent, render as rtlRender, waitFor } from "@testing-library/react-native";
 import i18n from "@/localization/i18n";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getCategoryTree } from "@/api/resources/categories";
 import { getVehicles } from "@/api/resources/vehicles";
 import { uploadLocalImages } from "@/api/resources/uploads";
@@ -16,6 +17,8 @@ import {
 import { getVehicle } from "@/api/resources/vehicles";
 import { ApiClientError } from "@/api/types";
 import { CartContext } from "@/context/CartContext";
+import { Role, useSession } from "@/context/AuthContext";
+import { RequestDraftProvider } from "@/context/RequestDraftContext";
 import CreateRequestScreen from "../requests/CreateRequestScreen";
 import RequestListScreen from "../requests";
 import VerificationScreen from "../requests/verification";
@@ -74,6 +77,10 @@ jest.mock("@/components/common/ImageInputList", () => {
 jest.mock("@/context/useStorageState", () => ({
   useStorageState: () => [[false, 42], jest.fn()],
 }));
+jest.mock("@/context/AuthContext", () => ({
+  Role: { CLIENT: "client", PRESTATAIRE: "prestataire" },
+  useSession: jest.fn(),
+}));
 jest.mock("@/api/resources/categories", () => ({ getCategoryTree: jest.fn() }));
 jest.mock("@/api/resources/vehicles", () => ({
   CLIENT_SELECTED_VEHICLE_ID_STORAGE_KEY: "selectedVehicleId",
@@ -124,11 +131,18 @@ const mockGetOffer = getOffer as jest.MockedFunction<typeof getOffer>;
 const mockGetOffers = getOffers as jest.MockedFunction<typeof getOffers>;
 const mockGetVehicle = getVehicle as jest.MockedFunction<typeof getVehicle>;
 const mockAcceptOffer = acceptOffer as jest.MockedFunction<typeof acceptOffer>;
+const mockedUseSession = useSession as jest.MockedFunction<typeof useSession>;
+
+// CreateRequestScreen and the Liste tab now read useRequestDraft() (guests
+// build their draft locally, login only at send) — shadow `render` so every
+// call site below picks up the provider without touching each test.
+function render(ui: React.ReactElement) {
+  return rtlRender(<RequestDraftProvider>{ui}</RequestDraftProvider>);
+}
 
 // ponytail: OfferDetailScreen calls useCart() (throws outside a provider) —
 // this is a lightweight stand-in for CartProvider that skips the real
-// provider's useSession()-gated auto-refresh, so this router-level suite
-// doesn't also need an AuthContext mock just to satisfy the cart context.
+// provider's useSession()-gated auto-refresh.
 function CartTestProvider({ children }: { children: React.ReactNode }) {
   const [basket, setBasket] = React.useState<Basket | null>(null);
   const itemCount = basket?.items?.reduce((n, i) => n + i.quantity, 0) ?? 0;
@@ -175,6 +189,7 @@ beforeEach(async () => {
   jest.clearAllMocks();
   mockParams = {};
   await i18n.changeLanguage("fr");
+  mockedUseSession.mockReturnValue({ role: Role.CLIENT } as ReturnType<typeof useSession>);
   mockGetCategoryTree.mockResolvedValue({ success: true, data: tree });
   mockGetVehicles.mockResolvedValue({ success: true, data: [vehicle], pagination });
   mockUploadLocalImages.mockResolvedValue(["tmp/mobile/5/image.jpg"]);
@@ -247,6 +262,69 @@ it("routes an empty garage to the existing add-car flow without creating a reque
   fireEvent.press(await screen.findByRole("button", { name: i18n.t("requestFlow.addVehicle") }));
   expect(mockPush).toHaveBeenCalledWith("/(client)/search/add-car");
   expect(mockCreateRequest).not.toHaveBeenCalled();
+});
+
+it("hydrates the builder from a persisted draft, upserts the param prefill, and clears the draft after sending", async () => {
+  (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([
+    { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 3, condition: "en_stock" },
+  ]));
+  mockParams = { categoryId: "12" };
+  const screen = render(<CreateRequestScreen />);
+
+  expect(await screen.findByText("Plaquettes")).toBeTruthy();
+
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.verify") }));
+
+  await waitFor(() => expect(mockCreateRequest).toHaveBeenCalledWith({
+    vehicleId: 42,
+    items: [{ categoryId: 12, quantity: 3, condition: "en_stock" }],
+    notes: null,
+    images: [],
+  }));
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith("requestDraft", "[]"));
+});
+
+it("pushes a guest submit to login-to-send instead of creating a request", async () => {
+  mockedUseSession.mockReturnValue({ role: "guest" } as ReturnType<typeof useSession>);
+  const screen = render(<CreateRequestScreen />);
+
+  fireEvent.press(await screen.findByRole("button", { name: "Freins" }));
+  fireEvent.press(screen.getByRole("button", { name: "Freins avant" }));
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.addPart", { name: "Plaquettes" }) }));
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.verify") }));
+
+  expect(mockPush).toHaveBeenCalledWith("/(client)/requests/login-to-send");
+  expect(mockCreateRequest).not.toHaveBeenCalled();
+  expect(mockGetVehicles).not.toHaveBeenCalled();
+});
+
+it("keeps listing the draft and offers the add-car CTA when the garage is empty", async () => {
+  mockGetVehicles.mockResolvedValueOnce({ success: true, data: [], pagination: { ...pagination, total: 0, from: null, to: null } });
+  const screen = render(<CreateRequestScreen />);
+
+  fireEvent.press(await screen.findByRole("button", { name: "Freins" }));
+  fireEvent.press(screen.getByRole("button", { name: "Freins avant" }));
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.addPart", { name: "Plaquettes" }) }));
+
+  expect(screen.getByText("Plaquettes")).toBeTruthy();
+  expect(screen.getByRole("button", { name: i18n.t("requestFlow.addVehicle") })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: i18n.t("requestFlow.verify") })).toBeNull();
+
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.addVehicle") }));
+  expect(mockPush).toHaveBeenCalledWith("/(client)/search/add-car");
+  expect(mockCreateRequest).not.toHaveBeenCalled();
+});
+
+it("shows a draft banner on the Liste tab that opens the request builder", async () => {
+  (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([
+    { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion" },
+  ]));
+  const screen = render(<RequestListScreen />);
+
+  const banner = await screen.findByText(i18n.t("requestFlow.draftBanner", { count: 1 }));
+  fireEvent.press(banner);
+
+  expect(mockPush).toHaveBeenCalledWith("/(client)/requests/CreateRequestScreen");
 });
 
 it("shows request status separately from a pending countdown", async () => {
@@ -486,7 +564,10 @@ it("ignores a stale first-offer response after a fast sibling-offer hop", async 
   const screen = renderWithCart(<OfferDetailScreen />);
 
   mockParams = { requestId: "73", offerId: "89" };
-  screen.rerender(<CartTestProvider><OfferDetailScreen /></CartTestProvider>);
+  // Rerender with the *same* wrapper shape renderWithCart used initially —
+  // a different root element type forces React to unmount+remount the
+  // whole tree instead of diffing OfferDetailScreen in place.
+  screen.rerender(<RequestDraftProvider><CartTestProvider><OfferDetailScreen /></CartTestProvider></RequestDraftProvider>);
 
   expect(await screen.findByText(i18n.t("requestFlow.reference", { value: "OFF-89" }))).toBeTruthy();
 

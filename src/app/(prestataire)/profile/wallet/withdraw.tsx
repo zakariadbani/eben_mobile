@@ -223,7 +223,7 @@ export default function PrestataireWithdrawScreen(): React.ReactElement {
   const selectedMethodLabel = selectedMethodItem ? t(selectedMethodItem.labelKey) : null;
 
   return (
-    <Screen whatsapp={false} scrollable={false} avoidKeyboard={false}>
+    <Screen whatsapp={false} scrollable={false} avoidKeyboard={false} edges={['bottom']}>
       {/* Header */}
       <CustomHeader title={t('partner.withdraw.screenTitle')} />
 

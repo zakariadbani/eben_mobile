@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { StyleSheet } from "react-native";
-import { Audio, AVPlaybackStatus } from "expo-av";
+import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { useTranslation } from "react-i18next";
 import { Text } from "@/components/common/Text";
 import Button from "@/components/common/Button";
@@ -13,83 +13,33 @@ interface AudioPlayerProps {
 
 const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri }) => {
   const { t } = useTranslation();
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const player = useAudioPlayer({ uri });
+  const status = useAudioPlayerStatus(player);
   const [error, setError] = useState(false);
-  const [status, setStatus] = useState({
-    positionMillis: 0,
-    durationMillis: 0,
-  });
 
-  useEffect(() => {
-    return sound
-      ? () => {
-          sound.unloadAsync(); // Unload the sound when component unmounts
-        }
-      : undefined;
-  }, [sound]);
+  const isPlaying = status.playing;
+  const busy = !status.isLoaded;
+  const hasError = error;
 
-  const playSound = async () => {
-    setBusy(true);
+  const togglePlayback = () => {
     setError(false);
     try {
-      const created = await Audio.Sound.createAsync(
-        { uri },
-        { shouldPlay: true },
-        onPlaybackStatusUpdate,
-      );
-      setSound(created.sound);
-      setIsPlaying(true);
-    } catch {
-      setError(true);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onPlaybackStatusUpdate = (playbackStatus: AVPlaybackStatus) => {
-    if (playbackStatus.isLoaded) {
-      setStatus({
-        positionMillis: playbackStatus.positionMillis,
-        durationMillis: playbackStatus.durationMillis ?? 0,
-      });
-      if (playbackStatus.didJustFinish) {
-        setIsPlaying(false);
-      }
-    }
-  };
-
-  const togglePlayback = async () => {
-    if (busy) return;
-    if (!sound) {
-      await playSound();
-      return;
-    }
-
-    setBusy(true);
-    setError(false);
-    try {
-      const playback = await sound.getStatusAsync();
-      if (playback.isLoaded && playback.isPlaying) {
-        await sound.pauseAsync();
-        setIsPlaying(false);
+      if (status.playing) {
+        player.pause();
       } else {
-        await sound.playAsync();
-        setIsPlaying(true);
+        if (status.didJustFinish) player.seekTo(0); // replay after end
+        player.play();
       }
     } catch {
       setError(true);
-    } finally {
-      setBusy(false);
     }
   };
 
-  const formatTime = (millis: number) => {
-    const totalSeconds = Math.floor(millis / 1000);
+  const formatTime = (seconds: number) => {
+    const totalSeconds = Math.floor(seconds);
     const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`;
+    const secs = totalSeconds % 60;
+    return `${minutes}:${secs < 10 ? `0${secs}` : secs}`;
   };
 
   return (
@@ -107,11 +57,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri }) => {
       </View>
       <View style={styles.progressContainer}>
         <Text>
-          {formatTime(status.positionMillis)} /{" "}
-          {formatTime(status.durationMillis)}
+          {formatTime(status.currentTime)} / {formatTime(status.duration)}
         </Text>
       </View>
-      {error ? (
+      {hasError ? (
         <Text accessibilityRole="alert" style={styles.error}>
           {t("requestFlow.audioError")}
         </Text>

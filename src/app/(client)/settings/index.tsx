@@ -8,7 +8,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { Href, useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import View from '@/components/common/View';
@@ -49,7 +49,7 @@ type MenuItem = MenuHeader | MenuRow;
 
 const ClientMenuScreen: React.FC = () => {
   const { t } = useTranslation();
-  const { logOut } = useSession();
+  const { logOut, session } = useSession();
   const router = useRouter();
   const [preferences, setPreferences] = useState<UserNotificationPreferences | null>(null);
   const [preferencesLoading, setPreferencesLoading] = useState(true);
@@ -57,6 +57,7 @@ const ClientMenuScreen: React.FC = () => {
   const [preferencesError, setPreferencesError] = useState<string | null>(null);
   const preferenceMutationRef = useRef(false);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [avatar, setAvatar] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState(false);
 
@@ -66,6 +67,7 @@ const ClientMenuScreen: React.FC = () => {
     try {
       const response = await getProfile();
       setDisplayName(response.data.name);
+      setAvatar(response.data.avatar);
     } catch {
       setProfileError(true);
     } finally {
@@ -212,13 +214,17 @@ const ClientMenuScreen: React.FC = () => {
     router.replace('/(auth)' as never);
   };
 
+  const avatarUri = avatar ?? session?.user.avatar ?? null;
+
   return (
-    <Screen scrollable>
+    <Screen scrollable edges={['top']} wrapperStyle={{ backgroundColor: Colors.primary }}>
       <View style={styles.container}>
         {/* User header */}
         <View flexDirection="row" alignItems="center" style={styles.userHeader}>
           <View style={styles.avatarWrapper}>
-            <Icon name="user" size={36} iconColor={Colors.gray} type="FontAwesome5" />
+            {avatarUri
+              ? <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+              : <Icon name="user" size={36} iconColor={Colors.gray} type="FontAwesome5" />}
           </View>
           <View flex>
             {profileLoading ? <ActivityIndicator size="small" color={Colors.brand} /> : (
@@ -321,6 +327,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+    resizeMode: 'cover',
   },
   bellBtn: {
     width: 40,

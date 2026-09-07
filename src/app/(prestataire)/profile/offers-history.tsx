@@ -117,7 +117,7 @@ export default function PrestataireOffersHistoryScreen(): React.ReactElement {
   );
 
   return (
-    <Screen whatsapp={false} scrollable={false}>
+    <Screen whatsapp={false} scrollable={false} edges={['bottom']}>
       <View flex style={styles.wrapper}>
         <CustomHeader title={t('partner.offersHistory.title')} />
         <PartnerHistoryToolbar monthLabel={groups[0]?.label ?? ''} count={visible.length} query={query} onQueryChange={setQuery} />

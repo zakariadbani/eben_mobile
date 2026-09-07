@@ -54,7 +54,7 @@ export default function PrestataireWalletVerificationScreen(): React.ReactElemen
   const invalidRoute = withdrawalId === null || !phone;
 
   return (
-    <Screen whatsapp={false} scrollable={false} avoidKeyboard={false}>
+    <Screen whatsapp={false} scrollable={false} avoidKeyboard={false} edges={['bottom']}>
       <CustomHeader title={t("partner.verification.screenTitle")} />
       <View flex style={styles.body} alignItems="center" justifyContent="center">
         <RNView style={styles.card} accessibilityLabel={t("partner.verification.screenTitle")}>

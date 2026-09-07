@@ -49,7 +49,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       duration: 500,
       useNativeDriver: true,
     }).start(() => {
-      setTimeout(() => hideNotification(), 50000); // Auto-hide after 5 seconds
+      setTimeout(() => hideNotification(), 5000); // Auto-hide after 5 seconds
     });
   };
 

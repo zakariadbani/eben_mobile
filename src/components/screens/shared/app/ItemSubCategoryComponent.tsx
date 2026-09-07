@@ -140,7 +140,7 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
           {isAdded && !actionButton && !actionButtonTwo && (
             <View style={styles.addedBadge}>
               <Text type="small" color={Colors.greenDark}>
-                Ajouté
+                {t("Ajouté")}
               </Text>
             </View>
           )}

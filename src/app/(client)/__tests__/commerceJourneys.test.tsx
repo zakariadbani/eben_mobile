@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render as rtlRender, waitFor } from '@testing-library/react-native';
 import i18n from '@/localization/i18n';
 import type { Basket } from '@/interfaces/Basket';
 import type { Address } from '@/interfaces/Address';
@@ -11,6 +11,7 @@ import { getAddresses } from '@/api/resources/addresses';
 import { getOrder, placeOrder } from '@/api/resources/orders';
 import { getProfile } from '@/api/resources/users';
 import { CartContext } from '@/context/CartContext';
+import { RequestDraftProvider } from '@/context/RequestDraftContext';
 import CartScreen from '../cart';
 import CheckoutScreen from '../payment';
 import OrderSuccessScreen from '../payment/success';
@@ -53,6 +54,9 @@ jest.mock('@/api/resources/orders', () => ({ getOrder: jest.fn(), placeOrder: je
 jest.mock('@/api/resources/users', () => ({ getProfile: jest.fn() }));
 jest.mock('@/context/ConfirmationContext', () => ({
   useConfirmation: () => ({ showConfirmation: (_title: string, _message: string, confirm: () => void) => confirm() }),
+}));
+jest.mock('@/context/NotificationContext', () => ({
+  useNotification: () => ({ showNotification: jest.fn() }),
 }));
 jest.mock('@/components/common/Button', () => {
   const React = require('react');
@@ -133,6 +137,14 @@ const mockGetAddresses = getAddresses as jest.MockedFunction<typeof getAddresses
 const mockGetProfile = getProfile as jest.MockedFunction<typeof getProfile>;
 const mockPlaceOrder = placeOrder as jest.MockedFunction<typeof placeOrder>;
 const mockGetOrder = getOrder as jest.MockedFunction<typeof getOrder>;
+
+// ProductDetailScreen now mounts AddToListSheet unconditionally (occasion
+// vs en_stock is decided inside the sheet, toggling only CustomModal's
+// `visible` prop) — shadow `render` so every call site below picks up
+// useRequestDraft() without touching each test.
+function render(ui: React.ReactElement) {
+  return rtlRender(<RequestDraftProvider>{ui}</RequestDraftProvider>);
+}
 
 // ponytail: CartScreen/CheckoutScreen call useCart() (throws outside a
 // provider) — this is a lightweight stand-in for CartProvider, skipping the

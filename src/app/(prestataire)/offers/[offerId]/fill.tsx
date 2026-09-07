@@ -366,7 +366,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
 
   if (submitDone) {
     return (
-      <Screen whatsapp={false} scrollable={false}>
+      <Screen whatsapp={false} scrollable={false} edges={['bottom']}>
         <CustomHeader title="partner.fill.title" />
         <View flex justifyContent="center" alignItems="center" p={24} gap={20}>
           <Text type="headerTitle" semiBold color={Colors.brand} center>
@@ -391,7 +391,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
 
   if (loadingRequest) {
     return (
-      <Screen whatsapp={false} scrollable={false}>
+      <Screen whatsapp={false} scrollable={false} edges={['bottom']}>
         <CustomHeader title="partner.fill.title" />
         <View flex justifyContent="center" alignItems="center">
           <ActivityIndicator size="large" color={Colors.primary} />
@@ -402,7 +402,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
 
   if (loadError || (isResendMode ? !existingOffer : !request)) {
     return (
-      <Screen whatsapp={false} scrollable={false}>
+      <Screen whatsapp={false} scrollable={false} edges={['bottom']}>
         <CustomHeader title="partner.fill.title" />
         <View flex justifyContent="center" alignItems="center" p={24} gap={16}>
           <Text type="default" color={Colors.red} center>
@@ -419,7 +419,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   // ── Main render ────────────────────────────────────────────────────────────
 
   return (
-    <Screen whatsapp={false} scrollable={false}>
+    <Screen whatsapp={false} scrollable={false} edges={['bottom']}>
       <CustomHeader title="partner.fill.title" />
 
       <KeyboardAvoidingView

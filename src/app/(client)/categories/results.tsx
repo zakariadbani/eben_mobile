@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next";
 
 import {
   addToWishlist,
-  getCategories,
   getCategoryTree,
   getProductsByCategory,
   searchAllPneumatics,
@@ -262,17 +261,6 @@ const CategoryResultsScreen: React.FC = () => {
         }}
         showPrice
         styleContainer={styles.resultCard}
-        actionButton={condition === "occasion" && item.isProduct ? {
-          variant: "primary",
-          title: t("Ajoutez à la liste"),
-          onPress: () => requireClient(
-            `/(client)/requests/CreateRequestScreen?categoryId=${categoryId}&productId=${item.id}`,
-            () => router.push({
-            pathname: "/(client)/requests/CreateRequestScreen",
-            params: { categoryId: String(categoryId), productId: String(item.id) },
-          } as Href),
-          ),
-        } : undefined}
         actionButtonTwo={item.isProduct ? {
           variant: "secondary",
           leftIcon: "heart",
@@ -324,7 +312,7 @@ const CategoryResultsScreen: React.FC = () => {
         {categories.length > 0 ? (
           <View style={styles.otherBlock}>
             <SliderBlockComponent<Category>
-              titleBlock="Vous cherchez d'autres catégories ?"
+              titleBlock={t("Vous cherchez d'autres catégories ?")}
               seeAllNavigate="/(client)/categories"
               data={categories}
               renderItem={({ item }) => (
@@ -345,10 +333,7 @@ const CategoryResultsScreen: React.FC = () => {
 
         <View style={styles.pubBlock}>
           <TouchableOpacity
-            onPress={() => requireClient(
-              "/(client)/requests/CreateRequestScreen",
-              () => router.push("/(client)/requests/CreateRequestScreen" as Href),
-            )}
+            onPress={() => router.push("/(client)/requests/CreateRequestScreen" as Href)}
             accessibilityRole="button"
             accessibilityLabel={t("Placer une demande")}
             activeOpacity={0.9}

@@ -158,7 +158,7 @@ export default function EditProfileScreen(): React.ReactElement {
 
   if (loading) {
     return (
-      <Screen whatsapp={false}>
+      <Screen whatsapp={false} edges={['bottom']}>
         {pageHeader}
         <View flex alignItems="center" justifyContent="center">
           <ActivityIndicator color={Colors.primary} size="large" />
@@ -169,7 +169,7 @@ export default function EditProfileScreen(): React.ReactElement {
 
   if (error || !profile) {
     return (
-      <Screen whatsapp={false}>
+      <Screen whatsapp={false} edges={['bottom']}>
         {pageHeader}
         <View flex alignItems="center" justifyContent="center" p={24}>
           <Text type="label" color={Colors.grayMidDark} center>
@@ -192,7 +192,7 @@ export default function EditProfileScreen(): React.ReactElement {
   const displayEmail = profile.email ?? '';
 
   return (
-    <Screen whatsapp scrollable>
+    <Screen whatsapp scrollable edges={['bottom']}>
       {pageHeader}
 
       {/* ── Avatar section — white background, left-aligned row per Figma ── */}

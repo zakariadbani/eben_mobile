@@ -147,7 +147,7 @@ export default function PrestataireNotificationsScreen(): React.ReactElement {
   );
 
   return (
-    <Screen whatsapp={false} scrollable={false}>
+    <Screen whatsapp={false} scrollable={false} edges={['bottom']}>
       <View flex style={styles.wrapper}>
         <CustomHeader title={t('partner.notifications.title')} />
         <View style={styles.subHeader} flexDirection="row" alignItems="center" gap={8}>

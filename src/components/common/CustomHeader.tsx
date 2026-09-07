@@ -1,5 +1,6 @@
 import React from "react";
-import { SafeAreaView, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Colors from "@/constants/Colors";
 import GoBack from "@/components/common/GoBack";
 import View from "@/components/common/View";
@@ -22,6 +23,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
 }) => {
   return (
     <SafeAreaView
+      edges={['top']}
       style={[styles.container, { backgroundColor }]}
     >
       <View style={styles.headerContent} flexDirection="row">
