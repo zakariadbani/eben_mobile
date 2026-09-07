@@ -35,7 +35,7 @@ const GoBack: React.FC<GoBackProps> = ({
   return (
     <Button
       outline
-      rightIcon={i18n.language === "ar" ? "arrowright" : "arrowleft"}
+      rightIcon={i18n.language === "ar" ? "arrow-right" : "arrow-left"}
       iconTypeName="AntDesign"
       style={StyleSheet.flatten([styles.button, style])}
       iconColor={iconColor}

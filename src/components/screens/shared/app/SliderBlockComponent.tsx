@@ -34,7 +34,7 @@ function SliderBlockComponent<T extends { id: number | string }>({
   renderItem,
 }: SliderBlockComponentProps<T>): React.ReactElement {
   // HorizontalSlider's internal signature uses `any`; cast here so callers stay typed.
-  const castRenderItem = renderItem as (item: { item: unknown }) => JSX.Element;
+  const castRenderItem = renderItem as (item: { item: unknown }) => React.JSX.Element;
 
   return (
     <View style={styles.container}>

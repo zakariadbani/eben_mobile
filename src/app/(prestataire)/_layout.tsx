@@ -2,6 +2,7 @@ import { Href, Tabs, useRouter } from "expo-router";
 import React from "react";
 import { Image, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useTranslation } from "react-i18next";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   TabBarIcon,
@@ -25,9 +26,7 @@ const TAB_BAR_STYLE = StyleSheet.create({
   bar: {
     backgroundColor: Colors.white,
     borderTopWidth: 0,
-    height: Platform.OS === "android" ? 72 : 82,
     paddingTop: 6,
-    paddingBottom: Platform.OS === "android" ? 6 : 12,
     ...Platform.select({
       ios: {
         shadowColor: Colors.borderLight,
@@ -40,6 +39,12 @@ const TAB_BAR_STYLE = StyleSheet.create({
   },
   item: {
     minHeight: 48,
+  },
+  barRtl: {
+    transform: [{ scaleX: -1 }],
+  },
+  itemRtl: {
+    transform: [{ scaleX: -1 }],
   },
   headerRow: {
     width: "100%",
@@ -112,7 +117,11 @@ const PartnerDashboardHeader: React.FC = () => {
 // Layout
 // ---------------------------------------------------------------------------
 export default function PrestataireLayout() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === "ar";
+  const insets = useSafeAreaInsets();
+  const barHeight = (Platform.OS === "android" ? 60 : 56) + insets.bottom;
+  const barPaddingBottom = Math.max(insets.bottom, Platform.OS === "android" ? 6 : 12);
 
   const customHeader = (props: { options: { title?: string } }) => (
     <CustomHeader
@@ -128,8 +137,12 @@ export default function PrestataireLayout() {
       screenOptions={{
         headerShown: true,
         header: customHeader,
-        tabBarStyle: TAB_BAR_STYLE.bar,
-        tabBarItemStyle: TAB_BAR_STYLE.item,
+        tabBarStyle: [
+          TAB_BAR_STYLE.bar,
+          { height: barHeight, paddingBottom: barPaddingBottom },
+          isArabic && TAB_BAR_STYLE.barRtl,
+        ],
+        tabBarItemStyle: [TAB_BAR_STYLE.item, isArabic && TAB_BAR_STYLE.itemRtl],
       }}
     >
       {/* ================================================================
@@ -223,7 +236,7 @@ export default function PrestataireLayout() {
           ================================================================ */}
       <Tabs.Screen
         name="settings"
-        options={{ tabBarButton: () => null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
 
       {/* ================================================================
@@ -231,7 +244,7 @@ export default function PrestataireLayout() {
           ================================================================ */}
       <Tabs.Screen
         name="orders/[orderId]/index"
-        options={{ tabBarButton: () => null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
 
       {/* ================================================================
@@ -239,15 +252,15 @@ export default function PrestataireLayout() {
           ================================================================ */}
       <Tabs.Screen
         name="offers/[offerId]/index"
-        options={{ tabBarButton: () => null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
       <Tabs.Screen
         name="offers/[offerId]/fill"
-        options={{ tabBarButton: () => null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
       <Tabs.Screen
         name="offers/[offerId]/ship"
-        options={{ tabBarButton: () => null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
 
       {/* ================================================================
@@ -255,55 +268,55 @@ export default function PrestataireLayout() {
           ================================================================ */}
       <Tabs.Screen
         name="profile/overview"
-        options={{ tabBarButton: () => null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
       <Tabs.Screen
         name="profile/edit"
-        options={{ tabBarButton: () => null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
       <Tabs.Screen
         name="profile/company"
-        options={{ tabBarButton: () => null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
       <Tabs.Screen
         name="profile/wallet/index"
-        options={{ tabBarButton: () => null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
       <Tabs.Screen
         name="profile/wallet/withdraw"
-        options={{ tabBarButton: () => null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
       <Tabs.Screen
         name="profile/wallet/verification"
-        options={{ tabBarButton: () => null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
       <Tabs.Screen
         name="profile/wallet/success"
-        options={{ tabBarButton: () => null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
       <Tabs.Screen
         name="profile/orders-history"
-        options={{ tabBarButton: () => null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
       <Tabs.Screen
         name="profile/offers-history"
-        options={{ tabBarButton: () => null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
       <Tabs.Screen
         name="profile/notifications"
-        options={{ tabBarButton: () => null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
       <Tabs.Screen
         name="profile/language"
-        options={{ tabBarButton: () => null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
       <Tabs.Screen
         name="profile/about"
-        options={{ tabBarButton: () => null, title: t("partner.profile.aboutEben"), tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, title: t("partner.profile.aboutEben"), tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
       <Tabs.Screen
         name="profile/legal"
-        options={{ tabBarButton: () => null, title: t("partner.profile.terms"), tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, title: t("partner.profile.terms"), tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
       />
     </Tabs>
   );

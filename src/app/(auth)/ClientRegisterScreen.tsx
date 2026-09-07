@@ -125,7 +125,7 @@ export default function ClientRegisterScreen() {
               <Button
                 title={t("auth.register.confirmBack")}
                 variant="pink"
-                leftIcon="closecircleo"
+                leftIcon="close-circle"
                 iconTypeName="AntDesign"
                 style={styles.modalButton}
                 onPress={() => setPending(null)}
@@ -137,7 +137,7 @@ export default function ClientRegisterScreen() {
                     ? t("auth.register.submitting")
                     : t("auth.register.confirmContinue")
                 }
-                leftIcon="checkcircleo"
+                leftIcon="check-circle"
                 iconTypeName="AntDesign"
                 style={styles.modalButton}
                 onPress={() => void handleConfirm()}

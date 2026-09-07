@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 interface HorizontalSliderProps {
   data: any; // Replace with your data structure
-  renderItem: (item: { item: any }) => JSX.Element;
+  renderItem: (item: { item: any }) => React.JSX.Element;
 }
 
 const HorizontalSlider: React.FC<HorizontalSliderProps> = ({

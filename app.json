@@ -13,14 +13,22 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ExpoLocalization_supportsRTL": true
+      }
     },
     "android": {
       "package": "com.eben.mobile",
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -28,7 +36,11 @@
       "favicon": "./src/assets/images/favicon.png"
     },
     "extra": {
-      "supportsRTL": true
+      "supportsRTL": true,
+      "router": {},
+      "eas": {
+        "projectId": "627b67bb-9e80-4587-99f4-0c9f772a8e83"
+      }
     },
     "plugins": [
       "expo-router",
@@ -43,6 +55,7 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "owner": "zakariadb"
   }
 }

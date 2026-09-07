@@ -108,3 +108,8 @@ graphify-out/
 
 # Local Expo integration target (never commit environment-specific URLs)
 .env.local
+
+# Android release signing
+credentials/
+*.keystore
+*.jks

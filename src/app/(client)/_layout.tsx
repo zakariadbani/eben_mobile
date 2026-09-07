@@ -2,6 +2,7 @@ import { Href, Tabs, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Image, Platform, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useTranslation } from "react-i18next";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   TabBarIcon,
@@ -43,9 +44,7 @@ const TAB_BAR_STYLE = StyleSheet.create({
   bar: {
     backgroundColor: Colors.white,
     borderTopWidth: 0,
-    height: Platform.OS === "android" ? 72 : 82,
     paddingTop: 6,
-    paddingBottom: Platform.OS === "android" ? 6 : 12,
     ...Platform.select({
       ios: {
         shadowColor: Colors.borderLight,
@@ -204,6 +203,9 @@ function ClientTabs() {
   const { itemCount } = useCart();
   const router = useRouter();
   const [guestAuthVisible, setGuestAuthVisible] = useState(false);
+  const insets = useSafeAreaInsets();
+  const barHeight = (Platform.OS === "android" ? 60 : 56) + insets.bottom;
+  const barPaddingBottom = Math.max(insets.bottom, Platform.OS === "android" ? 6 : 12);
 
   const customHeader = (props: { options: { title?: string } }) => (
     <CustomHeader
@@ -303,7 +305,11 @@ function ClientTabs() {
         screenOptions={{
           headerShown: true,
           header: customHeader,
-          tabBarStyle: [TAB_BAR_STYLE.bar, isArabic && TAB_BAR_STYLE.barRtl],
+          tabBarStyle: [
+            TAB_BAR_STYLE.bar,
+            { height: barHeight, paddingBottom: barPaddingBottom },
+            isArabic && TAB_BAR_STYLE.barRtl,
+          ],
           tabBarItemStyle: [TAB_BAR_STYLE.item, isArabic && TAB_BAR_STYLE.itemRtl],
         }}
       >
@@ -346,7 +352,7 @@ function ClientTabs() {
         name="categories/[categoryId]/index"
         options={{
           title: t("Détails"),
-          tabBarButton: () => null,
+          href: null,
           header: backHeader,
         }}
       />
@@ -356,7 +362,7 @@ function ClientTabs() {
         name="categories/results"
         options={{
           title: t("Recherche"),
-          tabBarButton: () => null,
+          href: null,
           header: backHeader,
         }}
       />
@@ -366,7 +372,7 @@ function ClientTabs() {
         name="search/index"
         options={{
           title: t("Recherche pneumatiques"),
-          tabBarButton: () => null,
+          href: null,
           header: () => <TyreSearchHeader />,
         }}
       />
@@ -374,14 +380,14 @@ function ClientTabs() {
         name="search/add-car"
         options={{
           title: t("Ajouter une voiture"),
-          tabBarButton: () => null,
+          href: null,
         }}
       />
       <Tabs.Screen
         name="search/change-car"
         options={{
           title: t("Changer de voiture"),
-          tabBarButton: () => null,
+          href: null,
         }}
       />
 
@@ -406,21 +412,21 @@ function ClientTabs() {
         name="requests/CreateRequestScreen"
         options={{
           title: t("Placer une demande"),
-          tabBarButton: () => null,
+          href: null,
         }}
       />
       <Tabs.Screen
         name="requests/OrdersListScreen"
         options={{
           title: t("Mes commandes"),
-          tabBarButton: () => null,
+          href: null,
         }}
       />
       <Tabs.Screen
         name="requests/verification"
         options={{
           title: t("Votre liste"),
-          tabBarButton: () => null,
+          href: null,
           header: backHeader,
         }}
       />
@@ -428,7 +434,7 @@ function ClientTabs() {
         name="requests/success"
         options={{
           title: t("Votre liste"),
-          tabBarButton: () => null,
+          href: null,
           header: backHeader,
         }}
       />
@@ -436,7 +442,7 @@ function ClientTabs() {
         name="requests/login-to-send"
         options={{
           title: t("Votre liste"),
-          tabBarButton: () => null,
+          href: null,
           header: backHeader,
         }}
       />
@@ -444,7 +450,7 @@ function ClientTabs() {
         name="requests/[requestId]/index"
         options={{
           title: t("Votre liste"),
-          tabBarButton: () => null,
+          href: null,
           header: backHeader,
         }}
       />
@@ -452,7 +458,7 @@ function ClientTabs() {
         name="requests/[requestId]/offers/index"
         options={{
           title: t("Vos offres"),
-          tabBarButton: () => null,
+          href: null,
           header: backHeader,
         }}
       />
@@ -460,7 +466,7 @@ function ClientTabs() {
         name="requests/[requestId]/offers/[offerId]/index"
         options={{
           title: t("Détails"),
-          tabBarButton: () => null,
+          href: null,
           header: backHeader,
         }}
       />
@@ -490,7 +496,7 @@ function ClientTabs() {
         options={{
           title: t("Caisse de sortie"),
           header: backHeaderWithSupport,
-          tabBarButton: () => null,
+          href: null,
           tabBarStyle: { display: "none" },
         }}
       />
@@ -501,7 +507,7 @@ function ClientTabs() {
         options={{
           title: t("Commande effectuée"),
           header: backHeaderWithSupport,
-          tabBarButton: () => null,
+          href: null,
           tabBarStyle: { display: "none" },
         }}
       />
@@ -514,7 +520,7 @@ function ClientTabs() {
         options={{
           title: t("productDetail.title"),
           header: backHeader,
-          tabBarButton: () => null,
+          href: null,
         }}
       />
       <Tabs.Screen
@@ -522,7 +528,7 @@ function ClientTabs() {
         options={{
           title: t("reviews.screenTitle"),
           header: backHeader,
-          tabBarButton: () => null,
+          href: null,
         }}
       />
       <Tabs.Screen
@@ -530,14 +536,14 @@ function ClientTabs() {
         options={{
           title: t("review.screenTitle"),
           header: backHeader,
-          tabBarButton: () => null,
+          href: null,
         }}
       />
       <Tabs.Screen
         name="products/[productId]/report"
         options={{
           title: t("report.screenTitle"),
-          tabBarButton: () => null,
+          href: null,
           header: backHeader,
         }}
       />
@@ -570,63 +576,63 @@ function ClientTabs() {
       {/* Hidden: settings sub-screens */}
       <Tabs.Screen
         name="settings/profile/index"
-        options={{ title: t("Modifier mon profil"), tabBarButton: () => null, header: darkHeader }}
+        options={{ title: t("Modifier mon profil"), href: null, header: darkHeader }}
       />
       <Tabs.Screen
         name="settings/profile/verify-phone"
-        options={{ title: t("settings.profile.verifyPhoneTitle"), tabBarButton: () => null, header: darkHeader }}
+        options={{ title: t("settings.profile.verifyPhoneTitle"), href: null, header: darkHeader }}
       />
       <Tabs.Screen
         name="settings/orders/index"
-        options={{ title: t("Mes commandes"), tabBarButton: () => null, header: darkHeader }}
+        options={{ title: t("Mes commandes"), href: null, header: darkHeader }}
       />
       <Tabs.Screen
         name="settings/orders/[orderId]/index"
-        options={{ title: t("Ma commande"), tabBarButton: () => null, header: darkHeader }}
+        options={{ title: t("Ma commande"), href: null, header: darkHeader }}
       />
       <Tabs.Screen
         name="settings/archived-offers/index"
-        options={{ title: t("Archives de mes offres"), tabBarButton: () => null, header: darkHeader }}
+        options={{ title: t("Archives de mes offres"), href: null, header: darkHeader }}
       />
       <Tabs.Screen
         name="settings/parking/index"
-        options={{ title: t("Mon garage"), tabBarButton: () => null, header: darkHeader }}
+        options={{ title: t("Mon garage"), href: null, header: darkHeader }}
       />
       <Tabs.Screen
         name="settings/addresses/index"
-        options={{ title: t("Mes adresses"), tabBarButton: () => null, header: darkHeader }}
+        options={{ title: t("Mes adresses"), href: null, header: darkHeader }}
       />
       <Tabs.Screen
         name="settings/addresses/add"
-        options={{ title: t("Ajouter une adresse"), tabBarButton: () => null, header: darkHeader }}
+        options={{ title: t("Ajouter une adresse"), href: null, header: darkHeader }}
       />
       <Tabs.Screen
         name="settings/addresses/[addressId]/index"
-        options={{ title: t("Modifier l'adresse"), tabBarButton: () => null, header: darkHeader }}
+        options={{ title: t("Modifier l'adresse"), href: null, header: darkHeader }}
       />
       <Tabs.Screen
         name="settings/payment/index"
-        options={{ title: t("Mes détails de paiement"), tabBarButton: () => null, header: darkHeader }}
+        options={{ title: t("Mes détails de paiement"), href: null, header: darkHeader }}
       />
       <Tabs.Screen
         name="settings/notifications/index"
-        options={{ title: t("Notifications"), tabBarButton: () => null, header: darkHeader }}
+        options={{ title: t("Notifications"), href: null, header: darkHeader }}
       />
       <Tabs.Screen
         name="settings/wishlist/index"
-        options={{ title: t("Ma liste de souhaits"), tabBarButton: () => null, header: darkHeader }}
+        options={{ title: t("Ma liste de souhaits"), href: null, header: darkHeader }}
       />
       <Tabs.Screen
         name="settings/pages/About"
-        options={{ title: t("À propos"), tabBarButton: () => null, header: darkHeader }}
+        options={{ title: t("À propos"), href: null, header: darkHeader }}
       />
       <Tabs.Screen
         name="settings/pages/Legal"
-        options={{ title: t("settings.terms"), tabBarButton: () => null, header: darkHeader }}
+        options={{ title: t("settings.terms"), href: null, header: darkHeader }}
       />
       <Tabs.Screen
         name="settings/language/index"
-        options={{ title: t("Langue"), tabBarButton: () => null }}
+        options={{ title: t("Langue"), href: null }}
       />
 
       </Tabs>

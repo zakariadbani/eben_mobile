@@ -10,7 +10,8 @@ import { mockCategories } from './mockCategories';
 
 const byId = new Map<number, Category>(mockCategories.map((c) => [c.id, c]));
 
-export function categoryImageFor(categoryId: number): ReturnType<typeof require> | string {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- require() asset id (number) or a string URL; `any` matches the pre-SDK54 inferred type.
+export function categoryImageFor(categoryId: number): any {
   let current = byId.get(categoryId);
   while (current) {
     if (current.image) return current.image;

@@ -3,6 +3,7 @@ import { Stack, useGlobalSearchParams, usePathname, useRouter, useSegments, Href
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { View, ActivityIndicator } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { SessionProvider, useSession } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
@@ -20,9 +21,11 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   return (
-    <SessionProvider>
-      <RootLayoutContent />
-    </SessionProvider>
+    <SafeAreaProvider>
+      <SessionProvider>
+        <RootLayoutContent />
+      </SessionProvider>
+    </SafeAreaProvider>
   );
 }
 

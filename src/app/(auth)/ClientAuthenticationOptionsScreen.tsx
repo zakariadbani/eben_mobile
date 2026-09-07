@@ -52,7 +52,7 @@ const ClientAuthenticationOptionsScreen = () => {
               />
               <View flexDirection="row">
                 <Icon
-                  name="infocirlceo"
+                  name="info-circle"
                   size={10}
                   iconColor={Colors.light}
                   type="AntDesign"

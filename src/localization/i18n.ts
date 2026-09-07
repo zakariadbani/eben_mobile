@@ -13,7 +13,7 @@ const resources = {
 
 const getDefaultLanguage = (): string => {
   try {
-    return Localization.locale.split("-")[0] || "fr";
+    return Localization.getLocales()[0]?.languageCode || "fr";
   } catch {
     return "fr";
   }
