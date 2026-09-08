@@ -378,8 +378,10 @@
   "Gérez vos voitures": "إدارة سياراتك",
   "Vos autres voitures": "سياراتك الأخرى",
   "Ajoutez": "أضف",
+  "Ajoutez à la liste": "أضف إلى القائمة",
   "Catégorie": "الفئة",
   "Category": "الفئة",
+  "Condition": "الحالة",
   "Produit introuvable": "المنتج غير موجود",
   "Retour": "رجوع",
   "en stock": "في المخزون",
@@ -1117,6 +1119,10 @@
   "requestList.condition": "الحالة: {{condition}}",
   "requestList.quantity": "الكمية: {{count}}",
   "requestList.category": "الفئة : {{value}}",
+  "requestFlow.detailTitle": "قائمتك - {{reference}}",
+  "requestFlow.offersCount": "X{{count}}",
+  "requestFlow.noOffer": "لا يوجد عرض",
+  "requestFlow.resend": "إعادة الإرسال",
   "guestAuth.title": "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644",
   "guestAuth.body": "\u064a\u062c\u0628 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0623\u0648 \u0625\u0646\u0634\u0627\u0621 \u062d\u0633\u0627\u0628 \u0644\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0645\u0644\u0641\u0643 \u0627\u0644\u0634\u062e\u0635\u064a.",
   "guestAuth.createAccount": "\u0625\u0646\u0634\u0627\u0621 \u062d\u0633\u0627\u0628",
@@ -1139,9 +1145,9 @@
   "requestFlow.no": "\u0644\u0627",
   "requestFlow.verify": "\u062a\u062d\u0642\u0642 \u0648\u0623\u0631\u0633\u0644 \u0627\u0644\u0642\u0627\u0626\u0645\u0629",
   "requestFlow.submitting": "\u062c\u0627\u0631\u064d \u0627\u0644\u0625\u0646\u0634\u0627\u0621...",
-  "requestFlow.send": "\u0646\u0639\u0645\u060c \u0625\u0631\u0633\u0627\u0644",
+  "requestFlow.send": "\u0646\u0639\u0645\u060c \u0623\u0631\u0633\u0644",
   "requestFlow.sending": "\u062c\u0627\u0631\u064d \u0627\u0644\u0625\u0631\u0633\u0627\u0644...",
-  "requestFlow.edit": "\u062a\u0639\u062f\u064a\u0644",
+  "requestFlow.edit": "\u0644\u0627\u060c \u062a\u0639\u062f\u064a\u0644",
   "requestFlow.retry": "\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629",
   "requestFlow.back": "\u0631\u062c\u0648\u0639",
   "requestFlow.loadError": "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062a",
@@ -1443,4 +1449,8 @@
   ,"D\u00e9tails de l'offre": "\u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u0639\u0631\u0636"
   ,"En attente de votre commande": "\u0641\u064a \u0627\u0646\u062a\u0638\u0627\u0631 \u0637\u0644\u0628\u0643"
   ,"Vos autres offres": "\u0639\u0631\u0648\u0636\u0643 \u0627\u0644\u0623\u062e\u0631\u0649"
+  ,"update.title": "\u0625\u0635\u062f\u0627\u0631 \u062c\u062f\u064a\u062f \u0645\u062a\u0627\u062d"
+  ,"update.body": "\u064a\u062a\u0648\u0641\u0631 \u0625\u0635\u062f\u0627\u0631 \u062c\u062f\u064a\u062f \u0645\u0646 EBEN \u0639\u0644\u0649 Google Play. \u0642\u0645 \u0628\u0627\u0644\u062a\u062d\u062f\u064a\u062b \u0644\u0644\u0627\u0633\u062a\u0641\u0627\u062f\u0629 \u0645\u0646 \u0622\u062e\u0631 \u0627\u0644\u062a\u062d\u0633\u064a\u0646\u0627\u062a."
+  ,"update.cta": "\u062a\u062d\u062f\u064a\u062b"
+  ,"update.later": "\u0644\u0627\u062d\u0642\u0627\u064b"
 }

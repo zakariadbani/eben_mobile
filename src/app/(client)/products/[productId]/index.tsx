@@ -609,7 +609,7 @@ const ProductDetailScreen: React.FC = () => {
       </CustomModal>
 
       <AddToListSheet
-        item={showListSheet ? { categoryId: product.categoryId, title: product.categoryName, titleAr: product.categoryNameAr } : null}
+        item={showListSheet ? { categoryId: product.categoryId, title: product.categoryName, titleAr: product.categoryNameAr, image: product.images[0] ?? null } : null}
         onClose={() => setShowListSheet(false)}
       />
     </Screen>

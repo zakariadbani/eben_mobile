@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet } from "react-native";
+import { ActivityIndicator, Image, ScrollView, StyleSheet } from "react-native";
 import { Href, useLocalSearchParams, useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/core";
 import { useTranslation } from "react-i18next";
@@ -7,12 +7,17 @@ import Screen from "@/components/common/Screen";
 import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
 import Button from "@/components/common/Button";
-import ImageSlider from "@/components/common/ImageSlider";
+import Icon from "@/components/common/Icon";
+import CountdownRing from "@/components/common/CountdownRing";
 import ProgressStepperComponent from "@/components/screens/shared/app/ProgressStepperComponent";
+import RequestPartCard from "@/components/screens/client/requests/RequestPartCard";
+import RequestSummaryCard, { isActiveRequest } from "@/components/screens/client/requests/RequestSummaryCard";
 import Colors from "@/constants/Colors";
-import { getRequest } from "@/api/resources/requests";
+import { getRequest, getOffers, getRequests } from "@/api/resources/requests";
+import { getCategoryTree } from "@/api/resources/categories";
+import { buildCategoryLookup, resolveImageSource, type CategoryLookupEntry } from "@/helpers/categoryLookup";
 import { useCountdown } from "@/helpers/countdown";
-import type { Request, RequestStatus } from "@/interfaces/Request";
+import type { Request, RequestItem, RequestStatus, RequestSummary } from "@/interfaces/Request";
 
 function positiveId(value: string | undefined): number | null {
   if (!value || !/^\d+$/.test(value)) return null;
@@ -32,14 +37,26 @@ const REQUEST_STEP: Record<RequestStatus, number | null> = {
   cancelled: null,
 };
 
+interface EnrichedItem {
+  item: RequestItem;
+  title: string;
+  categoryLabel: string | null;
+  image: ReturnType<typeof resolveImageSource>;
+  conditionLabel: string;
+}
+
 export default function RequestDetailScreen() {
   const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === "ar";
   const router = useRouter();
   const navigation = useNavigation();
   const params = useLocalSearchParams<{ requestId?: string }>();
   const requestId = positiveId(params.requestId);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [request, setRequest] = useState<Request | null>(null);
+  const [lookup, setLookup] = useState<Map<number, CategoryLookupEntry>>(new Map());
+  const [offersByItem, setOffersByItem] = useState<Map<number, number>>(new Map());
+  const [otherRequests, setOtherRequests] = useState<RequestSummary[]>([]);
   const countdown = useCountdown(request?.expiresAt ?? null, t("Expiré"));
 
   const load = useCallback(async () => {
@@ -47,7 +64,31 @@ export default function RequestDetailScreen() {
     setState("loading");
     try {
       const response = await getRequest(requestId);
-      setRequest(response.data);
+      const data = response.data;
+      setRequest(data);
+
+      const categoryPromise = getCategoryTree().catch(() => null);
+      if (data.offersCount > 0) {
+        const [categoryResponse, offersResponse] = await Promise.all([
+          categoryPromise,
+          getOffers(requestId).catch(() => null),
+        ]);
+        setLookup(categoryResponse ? buildCategoryLookup(categoryResponse.data) : new Map());
+        const counts = new Map<number, number>();
+        for (const offer of offersResponse?.data ?? []) {
+          counts.set(offer.requestItemId, (counts.get(offer.requestItemId) ?? 0) + 1);
+        }
+        setOffersByItem(counts);
+        setOtherRequests([]);
+      } else {
+        const [categoryResponse, requestsResponse] = await Promise.all([
+          categoryPromise,
+          getRequests().catch(() => null),
+        ]);
+        setLookup(categoryResponse ? buildCategoryLookup(categoryResponse.data) : new Map());
+        setOffersByItem(new Map());
+        setOtherRequests((requestsResponse?.data ?? []).filter(isActiveRequest).filter((r) => r.id !== data.id));
+      }
       setState("ready");
     } catch {
       setState("error");
@@ -56,7 +97,7 @@ export default function RequestDetailScreen() {
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
-    if (request) navigation.setOptions({ title: t("requestFlow.requestReference", { reference: request.reference }) });
+    if (request) navigation.setOptions({ title: t("requestFlow.detailTitle", { reference: request.reference }) });
   }, [navigation, request, t]);
 
   if (state === "loading") return <Screen whatsapp={false}><View flex style={styles.centered}><ActivityIndicator color={Colors.primary} /></View></Screen>;
@@ -83,89 +124,168 @@ export default function RequestDetailScreen() {
   const showCountdownRing = !isExpired
     && request.expiresAt != null
     && (request.status === "pending" || request.status === "offers_received");
+
+  const enrichedItems: EnrichedItem[] = (request.items ?? []).map((item) => {
+    const info = lookup.get(item.categoryId);
+    const title = (isArabic ? item.categoryTitleAr ?? item.categoryTitle : item.categoryTitle) ?? "";
+    const categoryLabel = (isArabic ? info?.categoryTitleAr : info?.categoryTitle) ?? null;
+    const image = resolveImageSource(item.categoryImage ?? info?.image);
+    const conditionLabel = t(`requestFlow.condition.${item.condition}`);
+    return { item, title, categoryLabel, image, conditionLabel };
+  });
+
+  const groups: { title: string; entries: EnrichedItem[] }[] = [];
+  if (hasOffers) {
+    const groupIndex = new Map<string, number>();
+    for (const entry of enrichedItems) {
+      const key = entry.categoryLabel ?? "";
+      let index = groupIndex.get(key);
+      if (index === undefined) {
+        index = groups.length;
+        groupIndex.set(key, index);
+        groups.push({ title: key, entries: [] });
+      }
+      groups[index].entries.push(entry);
+    }
+  }
+
   return (
     <Screen whatsapp={false}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text type="headerTitle" semiBold>{t("requestFlow.requestReference", { reference: request.reference })}</Text>
-        <Text type="label" color={isExpired ? Colors.error : Colors.gray} style={styles.status}>
-          {t(`requestFlow.requestStatus.${isExpired ? "expired" : request.status}`)}
-        </Text>
-        {request.expiresAt ? (
-          <Text type="small" color={Colors.gray} style={styles.expiry}>
-            {t("requestFlow.expires", { value: new Date(request.expiresAt).toLocaleString(i18n.language === "ar" ? "ar-MA" : "fr-MA") })}
+        {isExpired ? (
+          <Text type="label" color={Colors.error} style={styles.status}>
+            {t("requestFlow.requestStatus.expired")}
           </Text>
         ) : null}
-        {step !== null ? (
+
+        {step !== null && !isExpired ? (
           <ProgressStepperComponent
             steps={[t("Envoyé"), t("Commandez"), t("Paiement"), t("Traitement")]}
             currentStep={step}
           />
         ) : null}
-        {showCountdownRing ? (
+
+        {showCountdownRing && request.expiresAt ? (
           <View alignItems="center" style={styles.ringSection}>
-            {/* ponytail: plain border ring, upgrade to an svg arc once react-native-svg is verified */}
-            <View style={styles.ring} alignItems="center" justifyContent="center">
-              <Text type="headerTitle" semiBold translate={false}>{countdown}</Text>
-              <Text type="small" color={Colors.gray}>{t("Restant")}</Text>
-            </View>
-            <Text center color={Colors.error} style={styles.ringWarning}>
-              {t("Veuillez remplir votre commande avant le délai d'expiration")}
-            </Text>
+            <CountdownRing
+              expiresAt={request.expiresAt}
+              startsAt={request.createdAt}
+              label={countdown}
+              caption={t("Restant")}
+            />
+            {hasOffers ? (
+              <View flexDirection="row" gap={8} alignItems="flex-start" style={styles.warningRow}>
+                <Icon name="alert-triangle" type="Feather" size={20} iconColor={Colors.error} />
+                <Text color={Colors.error} flex>
+                  Veuillez remplir votre commande avant le délai d'expiration
+                </Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
-        <Text type="subTitle" semiBold style={styles.sectionTitle}>requestFlow.parts</Text>
-        {(request.items ?? []).length === 0 ? <Text color={Colors.gray}>requestFlow.noParts</Text> : null}
-        {(request.items ?? []).map((item) => (
-          <View key={item.id} style={styles.item}>
-            <Text semiBold translate={false}>{i18n.language === "ar" ? item.categoryTitleAr ?? item.categoryTitle : item.categoryTitle}</Text>
-            <Text type="small" color={Colors.gray}>{t("requestFlow.quantity", { count: item.quantity })}</Text>
-            <Text type="small" color={Colors.gray}>{t(`requestFlow.condition.${item.condition}`)}</Text>
-            {item.notes ? <Text type="small" translate={false}>{item.notes}</Text> : null}
-          </View>
+
+        <Text type="titleSection" color={Colors.brand} style={styles.sectionHeading}>requestFlow.parts</Text>
+        {enrichedItems.length === 0 ? <Text color={Colors.gray}>requestFlow.noParts</Text> : null}
+
+        {!hasOffers ? enrichedItems.map(({ item, title, categoryLabel, image, conditionLabel }) => (
+          <RequestPartCard
+            key={item.id}
+            title={title}
+            categoryLabel={categoryLabel}
+            image={image}
+            quantity={item.quantity}
+            conditionLabel={conditionLabel}
+          />
+        )) : groups.map((group) => (
+          <React.Fragment key={group.title || "_"}>
+            {group.title ? (
+              <Text type="textTwo" semiBold translate={false} style={styles.groupTitle}>{group.title}</Text>
+            ) : null}
+            {group.entries.map(({ item, title, categoryLabel, image, conditionLabel }) => (
+              <RequestPartCard
+                key={item.id}
+                title={title}
+                categoryLabel={categoryLabel}
+                image={image}
+                quantity={item.quantity}
+                conditionLabel={conditionLabel}
+                offersCount={offersByItem.get(item.id) ?? 0}
+                onOffers={() => router.push({
+                  pathname: "/(client)/requests/[requestId]/offers",
+                  params: { requestId: String(request.id), itemId: String(item.id) },
+                } as Href)}
+                onResend={() => router.push({
+                  pathname: "/(client)/requests/CreateRequestScreen",
+                  params: { categoryId: String(item.categoryId), condition: item.condition },
+                } as Href)}
+              />
+            ))}
+          </React.Fragment>
         ))}
+
         {request.notes || request.images?.length ? (
           <View>
-            <Text type="subTitle" semiBold style={styles.sectionTitle}>requestFlow.details</Text>
-            {request.notes ? <Text translate={false}>{request.notes}</Text> : null}
-            {request.images?.length ? <View style={styles.images}><Text semiBold>requestFlow.images</Text><ImageSlider images={request.images} /></View> : null}
+            <Text type="titleSection" color={Colors.brand} style={styles.sectionHeading}>requestFlow.details</Text>
+            {request.notes ? (
+              <View gap={4} style={styles.notesBlock}>
+                <Text type="textTwo" semiBold>Votre commentaire</Text>
+                <Text translate={false}>{request.notes}</Text>
+              </View>
+            ) : null}
+            {request.images?.length ? (
+              <View gap={4}>
+                <Text type="textTwo" semiBold>Vos images jointes</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View flexDirection="row" gap={12}>
+                    {request.images.map((uri, index) => (
+                      <Image
+                        key={uri}
+                        source={{ uri }}
+                        style={styles.attachedImage}
+                        accessibilityLabel={`${t("Vos images jointes")} ${index + 1}/${request.images!.length}`}
+                      />
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+            ) : null}
           </View>
         ) : null}
-        {hasOffers && !isExpired ? <Text color={Colors.greenDark} style={styles.offerNotice}>{t("requestFlow.offersReady", { count: request.offersCount })}</Text> : null}
-        <View style={styles.spacer} />
+
+        {!hasOffers && otherRequests.length > 0 && !isExpired ? (
+          <View>
+            <Text type="titleSection" color={Colors.brand} style={styles.sectionHeading}>Vos autres demandes</Text>
+            {otherRequests.map((other) => (
+              <RequestSummaryCard
+                key={other.id}
+                request={other}
+                onPress={() => router.push(`/(client)/requests/${other.id}` as Href)}
+              />
+            ))}
+          </View>
+        ) : null}
       </ScrollView>
-      <View style={styles.sticky}>
-        {isExpired ? (
+      {isExpired ? (
+        <View style={styles.sticky}>
           <Button
             title="requestFlow.createNew"
             onPress={() => router.push("/(client)/requests/CreateRequestScreen" as Href)}
           />
-        ) : (
-          <Button
-            title={hasOffers ? "requestFlow.viewOffers" : "requestFlow.waitingOffers"}
-            disabled={!hasOffers}
-            onPress={() => router.push({
-              pathname: "/(client)/requests/[requestId]/offers",
-              params: { requestId: String(request.id) },
-            } as Href)}
-          />
-        )}
-      </View>
+        </View>
+      ) : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   centered: { justifyContent: "center", alignItems: "center" },
-  content: { padding: 16, paddingBottom: 100 },
-  expiry: { marginTop: 4 },
+  content: { padding: 16, paddingBottom: 40 },
   status: { marginTop: 6 },
-  sectionTitle: { marginTop: 22, marginBottom: 10 },
-  item: { padding: 12, marginBottom: 8, borderRadius: 8, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderLight, gap: 3 },
-  images: { marginTop: 14, gap: 8 },
-  offerNotice: { marginTop: 20 },
-  spacer: { height: 50 },
+  sectionHeading: { fontSize: 25, lineHeight: 32, marginTop: 20, marginBottom: 12 },
+  groupTitle: { marginTop: 8, marginBottom: 8 },
+  notesBlock: { marginBottom: 12 },
+  attachedImage: { width: 128, height: 85, borderRadius: 4 },
+  ringSection: { marginVertical: 20 },
+  warningRow: { marginTop: 12, paddingHorizontal: 12 },
   sticky: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 16, backgroundColor: Colors.white },
-  ringSection: { marginTop: 20 },
-  ring: { width: 180, height: 180, borderRadius: 90, borderWidth: 8, borderColor: Colors.primary, marginBottom: 12 },
-  ringWarning: { marginTop: 4, paddingHorizontal: 12 },
 });

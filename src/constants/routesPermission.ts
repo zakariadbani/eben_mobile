@@ -48,7 +48,6 @@ const allowedRoutes: Record<AllowedRole, string[]> = {
     "(client)/requests/index",
     "(client)/requests/CreateRequestScreen",
     "(client)/requests/OrdersListScreen",
-    "(client)/requests/verification",
     "(client)/requests/success",
     "(client)/requests/login-to-send",
     "(client)/requests/[requestId]/index",

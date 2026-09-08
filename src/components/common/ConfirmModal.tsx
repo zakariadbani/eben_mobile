@@ -23,6 +23,7 @@ interface ButtonProps {
   iconType?: string;
   outline?: boolean;
   bordless?: boolean;
+  disabled?: boolean;
 }
 
 interface ConfirmModalProps {
@@ -46,6 +47,10 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
   useEffect(() => {
     if (visible) slideIn();
+    // A parent that closes the modal directly (setting `visible={false}`
+    // without going through slideOut) leaves slideAnim at 0 — reset it here
+    // so the next open animates back in instead of appearing instantly.
+    else slideAnim.setValue(height);
   }, [visible]);
 
   const slideIn = () => {
@@ -103,6 +108,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
                 onPress={secondaryButton.onPress}
                 outline={secondaryButton.outline}
                 bordless={secondaryButton.bordless}
+                disabled={secondaryButton.disabled}
               />
             </View>
           )}
@@ -119,6 +125,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
                 onPress={primaryButton.onPress}
                 outline={primaryButton.outline}
                 bordless={primaryButton.bordless}
+                disabled={primaryButton.disabled}
               />
             </View>
           )}

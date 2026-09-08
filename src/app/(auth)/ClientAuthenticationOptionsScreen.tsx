@@ -9,11 +9,13 @@ import Colors from "@/constants/Colors";
 import GoBack from "@/components/common/GoBack";
 import { useTranslation } from "react-i18next";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { clientAuthHref, getClientReturnTo } from "@/constants/clientReturnTo";
 
 const ClientAuthenticationOptionsScreen = () => {
   const { i18n } = useTranslation();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const destination = String(getClientReturnTo(returnTo));
 
@@ -33,7 +35,10 @@ const ClientAuthenticationOptionsScreen = () => {
         <View
           style={[
             styles.header,
-            { alignItems: isArabic ? "flex-end" : "flex-start" },
+            {
+              alignItems: isArabic ? "flex-end" : "flex-start",
+              marginTop: insets.top + 8,
+            },
           ]}
         >
           <GoBack />

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Image, ImageSourcePropType, StyleSheet, TouchableOpacity } from "react-native";
+import { ActivityIndicator, Image, StyleSheet, TouchableOpacity } from "react-native";
 import { Href, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 
@@ -12,14 +12,17 @@ import ImageInputList from "@/components/common/ImageInputList";
 import QtyStepper from "@/components/common/QtyStepper";
 import CustomIcon from "@/components/common/CustomIcon";
 import RequestSummaryCard, { isActiveRequest } from "@/components/screens/client/requests/RequestSummaryCard";
+import SendListSheet from "@/components/screens/client/requests/SendListSheet";
+import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
 import Colors from "@/constants/Colors";
+import { buildCategoryLookup, resolveImageSource } from "@/helpers/categoryLookup";
 import { getCategoryTree } from "@/api/resources/categories";
 import {
   CLIENT_SELECTED_VEHICLE_ID_STORAGE_KEY,
   getVehicles,
 } from "@/api/resources/vehicles";
 import { uploadLocalImages } from "@/api/resources/uploads";
-import { createRequest, getRequests } from "@/api/resources/requests";
+import { createRequest, getRequests, sendRequest } from "@/api/resources/requests";
 import { ApiClientError } from "@/api/types";
 import { useStorageState } from "@/context/useStorageState";
 import { Role, useSession } from "@/context/AuthContext";
@@ -52,40 +55,6 @@ function errorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-interface CategoryLookupEntry {
-  image: Category["image"];
-  categoryTitle: string;
-  categoryTitleAr: string;
-}
-
-/** Maps every category node (any level) to its image + nearest-ancestor title,
- * so a saved DraftItem (which only stores categoryId/title/titleAr) can
- * resolve a thumbnail/"Catégorie" line at render time from the already
- * loaded tree — nothing extra is persisted to AsyncStorage. Falls back to the
- * node's own title/image when no L1/L2 ancestor exists (orphan/non-leaf ids,
- * e.g. from a persisted draft or products/[productId]). */
-function buildCategoryLookup(categories: Category[]): Map<number, CategoryLookupEntry> {
-  const map = new Map<number, CategoryLookupEntry>();
-  const walk = (nodes: Category[], l1: Category | null, l2: Category | null) => {
-    for (const node of nodes) {
-      map.set(node.id, {
-        image: node.image ?? l2?.image ?? l1?.image ?? null,
-        categoryTitle: (l1 ?? l2 ?? node).title,
-        categoryTitleAr: (l1 ?? l2 ?? node).titleAr,
-      });
-      if (node.level === 1) { walk(node.children ?? [], node, null); continue; }
-      if (node.level === 2) { walk(node.children ?? [], l1, node); continue; }
-    }
-  };
-  walk(categories, null, null);
-  return map;
-}
-
-function resolveImageSource(image: Category["image"] | undefined): ImageSourcePropType | undefined {
-  if (image === null || image === undefined || image === "") return undefined;
-  return typeof image === "string" ? { uri: image } : image;
-}
-
 export default function CreateRequestScreen() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === "ar";
@@ -98,6 +67,8 @@ export default function CreateRequestScreen() {
   );
   const { loading: draftLoading, items: draftItems, setItems: setDraftItems } = useRequestDraft();
   const submittingRef = useRef(false);
+  const loadedRef = useRef(false);
+  const createdIdRef = useRef<number | null>(null);
 
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [categories, setCategories] = useState<Category[]>([]);
@@ -117,6 +88,7 @@ export default function CreateRequestScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [brokenImages, setBrokenImages] = useState<Set<number>>(() => new Set());
+  const [verifying, setVerifying] = useState(false);
 
   const load = useCallback(async () => {
     if (storageLoading || draftLoading) return;
@@ -161,6 +133,7 @@ export default function CreateRequestScreen() {
             }]);
         }
       }
+      loadedRef.current = true;
       setLoadState("ready");
     } catch {
       setLoadState("error");
@@ -169,10 +142,27 @@ export default function CreateRequestScreen() {
 
   useEffect(() => { void load(); }, [load]);
 
+  // Silent refresh of the requests list only — does not re-run load()'s
+  // params.categoryId prefill, which would re-add a part the user deleted.
+  const refreshRequests = useCallback(async () => {
+    if (isGuest) return;
+    try {
+      const r = await getRequests();
+      setRequests(r.data.filter(isActiveRequest));
+    } catch {
+      /* keep current list */
+    }
+  }, [isGuest]);
+
   // Tabs keep this screen mounted between visits — reset the drill overlay
   // when the tab loses focus so returning via the header back arrow doesn't
-  // resurface it.
-  useFocusEffect(useCallback(() => () => setAdding(false), []));
+  // resurface it. Also silently refreshes the requests list on refocus
+  // (e.g. after a request was created elsewhere), skipped until the first
+  // load has completed.
+  useFocusEffect(useCallback(() => {
+    if (loadedRef.current) void refreshRequests();
+    return () => setAdding(false);
+  }, [refreshRequests]));
 
   const level1 = useMemo(() => categories.filter((category) => category.level === 1), [categories]);
   const level2 = useMemo(() => (selectedL1?.children ?? []).filter((category) => category.level === 2), [selectedL1]);
@@ -207,7 +197,12 @@ export default function CreateRequestScreen() {
     setUploadedPaths(null);
   };
 
-  const submit = async () => {
+  // Reset the pending created-request id whenever the draft, note, or images
+  // change (e.g. the user edits the list/comment/photos after "Vérifier") so
+  // a re-send creates a fresh request instead of re-sending a stale one.
+  useEffect(() => { createdIdRef.current = null; }, [draftItems, note, imageUris]);
+
+  const send = async () => {
     if (submittingRef.current || !vehicleId || draftItems.length === 0) return;
     submittingRef.current = true;
     setSubmitting(true);
@@ -215,23 +210,36 @@ export default function CreateRequestScreen() {
     try {
       const paths = uploadedPaths ?? (imageUris.length > 0 ? await uploadLocalImages(imageUris) : []);
       if (uploadedPaths === null) setUploadedPaths(paths);
-      const response = await createRequest({
-        vehicleId,
-        items: draftItems.map(({ categoryId, quantity, condition: itemCondition }) => ({
-          categoryId,
-          quantity,
-          condition: itemCondition,
-        })),
-        notes: note.trim() || null,
-        images: paths,
-      });
+      let id = createdIdRef.current;
+      if (id === null) {
+        const response = await createRequest({
+          vehicleId,
+          items: draftItems.map(({ categoryId, quantity, condition: itemCondition }) => ({
+            categoryId,
+            quantity,
+            condition: itemCondition,
+          })),
+          notes: note.trim() || null,
+          images: paths,
+        });
+        id = response.data.id;
+        createdIdRef.current = id;
+      }
+      const sent = await sendRequest(id);
       setDraftItems([]);
-      router.push({
-        pathname: "/(client)/requests/verification",
-        params: { requestId: String(response.data.id), reference: response.data.reference },
+      setNote("");
+      setImageUris([]);
+      setUploadedPaths(null);
+      createdIdRef.current = null;
+      setVerifying(false);
+      router.replace({
+        pathname: "/(client)/requests/success",
+        params: { requestId: String(sent.data.id) },
       } as Href);
     } catch (submitError) {
-      setError(errorMessage(submitError, t("requestFlow.submitError")));
+      setError(createdIdRef.current === null
+        ? errorMessage(submitError, t("requestFlow.submitError"))
+        : errorMessage(submitError, t("requestFlow.sendError")));
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
@@ -248,12 +256,24 @@ export default function CreateRequestScreen() {
 
   const emptyGarage = !isGuest && vehicles.length === 0;
   const choices = step === 0 ? level1 : step === 1 ? level2 : level3;
-  const showDrill = draftItems.length === 0 || adding;
+  const showDrill = adding;
   const totalQuantity = draftItems.reduce((sum, item) => sum + item.quantity, 0);
+  const activeRequests = !isGuest && requests.length > 0 ? (
+    <View gap={10}>
+      <Text type="titleSection" color={Colors.brand} style={styles.sectionHeading}>Vos requêtes actives</Text>
+      {requests.map((request) => (
+        <RequestSummaryCard
+          key={request.id}
+          request={request}
+          onPress={() => router.push(`/(client)/requests/${request.id}` as Href)}
+        />
+      ))}
+    </View>
+  ) : null;
   return (
     <View style={styles.root}>
       <Screen padding scrollable whatsapp={false}>
-        {!isGuest ? (
+        {!isGuest && draftItems.length > 0 ? (
           <Text type="small" color={Colors.gray} style={styles.vehicleLabel}>
             {t("requestFlow.vehicle", { value: vehicles.find((vehicle) => vehicle.id === vehicleId)?.nickname
               ?? vehicles.find((vehicle) => vehicle.id === vehicleId)?.modelName
@@ -261,7 +281,9 @@ export default function CreateRequestScreen() {
           </Text>
         ) : null}
 
-        {error ? <Text accessibilityRole="alert" color={Colors.error} style={styles.error} translate={false}>{error}</Text> : null}
+        {/* While the send sheet is open, the same `error` state surfaces inside
+            it instead — avoids rendering the message twice on screen. */}
+        {error && !verifying ? <Text accessibilityRole="alert" color={Colors.error} style={styles.error} translate={false}>{error}</Text> : null}
 
         {showDrill ? (
           <>
@@ -309,6 +331,19 @@ export default function CreateRequestScreen() {
               })}
             </View>
           </>
+        ) : null}
+
+        {draftItems.length === 0 && !showDrill ? (
+          <View style={styles.details} gap={16}>
+            <Text type="titleSection" color={Colors.brand} style={styles.sectionHeading}>Ajouter des détails</Text>
+            <EmptyListComponent
+              title=""
+              illustrationSize={260}
+              styleContainer={styles.emptyState}
+              actionButton={{ title: "Explorer les produits", iconType: "FontAwesome5", rightIcon: "search", sizeIcon: 20, navigateTo: "/(client)/categories" }}
+            />
+            {activeRequests}
+          </View>
         ) : null}
 
         {draftItems.length > 0 && !showDrill ? (
@@ -382,23 +417,14 @@ export default function CreateRequestScreen() {
                 placeholder={t("requestFlow.notePlaceholder")}
                 translate={false}
                 multiline
+                numberOfLines={4}
+                inputStyle={styles.noteInput}
                 value={note}
                 onChangeText={setNote}
               />
             </View>
 
-            {!isGuest && requests.length > 0 ? (
-              <View gap={10}>
-                <Text type="titleSection" color={Colors.brand} style={styles.sectionHeading}>Vos requêtes actives</Text>
-                {requests.map((request) => (
-                  <RequestSummaryCard
-                    key={request.id}
-                    request={request}
-                    onPress={() => router.push(`/(client)/requests/${request.id}` as Href)}
-                  />
-                ))}
-              </View>
-            ) : null}
+            {activeRequests}
           </View>
         ) : null}
         <View style={styles.spacer} />
@@ -407,20 +433,35 @@ export default function CreateRequestScreen() {
         <View style={styles.sendBar}>
           <Button title="requestFlow.addVehicle" onPress={() => router.push("/(client)/search/add-car" as Href)} />
         </View>
-      ) : draftItems.length > 0 ? (
+      ) : (
         <View style={styles.sendBar}>
           <Button
-            title={submitting ? "requestFlow.submitting" : "requestFlow.verify"}
-            disabled={submitting}
+            title="requestFlow.verify"
+            disabled={draftItems.length === 0}
             rightIcon="send"
             iconType="custom"
             onPress={() => {
               if (isGuest) { router.push("/(client)/requests/login-to-send" as Href); return; }
-              void submit();
+              setError(null);
+              setVerifying(true);
             }}
           />
         </View>
-      ) : null}
+      )}
+      <SendListSheet
+        visible={verifying}
+        items={draftItems.map((item) => ({
+          key: item.categoryId,
+          title: isArabic ? item.titleAr : item.title,
+          quantity: item.quantity,
+          image: resolveImageSource(categoryLookup.get(item.categoryId)?.image),
+        }))}
+        note={note}
+        sending={submitting}
+        error={error}
+        onEdit={() => setVerifying(false)}
+        onSend={() => void send()}
+      />
     </View>
   );
 }
@@ -436,11 +477,14 @@ const styles = StyleSheet.create({
   sectionHeading: { fontSize: 25, lineHeight: 32 },
   card: { padding: 14, borderRadius: 8, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderLight },
   details: { marginTop: 24 },
+  emptyState: { flex: 0, paddingVertical: 0, paddingHorizontal: 0 },
   itemCard: { padding: 12, borderRadius: 8, backgroundColor: Colors.white, shadowColor: Colors.borderLight, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 3, elevation: 2 },
   thumbnail: { width: 64, height: 64, borderRadius: 6 },
   thumbnailPlaceholder: { backgroundColor: Colors.backgroundGray },
   trashBtn: { width: 36, height: 36, borderRadius: 6, backgroundColor: Colors.pink, alignItems: "center", justifyContent: "center" },
   notice: { paddingHorizontal: 6, marginTop: 4 },
+  // Figma "List / full": borderless light-gray textarea.
+  noteInput: { backgroundColor: Colors.backgroundGray, borderColor: Colors.backgroundGray, borderRadius: 8, paddingHorizontal: 12 },
   noticeText: { lineHeight: 19 },
   spacer: { height: 100 },
   sendBar: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 16, backgroundColor: Colors.white },

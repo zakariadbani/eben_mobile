@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { StyleSheet, ImageBackground, TouchableOpacity } from "react-native";
 import { Stack, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/components/common/Text";
 import View from "@/components/common/View";
 import Screen from "@/components/common/Screen";
@@ -11,6 +12,7 @@ type Role = "acheteur" | "vendeur";
 
 const WelcomeRoleSelectionScreen = () => {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const [selectedRole, setSelectedRole] = useState<Role>("acheteur");
 
@@ -36,7 +38,10 @@ const WelcomeRoleSelectionScreen = () => {
         style={styles.background}
         resizeMode="cover"
       >
-        <GoBack iconColor={Colors.black} style={styles.backButton} />
+        <GoBack
+          iconColor={Colors.black}
+          style={[styles.backButton, { top: insets.top + 16 }]}
+        />
         <View style={styles.container}>
           <Text type="loginTitle" style={styles.title}>Bienvenue à EBEN</Text>
           <Text type="loginDefault" style={styles.description}>

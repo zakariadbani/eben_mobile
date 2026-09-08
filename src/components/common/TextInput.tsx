@@ -189,6 +189,8 @@ const TextInput = forwardRef<TextInputNative, TextInputProps>(
                 paddingLeft: isRtl ? endPadding : startPadding,
                 paddingRight: isRtl ? startPadding : endPadding,
               },
+              // Multiline renders as a textarea: taller box, text anchored top.
+              otherProps.multiline && styles.multilineText,
               textStyle,
             ]}
             keyboardType={keyboardType}
@@ -274,6 +276,10 @@ const styles = StyleSheet.create({
     minHeight: 20,
     fontSize: 16,
     // color: Colors.brand,
+  },
+  multilineText: {
+    minHeight: 100,
+    textAlignVertical: "top",
   },
   icon: {
     position: "absolute",

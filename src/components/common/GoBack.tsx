@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, ViewStyle } from "react-native";
+import { StyleProp, StyleSheet, ViewStyle } from "react-native";
 import { useRouter } from "expo-router"; // Adjust the import if you're using a different router
 import Button from "@/components/common/Button"; // Adjust the import path as necessary
 import Colors from "@/constants/Colors"; // Adjust the import path as necessary
@@ -16,7 +16,7 @@ interface ButtonProps {
 
 interface GoBackProps {
   iconColor?: string; // Allow custom icon color
-  style?: ViewStyle; // Custom style for the inner container
+  style?: StyleProp<ViewStyle>; // Custom style for the inner container
   buttonProps?: ButtonProps; // Button properties for customization
 }
 

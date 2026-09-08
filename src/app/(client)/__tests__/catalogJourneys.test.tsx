@@ -291,6 +291,43 @@ it("shows a promo badge with the struck original price and only fills the tapped
   expect(screen.queryAllByLabelText(i18n.t("Retirer de la liste de souhaits"))).toHaveLength(0);
 });
 
+it("undoes an orphaned backend wishlist item when the user removes it again before the add resolves", async () => {
+  mockedUseSession.mockReturnValue({ role: Role.CLIENT } as ReturnType<typeof useSession>);
+
+  let resolveAdd: (value: Awaited<ReturnType<typeof addToWishlist>>) => void;
+  mockAddToWishlist.mockReturnValueOnce(
+    new Promise((resolve) => {
+      resolveAdd = resolve;
+    }),
+  );
+  mockRemoveWishlistItem.mockResolvedValueOnce({ success: true, data: { id: 501 } });
+
+  const screen = render(<HomeScreen />);
+  await screen.findAllByText("Plaquettes live");
+
+  fireEvent.press(screen.getByLabelText(i18n.t("Ajouter à la liste de souhaits")));
+  await waitFor(() => expect(mockAddToWishlist).toHaveBeenCalledTimes(1));
+
+  // Double-tap before the add resolves: the map already holds productId ->
+  // null, so this second tap takes the remove branch and deletes locally
+  // (storedId is null, so no backend remove call yet).
+  expect(await screen.findByLabelText(i18n.t("Retirer de la liste de souhaits"))).toBeTruthy();
+  fireEvent.press(screen.getByLabelText(i18n.t("Retirer de la liste de souhaits")));
+  expect(await screen.findByLabelText(i18n.t("Ajouter à la liste de souhaits"))).toBeTruthy();
+
+  // The in-flight add now resolves with a freshly created backend item.
+  resolveAdd!({
+    success: true,
+    data: { id: 501, userId: 1, categoryId: 12, pneumaticId: null, createdAt: "2026-01-01" },
+  });
+
+  // The orphaned backend item must be undone, and the heart must not be
+  // resurrected — it stays empty since the user removed it mid-flight.
+  await waitFor(() => expect(mockRemoveWishlistItem).toHaveBeenCalledWith(501));
+  expect(screen.getByLabelText(i18n.t("Ajouter à la liste de souhaits"))).toBeTruthy();
+  expect(screen.queryByLabelText(i18n.t("Retirer de la liste de souhaits"))).toBeNull();
+});
+
 it("renders the regular price when promoPrice is zero instead of a false discount", async () => {
   mockedUseSession.mockReturnValue({ role: Role.CLIENT } as ReturnType<typeof useSession>);
   mockGetProducts.mockResolvedValueOnce({
@@ -627,7 +664,7 @@ it("guest adds a level-3 category from the sheet without a login redirect", asyn
   const screen = render(<CategoryDrillScreen />);
 
   fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajoutez à la liste") }));
-  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajoutez") }));
+  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajouter à la liste") }));
 
   expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Ajouté à la liste !"));
   expect(await screen.findByRole("button", { name: i18n.t("Ajouté") })).toBeTruthy();
@@ -644,7 +681,7 @@ it("adds a level-3 category from the sheet as a signed-in client, toasts, with n
   const screen = render(<CategoryDrillScreen />);
 
   fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajoutez à la liste") }));
-  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajoutez") }));
+  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajouter à la liste") }));
 
   expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Ajouté à la liste !"));
   expect(await screen.findByRole("button", { name: i18n.t("Ajouté") })).toBeTruthy();
@@ -657,7 +694,7 @@ it("lists an occasion product's category from product detail instead of adding t
   const screen = render(<ProductDetailScreen />);
 
   fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajoutez à la liste") }));
-  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajoutez") }));
+  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajouter à la liste") }));
 
   await waitFor(() => expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Ajouté à la liste !")));
   expect(addToBasket).not.toHaveBeenCalled();

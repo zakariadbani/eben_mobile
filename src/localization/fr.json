@@ -204,6 +204,8 @@
   "Votre liste —": "Votre liste —",
   "Aucune pièce": "Aucune pièce",
   "Vos autres demandes": "Vos autres demandes",
+  "Votre commentaire": "Votre commentaire",
+  "Vos images jointes": "Vos images jointes",
   "Vous obtiendrez un prix dans quelques heures": "Vous obtiendrez un prix dans quelques heures",
   "Votre liste": "Votre liste",
   "Veuillez remplir votre commande avant le délai d'expiration": "Veuillez remplir votre commande avant le délai d'expiration",
@@ -887,6 +889,7 @@
   "requestList.condition": "État : {{condition}}",
   "requestList.quantity": "Qté : {{count}}",
   "requestList.category": "Catégorie : {{value}}",
+  "Explorer les produits": "Explorer les produits",
   "Ajouter une pièce": "Ajouter une pièce",
   "Ajouter des détails": "Ajouter des détails",
   "Vos requêtes actives": "Vos requêtes actives",
@@ -913,9 +916,9 @@
   "requestFlow.no": "Non",
   "requestFlow.verify": "Vérifier et envoyer la liste",
   "requestFlow.submitting": "Création...",
-  "requestFlow.send": "Oui, envoyer",
+  "requestFlow.send": "Oui, Envoyez",
   "requestFlow.sending": "Envoi...",
-  "requestFlow.edit": "Modifier",
+  "requestFlow.edit": "Non, modifier",
   "requestFlow.retry": "Réessayer",
   "requestFlow.back": "Retour",
   "requestFlow.loadError": "Impossible de charger les demandes",
@@ -941,6 +944,10 @@
   "requestFlow.condition.occasion": "Occasion",
   "requestFlow.condition.en_stock": "Neuf",
   "requestFlow.details": "Détails ajoutés",
+  "requestFlow.detailTitle": "Votre liste - {{reference}}",
+  "requestFlow.offersCount": "X{{count}}",
+  "requestFlow.noOffer": "Aucune offre",
+  "requestFlow.resend": "Renvoyer",
   "requestFlow.images": "Images jointes",
   "requestFlow.expires": "Expire le {{value}}",
   "requestFlow.offersReady": "Vous avez reçu {{count}} offre(s)",
@@ -1162,6 +1169,7 @@
   ,"Ajouter une adresse": "Ajouter une adresse"
   ,"Ajouter une voiture": "Ajouter une voiture"
   ,"Ajouter à la liste": "Ajouter à la liste"
+  ,"Ajoutez à la liste": "Ajoutez à la liste"
   ,"Ajouter": "Ajouter"
   ,"Appliquer": "Appliquer"
   ,"Bienvenue à EBEN": "Bienvenue à EBEN"
@@ -1171,6 +1179,7 @@
   ,"Changer de voiture": "Changer de voiture"
   ,"Chercher ...": "Chercher..."
   ,"Chercher": "Chercher"
+  ,"Condition": "Condition"
   ,"Choisissez votre langue": "Choisissez votre langue"
   ,"En stock": "En stock"
   ,"La liste a été envoyée": "La liste a été envoyée"
@@ -1278,4 +1287,8 @@
   ,"D\u00e9tails de l'offre": "D\u00e9tails de l'offre"
   ,"En attente de votre commande": "En attente de votre commande"
   ,"Vos autres offres": "Vos autres offres"
+  ,"update.title": "Nouvelle version disponible"
+  ,"update.body": "Une nouvelle version d'EBEN est disponible sur Google Play. Mettez à jour pour profiter des dernières améliorations."
+  ,"update.cta": "Mettre à jour"
+  ,"update.later": "Plus tard"
 }

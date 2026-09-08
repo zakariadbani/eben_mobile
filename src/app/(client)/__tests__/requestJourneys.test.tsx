@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render as rtlRender, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render as rtlRender, waitFor } from "@testing-library/react-native";
 import i18n from "@/localization/i18n";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getCategoryTree } from "@/api/resources/categories";
@@ -20,20 +20,29 @@ import { CartContext } from "@/context/CartContext";
 import { Role, useSession } from "@/context/AuthContext";
 import { RequestDraftProvider } from "@/context/RequestDraftContext";
 import CreateRequestScreen from "../requests/CreateRequestScreen";
-import RequestListScreen from "../requests";
-import VerificationScreen from "../requests/verification";
 import RequestSuccessScreen from "../requests/success";
 import RequestDetailScreen from "../requests/[requestId]";
 import OfferDetailScreen from "../requests/[requestId]/offers/[offerId]";
 import ArchivedOffersScreen from "../settings/archived-offers";
 import WhatsappBtn from "@/components/common/WhatsappBtn";
+import { formatCountdown } from "@/helpers/countdown";
 import type { Basket } from "@/interfaces/Basket";
+
+jest.mock("react-native-svg", () => {
+  const React = require("react");
+  const { View } = require("react-native");
+  const Stub = (props: object) => React.createElement(View, props);
+  return { __esModule: true, default: Stub, Svg: Stub, Circle: Stub };
+});
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockSetOptions = jest.fn();
 let mockParams: Record<string, string | undefined> = {};
+// Captures the latest useFocusEffect callback so tests can replay it
+// directly to simulate a refocus, without needing a real navigation stack.
+let mockFocusCallback: (() => void) | null = null;
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn().mockResolvedValue(null),
@@ -42,7 +51,13 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
 jest.mock("expo-router", () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace, back: mockBack }),
   useLocalSearchParams: () => mockParams,
-  useFocusEffect: jest.fn(),
+  // Mirrors catalogJourneys.test.tsx: runs the focus callback via a real
+  // useEffect (so mount == "first focus") instead of the previous no-op.
+  useFocusEffect: (callback: () => void) => {
+    mockFocusCallback = callback;
+    const ReactModule = require("react") as typeof React;
+    ReactModule.useEffect(callback, [callback]);
+  },
 }));
 jest.mock("@react-navigation/core", () => ({
   useNavigation: () => ({ setOptions: mockSetOptions }),
@@ -51,12 +66,13 @@ jest.mock("@/components/common/Button", () => {
   const React = require("react");
   const { Text, View } = require("react-native");
   const { useTranslation } = require("react-i18next");
-  return function MockButton({ title, onPress, disabled }: { title?: string; onPress?: () => void; disabled?: boolean }) {
+  return function MockButton({ title, onPress, disabled, navigateTo }: { title?: string; onPress?: () => void; disabled?: boolean; navigateTo?: string }) {
     const { t } = useTranslation();
     const label = title ? t(title) : "button";
     return React.createElement(View, {
       accessible: true, accessibilityRole: "button", accessibilityLabel: label,
-      accessibilityState: { disabled }, onPress: disabled ? undefined : onPress,
+      accessibilityState: { disabled },
+      onPress: disabled ? undefined : navigateTo ? () => mockPush(navigateTo) : onPress,
     }, React.createElement(Text, null, label));
   };
 });
@@ -195,6 +211,7 @@ const offer = {
 beforeEach(async () => {
   jest.clearAllMocks();
   mockParams = {};
+  mockFocusCallback = null;
   await i18n.changeLanguage("fr");
   mockedUseSession.mockReturnValue({ role: Role.CLIENT } as ReturnType<typeof useSession>);
   mockGetCategoryTree.mockResolvedValue({ success: true, data: tree });
@@ -216,48 +233,67 @@ beforeEach(async () => {
 });
 
 it("uploads local attachments and creates a draft with selected server vehicle and leaf IDs", async () => {
+  (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([
+    { categoryId: 13, title: "Disques", titleAr: "أقراص", quantity: 1, condition: "occasion" },
+  ]));
   const screen = render(<CreateRequestScreen />);
 
+  await screen.findByText("Disques");
+  fireEvent.press(screen.getByRole("button", { name: "Ajouter une pièce" }));
   fireEvent.press(await screen.findByRole("button", { name: "Freins" }));
   fireEvent.press(screen.getByRole("button", { name: "Freins avant" }));
   fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.addPart", { name: "Plaquettes" }) }));
   fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.addImage") }));
   await screen.findByLabelText("file:///part.jpg");
-  expect(screen.getByLabelText(i18n.t("Diminuer la quantité")).props.accessibilityState.disabled).toBe(true);
-  fireEvent.press(screen.getByLabelText(i18n.t("Augmenter la quantité")));
+  expect(screen.getAllByLabelText(i18n.t("Diminuer la quantité"))[1].props.accessibilityState.disabled).toBe(true);
+  fireEvent.press(screen.getAllByLabelText(i18n.t("Augmenter la quantité"))[1]);
   fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.verify") }));
+
+  const send = await screen.findByRole("button", { name: i18n.t("requestFlow.send") });
+  fireEvent.press(send);
 
   await waitFor(() => expect(mockCreateRequest).toHaveBeenCalledWith({
     vehicleId: 42,
-    items: [{ categoryId: 12, quantity: 2, condition: "occasion" }],
+    items: [
+      { categoryId: 13, quantity: 1, condition: "occasion" },
+      { categoryId: 12, quantity: 2, condition: "occasion" },
+    ],
     notes: null,
     images: ["tmp/mobile/5/image.jpg"],
   }));
   expect(mockUploadLocalImages).toHaveBeenCalledWith(["file:///part.jpg"]);
   expect(mockUploadLocalImages.mock.invocationCallOrder[0]).toBeLessThan(mockCreateRequest.mock.invocationCallOrder[0]);
-  expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({
-    pathname: "/(client)/requests/verification",
-    params: { requestId: "73", reference: "REQ-73" },
-  }));
+  await waitFor(() => expect(mockSendRequest).toHaveBeenCalledWith(73));
+  expect(mockReplace).toHaveBeenCalledWith({
+    pathname: "/(client)/requests/success",
+    params: { requestId: "73" },
+  });
 });
 
 it("preserves the draft and uploaded paths across a Laravel validation error", async () => {
   mockCreateRequest
     .mockRejectedValueOnce(new ApiClientError("Validation failed", 422, { "items.0.categoryId": ["Leaf required"] }))
     .mockResolvedValueOnce({ success: true, data: { id: 73, reference: "REQ-73" } });
+  (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([
+    { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion" },
+  ]));
   const screen = render(<CreateRequestScreen />);
 
-  fireEvent.press(await screen.findByRole("button", { name: "Freins" }));
-  fireEvent.press(screen.getByRole("button", { name: "Freins avant" }));
-  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.addPart", { name: "Plaquettes" }) }));
+  await screen.findByText("Plaquettes");
   fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.addImage") }));
   await screen.findByLabelText("file:///part.jpg");
   fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.verify") }));
 
+  const send = await screen.findByRole("button", { name: i18n.t("requestFlow.send") });
+  fireEvent.press(send);
+
   expect(await screen.findByText("Leaf required")).toBeTruthy();
-  expect(screen.getByText("Plaquettes")).toBeTruthy();
+  // "Plaquettes" now renders both in the underlying draft list and inside
+  // the still-open send sheet — assert the draft survived without pinning
+  // to a single node.
+  expect(screen.getAllByText("Plaquettes").length).toBeGreaterThan(0);
   expect(screen.getByLabelText("file:///part.jpg")).toBeTruthy();
-  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.verify") }));
+  fireEvent.press(send);
   await waitFor(() => expect(mockCreateRequest).toHaveBeenCalledTimes(2));
   expect(mockUploadLocalImages).toHaveBeenCalledTimes(1);
 });
@@ -281,6 +317,8 @@ it("hydrates the builder from a persisted draft, upserts the param prefill, and 
   expect(await screen.findByText("Plaquettes")).toBeTruthy();
 
   fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.verify") }));
+  const send = await screen.findByRole("button", { name: i18n.t("requestFlow.send") });
+  fireEvent.press(send);
 
   await waitFor(() => expect(mockCreateRequest).toHaveBeenCalledWith({
     vehicleId: 42,
@@ -293,11 +331,12 @@ it("hydrates the builder from a persisted draft, upserts the param prefill, and 
 
 it("pushes a guest submit to login-to-send instead of creating a request", async () => {
   mockedUseSession.mockReturnValue({ role: "guest" } as ReturnType<typeof useSession>);
+  (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([
+    { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion" },
+  ]));
   const screen = render(<CreateRequestScreen />);
 
-  fireEvent.press(await screen.findByRole("button", { name: "Freins" }));
-  fireEvent.press(screen.getByRole("button", { name: "Freins avant" }));
-  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.addPart", { name: "Plaquettes" }) }));
+  await screen.findByText("Plaquettes");
   fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.verify") }));
 
   expect(mockPush).toHaveBeenCalledWith("/(client)/requests/login-to-send");
@@ -307,11 +346,12 @@ it("pushes a guest submit to login-to-send instead of creating a request", async
 
 it("keeps listing the draft and offers the add-car CTA when the garage is empty", async () => {
   mockGetVehicles.mockResolvedValueOnce({ success: true, data: [], pagination: { ...pagination, total: 0, from: null, to: null } });
+  (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([
+    { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion" },
+  ]));
   const screen = render(<CreateRequestScreen />);
 
-  fireEvent.press(await screen.findByRole("button", { name: "Freins" }));
-  fireEvent.press(screen.getByRole("button", { name: "Freins avant" }));
-  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.addPart", { name: "Plaquettes" }) }));
+  await screen.findByText("Plaquettes");
 
   expect(screen.getByText("Plaquettes")).toBeTruthy();
   expect(screen.getByRole("button", { name: i18n.t("requestFlow.addVehicle") })).toBeTruthy();
@@ -383,47 +423,113 @@ it("never calls getRequests for a guest with a saved draft and hides the active-
   expect(mockGetRequests).not.toHaveBeenCalled();
 });
 
-it("shows a draft banner on the Liste tab that opens the request builder", async () => {
-  (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([
-    { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion" },
-  ]));
-  const screen = render(<RequestListScreen />);
-
-  const banner = await screen.findByText(i18n.t("requestFlow.draftBanner", { count: 1 }));
-  fireEvent.press(banner);
-
-  expect(mockPush).toHaveBeenCalledWith("/(client)/requests/CreateRequestScreen");
-});
-
-it("shows request status separately from a pending countdown", async () => {
+it("renders the Figma list/empty layout for an empty draft", async () => {
   mockGetRequests.mockResolvedValueOnce({
     success: true,
     data: [
       { id: 1, reference: "REQ-1", status: "offers_received", expiresDisplay: "1h 30min", createdAt: "2026-08-01" },
       { id: 2, reference: "REQ-2", status: "pending", expiresDisplay: "45min", createdAt: "2026-08-01" },
+      { id: 3, reference: "REQ-3", status: "expired", expiresDisplay: null, createdAt: "2026-08-01" },
     ],
-    pagination: { ...pagination, total: 2 },
+    pagination: { ...pagination, total: 3 },
   });
+  const screen = render(<CreateRequestScreen />);
 
-  const screen = render(<RequestListScreen />);
+  expect(await screen.findByText(i18n.t("Ajouter des détails"))).toBeTruthy();
+  expect(screen.getByText(i18n.t("Vos requêtes actives"))).toBeTruthy();
+  expect(screen.getByText(i18n.t("home.reference", { value: "REQ-1" }))).toBeTruthy();
+  expect(screen.getByText(i18n.t("home.reference", { value: "REQ-2" }))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("home.reference", { value: "REQ-3" }))).toBeNull();
+  expect(screen.queryByText(i18n.t("requestFlow.chooseCategory"))).toBeNull();
+  expect(screen.queryByRole("button", { name: "Freins" })).toBeNull();
+  expect(screen.getByRole("button", { name: i18n.t("requestFlow.verify") }).props.accessibilityState.disabled).toBe(true);
 
-  expect(await screen.findByText(i18n.t("requestFlow.requestStatus.offers_received"))).toBeTruthy();
-  expect(screen.getByText(i18n.t("requestFlow.requestStatus.pending"))).toBeTruthy();
-  expect(screen.getByText(i18n.t("home.expiresIn", { value: "45min" }))).toBeTruthy();
-  expect(screen.queryByText(i18n.t("home.expiresIn", { value: "1h 30min" }))).toBeNull();
-  expect(screen.UNSAFE_queryAllByType(WhatsappBtn)).toHaveLength(0);
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("Explorer les produits") }));
+  expect(mockPush).toHaveBeenCalledWith("/(client)/categories");
 });
 
-it("shows live request empty state and retries a failed list read", async () => {
-  mockGetRequests.mockRejectedValueOnce(new Error("offline"));
-  const screen = render(<RequestListScreen />);
+it("hides the active-requests section for a guest with an empty draft", async () => {
+  mockedUseSession.mockReturnValue({ role: "guest" } as ReturnType<typeof useSession>);
+  const screen = render(<CreateRequestScreen />);
 
-  const retry = await screen.findByRole("button", { name: i18n.t("requestFlow.retry") });
-  fireEvent.press(retry);
-  expect(await screen.findByText(i18n.t("requestFlow.requestsEmpty"))).toBeTruthy();
-  expect(screen.getByText(i18n.t("requestFlow.requestsEmptyBody"))).toBeTruthy();
-  expect(screen.getAllByRole("button", { name: i18n.t("requestFlow.create") })).toHaveLength(2);
-  expect(mockGetRequests).toHaveBeenCalledTimes(2);
+  expect(await screen.findByText(i18n.t("Ajouter des détails"))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("Vos requêtes actives"))).toBeNull();
+  expect(mockGetRequests).not.toHaveBeenCalled();
+});
+
+it("fetches requests once on mount and again silently on a later refocus", async () => {
+  const screen = render(<CreateRequestScreen />);
+
+  expect(await screen.findByText(i18n.t("Ajouter des détails"))).toBeTruthy();
+  expect(mockGetRequests).toHaveBeenCalledTimes(1);
+
+  const freshRequest = {
+    id: 55, reference: "REQ-55", status: "pending" as const, expiresDisplay: "10min", createdAt: "2026-09-08",
+  };
+  mockGetRequests.mockResolvedValueOnce({ success: true, data: [freshRequest], pagination: { ...pagination, total: 1 } });
+
+  await act(async () => { mockFocusCallback?.(); });
+
+  await waitFor(() => expect(mockGetRequests).toHaveBeenCalledTimes(2));
+  expect(await screen.findByText(i18n.t("home.reference", { value: "REQ-55" }))).toBeTruthy();
+});
+
+it("lets the user retry sendRequest after a transient failure without re-creating the request", async () => {
+  mockSendRequest.mockRejectedValueOnce(new Error("boom"));
+  (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([
+    { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion" },
+  ]));
+  const screen = render(<CreateRequestScreen />);
+
+  await screen.findByText("Plaquettes");
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.verify") }));
+
+  const send = await screen.findByRole("button", { name: i18n.t("requestFlow.send") });
+  fireEvent.press(send);
+
+  expect(await screen.findByText(i18n.t("requestFlow.sendError"))).toBeTruthy();
+
+  fireEvent.press(send);
+
+  await waitFor(() => expect(mockSendRequest).toHaveBeenCalledTimes(2));
+  expect(mockCreateRequest).toHaveBeenCalledTimes(1);
+  expect(mockSendRequest).toHaveBeenNthCalledWith(1, 73);
+  expect(mockSendRequest).toHaveBeenNthCalledWith(2, 73);
+  expect(mockReplace).toHaveBeenCalledWith({
+    pathname: "/(client)/requests/success",
+    params: { requestId: "73" },
+  });
+});
+
+it("clears the note and images after a successful send so a later draft starts fresh", async () => {
+  (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([
+    { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion" },
+  ]));
+  const screen = render(<CreateRequestScreen />);
+
+  await screen.findByText("Plaquettes");
+  fireEvent.changeText(screen.getByLabelText(i18n.t("requestFlow.note")), "Bruit au freinage");
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.addImage") }));
+  await screen.findByLabelText("file:///part.jpg");
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.verify") }));
+  fireEvent.press(await screen.findByRole("button", { name: i18n.t("requestFlow.send") }));
+
+  await waitFor(() => expect(mockReplace).toHaveBeenCalled());
+  expect(await screen.findByText(i18n.t("Ajouter des détails"))).toBeTruthy();
+
+  // Tabs keep this screen mounted — simulate returning to it via a fresh
+  // route prefill instead of unmounting, on the same instance that just sent.
+  mockParams = { categoryId: "12" };
+  await act(async () => {
+    screen.rerender(<RequestDraftProvider><CreateRequestScreen /></RequestDraftProvider>);
+  });
+
+  await screen.findByText("Plaquettes");
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.verify") }));
+  fireEvent.press(await screen.findByRole("button", { name: i18n.t("requestFlow.send") }));
+
+  await waitFor(() => expect(mockCreateRequest).toHaveBeenCalledTimes(2));
+  expect(mockCreateRequest).toHaveBeenLastCalledWith(expect.objectContaining({ notes: null, images: [] }));
 });
 
 it("keeps unvalidated offer counts from enabling the request offers action", async () => {
@@ -434,9 +540,11 @@ it("keeps unvalidated offer counts from enabling the request offers action", asy
   });
   const screen = render(<RequestDetailScreen />);
 
-  const button = await screen.findByRole("button", { name: i18n.t("requestFlow.waitingOffers") });
-  expect(button.props.accessibilityState.disabled).toBe(true);
+  await screen.findByText("Plaquettes");
+  expect(screen.queryByRole("button", { name: i18n.t("Les offres") })).toBeNull();
+  expect(screen.queryByText(i18n.t("requestFlow.noOffer"))).toBeNull();
   expect(screen.UNSAFE_queryAllByType(WhatsappBtn)).toHaveLength(0);
+  expect(mockGetOffers).not.toHaveBeenCalled();
 });
 
 it("shows the request stepper at the matching step for an in-progress request", async () => {
@@ -494,14 +602,75 @@ it("keeps a validated request in progress even past its original deadline", asyn
     success: true,
     data: { ...request, status: "validated", offersCount: 1, expiresAt: "2020-01-01T00:00:00.000Z" },
   });
+  mockGetOffers.mockResolvedValueOnce({ success: true, data: [offer], pagination });
   const screen = render(<RequestDetailScreen />);
 
-  expect(await screen.findByText(i18n.t("requestFlow.requestStatus.validated"))).toBeTruthy();
-  expect(screen.queryByText(i18n.t("requestFlow.requestStatus.expired"))).toBeNull();
-  expect(screen.getByRole("button", { name: i18n.t("requestFlow.viewOffers") })).toBeTruthy();
   expect(await screen.findByLabelText(`${i18n.t("Paiement")}, 3/4`)).toBeTruthy();
+  expect(screen.getByText(i18n.t("requestFlow.offersCount", { count: 1 }))).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("Les offres") }));
+  expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({
+    pathname: "/(client)/requests/[requestId]/offers",
+    params: { requestId: "73", itemId: "1" },
+  }));
   expect(screen.queryByText(i18n.t("Restant"))).toBeNull();
   expect(screen.queryByText(i18n.t("Expiré"))).toBeNull();
+  expect(screen.queryByText(i18n.t("requestFlow.requestStatus.expired"))).toBeNull();
+});
+
+it("renders the Figma list detail for a pending request", async () => {
+  mockParams = { requestId: "73" };
+  const expiresAt = new Date(Date.now() + 90 * 60_000).toISOString();
+  const createdAt = new Date(Date.now() - 30 * 60_000).toISOString();
+  mockGetRequest.mockResolvedValueOnce({
+    success: true,
+    data: { ...request, status: "pending", offersCount: 0, expiresAt, createdAt },
+  });
+  mockGetRequests.mockResolvedValueOnce({
+    success: true,
+    data: [
+      { id: 99, reference: "REQ-99", status: "pending", expiresDisplay: "45min", createdAt: "2026-08-01" },
+      { id: 73, reference: "REQ-73", status: "pending", expiresDisplay: "1h", createdAt: "2026-08-01" },
+    ],
+    pagination,
+  });
+  const screen = render(<RequestDetailScreen />);
+
+  await waitFor(() => expect(mockSetOptions).toHaveBeenCalledWith({ title: i18n.t("requestFlow.detailTitle", { reference: "REQ-73" }) }));
+  expect(await screen.findByText(i18n.t("Restant"))).toBeTruthy();
+  expect(screen.getByText(formatCountdown(expiresAt, "Expiré"))).toBeTruthy();
+  expect(screen.getByText(i18n.t("requestList.category", { value: "Freins" }))).toBeTruthy();
+  expect(screen.getByText("Plaquettes")).toBeTruthy();
+  expect(screen.getByText(i18n.t("Vos autres demandes"))).toBeTruthy();
+  expect(screen.getByText(i18n.t("home.reference", { value: "REQ-99" }))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("home.reference", { value: "REQ-73" }))).toBeNull();
+  expect(screen.queryByText(i18n.t("Veuillez remplir votre commande avant le délai d'expiration"))).toBeNull();
+  expect(screen.queryByRole("button", { name: i18n.t("Les offres") })).toBeNull();
+  expect(screen.queryByRole("button", { name: i18n.t("requestFlow.viewOffers") })).toBeNull();
+});
+
+it("groups parts by category with per-part offer counts and a resend path", async () => {
+  mockParams = { requestId: "73" };
+  const expiresAt = new Date(Date.now() + 90 * 60_000).toISOString();
+  const item1 = { ...request.items[0], id: 1, categoryId: 12, categoryTitle: "Plaquettes" };
+  const item2 = { ...request.items[0], id: 2, categoryId: 13, categoryTitle: "Disques", condition: "occasion" as const };
+  mockGetRequest.mockResolvedValueOnce({
+    success: true,
+    data: { ...request, status: "offers_received", offersCount: 1, expiresAt, items: [item1, item2] },
+  });
+  mockGetOffers.mockResolvedValueOnce({ success: true, data: [offer], pagination });
+  const screen = render(<RequestDetailScreen />);
+
+  expect(await screen.findByText(i18n.t("requestFlow.offersCount", { count: 1 }))).toBeTruthy();
+  expect(screen.getByText(i18n.t("requestFlow.noOffer"))).toBeTruthy();
+  expect(screen.getByText(i18n.t("Veuillez remplir votre commande avant le délai d'expiration"))).toBeTruthy();
+  expect(screen.getAllByText("Freins").length).toBeGreaterThanOrEqual(1);
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.resend") }));
+  expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({
+    pathname: "/(client)/requests/CreateRequestScreen",
+    params: { categoryId: "13", condition: "occasion" },
+  }));
+  expect(screen.queryByText(i18n.t("Vos autres demandes"))).toBeNull();
+  expect(mockGetRequests).not.toHaveBeenCalled();
 });
 
 it("shows only closed requests in archived offers", async () => {
@@ -535,11 +704,15 @@ it("shows only closed requests in archived offers", async () => {
 });
 
 it("loads the created draft and sends once using the server response reference", async () => {
-  mockParams = { requestId: "73", reference: "stale-ref" };
-  const screen = render(<VerificationScreen />);
+  (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([
+    { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion" },
+  ]));
+  const screen = render(<CreateRequestScreen />);
 
-  expect(await screen.findByText("Plaquettes")).toBeTruthy();
-  const send = screen.getByRole("button", { name: i18n.t("requestFlow.send") });
+  await screen.findByText("Plaquettes");
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.verify") }));
+
+  const send = await screen.findByRole("button", { name: i18n.t("requestFlow.send") });
   fireEvent.press(send);
   fireEvent.press(send);
 

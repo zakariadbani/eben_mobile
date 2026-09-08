@@ -15,7 +15,7 @@ describe("formatCountdown", () => {
 
   it("formats a future deadline as zero-padded hours and minutes", () => {
     const expiresAt = new Date(NOW + (2 * 60 + 5) * 60_000).toISOString();
-    expect(formatCountdown(expiresAt, "Expiré")).toBe("02h05min");
+    expect(formatCountdown(expiresAt, "Expiré")).toBe("2h 05min");
   });
 
   it("returns the expired label once the deadline has passed", () => {
@@ -30,7 +30,7 @@ describe("formatCountdown", () => {
 
   it("does not cap the hour component past two digits", () => {
     const expiresAt = new Date(NOW + (100 * 3600 + 5 * 60) * 1000).toISOString();
-    expect(formatCountdown(expiresAt, "Expiré")).toBe("100h05min");
+    expect(formatCountdown(expiresAt, "Expiré")).toBe("100h 05min");
   });
 });
 
@@ -48,11 +48,11 @@ describe("useCountdown", () => {
     const expiresAt = new Date(NOW + 90_000).toISOString();
     const { result } = renderHook(() => useCountdown(expiresAt, "Expiré", 60_000));
 
-    expect(result.current).toBe("00h01min");
+    expect(result.current).toBe("0h 01min");
     expect(jest.getTimerCount()).toBe(1);
 
     act(() => { jest.advanceTimersByTime(60_000); });
-    expect(result.current).toBe("00h00min");
+    expect(result.current).toBe("0h 00min");
     expect(jest.getTimerCount()).toBe(1);
 
     act(() => { jest.advanceTimersByTime(60_000); });

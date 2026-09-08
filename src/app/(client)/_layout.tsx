@@ -431,14 +431,6 @@ function ClientTabs() {
         }}
       />
       <Tabs.Screen
-        name="requests/verification"
-        options={{
-          title: t("Votre liste"),
-          href: null,
-          header: backHeader,
-        }}
-      />
-      <Tabs.Screen
         name="requests/success"
         options={{
           title: t("Votre liste"),
@@ -640,7 +632,7 @@ function ClientTabs() {
       />
       <Tabs.Screen
         name="settings/language/index"
-        options={{ title: t("Langue"), href: null }}
+        options={{ title: t("Langue"), href: null, headerShown: false }}
       />
 
       </Tabs>

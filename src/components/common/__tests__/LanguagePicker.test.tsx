@@ -1,6 +1,5 @@
 import React from "react";
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
-import { StyleSheet } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import LanguagePicker from "@/components/common/LanguagePicker";
 import i18n from "@/localization/i18n";
@@ -28,12 +27,11 @@ describe("LanguagePicker", () => {
     jest.clearAllMocks();
   });
 
-  it("shows a centered language label and a visible select affordance", () => {
+  it("hides the native picker behind a centered label and chevron", () => {
     const { getByTestId, getByText } = render(<LanguagePicker />);
 
     expect(getByText("Fran\u00e7ais")).toBeTruthy();
     expect(getByTestId("language-picker-chevron")).toBeTruthy();
-    expect(StyleSheet.flatten(getByTestId("language-picker").props.style).opacity).not.toBe(0);
   });
 
   it("updates and persists the selected language", async () => {

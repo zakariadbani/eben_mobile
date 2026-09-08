@@ -20,8 +20,9 @@ function positiveId(value: string | undefined): number | null {
 export default function OffersListScreen() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const params = useLocalSearchParams<{ requestId?: string }>();
+  const params = useLocalSearchParams<{ requestId?: string; itemId?: string }>();
   const requestId = positiveId(params.requestId);
+  const itemId = positiveId(params.itemId);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [offers, setOffers] = useState<ClientOfferItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -33,14 +34,14 @@ export default function OffersListScreen() {
     if (refresh) setRefreshing(true); else setState("loading");
     try {
       const response = await getOffers(requestId);
-      setOffers(response.data);
+      setOffers(itemId === null ? response.data : response.data.filter((offer) => offer.requestItemId === itemId));
       setState("ready");
     } catch {
       setState("error");
     } finally {
       setRefreshing(false);
     }
-  }, [requestId]);
+  }, [requestId, itemId]);
 
   useEffect(() => { void load(); }, [load]);
 

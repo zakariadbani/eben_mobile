@@ -64,20 +64,18 @@ const ProgressStepperComponent: React.FC<ProgressStepperComponentProps> = ({
                 {isCompleted ? (
                   <Icon
                     name="check"
-                    size={12}
+                    size={14}
                     iconColor={Colors.white}
                     type="Feather"
                   />
-                ) : (
-                  <Text
-                    type="small"
-                    color={isActive ? Colors.brand : Colors.gray}
-                    center
-                    translate={false}
-                  >
-                    {index + 1}
-                  </Text>
-                )}
+                ) : isActive ? (
+                  <Icon
+                    name="check"
+                    size={14}
+                    iconColor={Colors.brand}
+                    type="Feather"
+                  />
+                ) : null}
               </View>
 
               {/* Label */}
@@ -95,15 +93,9 @@ const ProgressStepperComponent: React.FC<ProgressStepperComponentProps> = ({
               </Text>
             </NativeView>
 
-            {/* Connector line (not after last step) */}
-            {!isLast && (
-              <View
-                style={[
-                  styles.connector,
-                  isCompleted ? styles.connectorCompleted : styles.connectorPending,
-                ]}
-              />
-            )}
+            {/* Connector line (not after last step) — Figma draws one
+                continuous black line regardless of step state. */}
+            {!isLast && <View style={styles.connector} />}
           </View>
         );
       })}
@@ -129,9 +121,9 @@ const styles = StyleSheet.create({
     width: 72,
   },
   circle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
@@ -143,23 +135,18 @@ const styles = StyleSheet.create({
   },
   circleActive: {
     backgroundColor: Colors.primary,
-    borderColor: Colors.brand,
+    borderColor: Colors.primary,
   },
   circlePending: {
-    backgroundColor: Colors.backgroundGray,
-    borderColor: Colors.borderLight,
+    backgroundColor: Colors.white,
+    borderColor: Colors.brand,
   },
   connector: {
     flex: 1,
     height: 2,
-    marginBottom: 20, // offset to align with circle centres
+    marginBottom: 19, // offset to align with the 26px circle centres
     marginHorizontal: 2,
-  },
-  connectorCompleted: {
-    backgroundColor: Colors.greenDark,
-  },
-  connectorPending: {
-    backgroundColor: Colors.borderLight,
+    backgroundColor: Colors.brand,
   },
   stepLabel: {
     maxWidth: 72,
@@ -168,10 +155,10 @@ const styles = StyleSheet.create({
     color: Colors.greenDark,
   },
   labelActive: {
-    color: Colors.brand,
+    color: Colors.orange,
   },
   labelPending: {
-    color: Colors.gray,
+    color: Colors.textLight,
   },
 });
 

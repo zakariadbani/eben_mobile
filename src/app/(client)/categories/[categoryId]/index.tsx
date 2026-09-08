@@ -117,7 +117,7 @@ const CategoryDrillScreen: React.FC = () => {
   // own level so it can't be confused with the (unrelated) en_stock redirect
   // path, which also briefly sets `current` to a level-3 leaf.
   const [leafFallback, setLeafFallback] = useState(false);
-  const [sheetItem, setSheetItem] = useState<{ categoryId: number; title: string; titleAr: string } | null>(null);
+  const [sheetItem, setSheetItem] = useState<{ categoryId: number; title: string; titleAr: string; image?: Category["image"] | null } | null>(null);
   const { items: draftItems } = useRequestDraft();
 
   const validCategoryId = Number.isSafeInteger(categoryId) && categoryId > 0;
@@ -197,7 +197,7 @@ const CategoryDrillScreen: React.FC = () => {
       if (condition === "occasion") {
         // Generic part — add the category itself to the request draft, no
         // product/results detour and no auth gate (guests can add too).
-        setSheetItem({ categoryId: child.id, title: child.title, titleAr: child.titleAr });
+        setSheetItem({ categoryId: child.id, title: child.title, titleAr: child.titleAr, image: child.image });
         return;
       }
       // Leaf — go straight to results.

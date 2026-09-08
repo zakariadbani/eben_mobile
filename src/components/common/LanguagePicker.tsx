@@ -114,6 +114,8 @@ const styles = StyleSheet.create({
   picker: {
     ...StyleSheet.absoluteFillObject,
     color: "transparent",
+    // dropdownIconColor alone doesn't hide the native Android spinner arrow
+    opacity: 0,
   },
   item: {},
   display: {

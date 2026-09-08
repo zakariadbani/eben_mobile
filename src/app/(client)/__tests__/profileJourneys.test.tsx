@@ -60,7 +60,6 @@ jest.mock('@/context/AuthContext', () => ({
 }));
 
 jest.mock('expo-image-picker', () => ({
-  MediaTypeOptions: { Images: 'Images' },
   requestMediaLibraryPermissionsAsync: jest.fn().mockResolvedValue({ granted: true }),
   launchImageLibraryAsync: jest.fn().mockResolvedValue({ canceled: false, assets: [{ uri: 'file:///avatar.jpg' }] }),
 }));

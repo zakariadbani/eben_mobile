@@ -17,6 +17,7 @@ import {
 import { ConfirmationProvider } from "@/context/ConfirmationContext";
 import { getClientReturnTo } from "@/constants/clientReturnTo";
 import { useInAppUpdate } from "@/hooks/useInAppUpdate";
+import UpdateAppModal from "@/components/common/UpdateAppModal";
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
@@ -31,7 +32,7 @@ export default function RootLayout() {
 }
 
 function RootLayoutContent() {
-  useInAppUpdate();
+  const update = useInAppUpdate();
 
   // Load fonts
   // Font files present in src/assets/fonts/:
@@ -89,6 +90,11 @@ function RootLayoutContent() {
       <ConfirmationProvider>
         <StackLayout />
       </ConfirmationProvider>
+      <UpdateAppModal
+        visible={update.updateAvailable}
+        onUpdate={update.openStore}
+        onSkip={update.dismiss}
+      />
     </NotificationProvider>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { Href, useRouter } from "expo-router";
+import { Href, useFocusEffect, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import { getCategories, getCategoryTree, getProducts, getRequests } from "@/api";
@@ -52,6 +52,7 @@ const HomeScreen: React.FC = () => {
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
   const { isWishlisted, toggle } = useWishlist();
   const push = (href: Href) => router.push(href);
+  const loadedRef = useRef(false);
 
   const requireClient = (href: string) => {
     push(role === Role.CLIENT ? href as Href : clientAuthHref("/(auth)/ClientLoginScreen", href));
@@ -80,12 +81,23 @@ const HomeScreen: React.FC = () => {
       setRecentProducts(recentResponse?.data ?? []);
       setRequests(requestResponse?.data.filter(isActiveRequest).slice(0, 2) ?? []);
       setState("ready");
+      loadedRef.current = true;
     } catch {
       setState("error");
     }
   }, [role]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Silent refresh of just the active-requests block on refocus (e.g. after
+  // creating a request elsewhere) — skipped until the first load completes,
+  // and skipped entirely for non-clients.
+  useFocusEffect(useCallback(() => {
+    if (!loadedRef.current || role !== Role.CLIENT) return;
+    getRequests()
+      .then((data) => setRequests(data.data.filter(isActiveRequest).slice(0, 2)))
+      .catch(() => { /* keep current list */ });
+  }, [role]));
 
   const sectionTitle = (title: string, seeAll?: Href) => (
     <View style={[styles.sectionTitleRow, isArabic && styles.rowReverse]}>

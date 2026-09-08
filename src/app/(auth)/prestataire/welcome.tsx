@@ -2,6 +2,7 @@ import React from "react";
 import { ImageBackground, StyleSheet, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/common/Button";
 import GoBack from "@/components/common/GoBack";
 import Screen from "@/components/common/Screen";
@@ -11,6 +12,7 @@ import Colors from "@/constants/Colors";
 const PartnerWelcomeScreen = () => {
   const router = useRouter();
   const { i18n, t } = useTranslation();
+  const insets = useSafeAreaInsets();
 
   return (
     <Screen useSafeArea={false} whatsapp={false} backgroundColor={Colors.brand}>
@@ -22,7 +24,11 @@ const PartnerWelcomeScreen = () => {
       >
         <View
           testID="partner-welcome-back"
-          style={[styles.header, i18n.language === "ar" && styles.headerRtl]}
+          style={[
+            styles.header,
+            { top: insets.top },
+            i18n.language === "ar" && styles.headerRtl,
+          ]}
         >
           <GoBack iconColor={Colors.white} />
         </View>

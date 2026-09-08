@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 
 /**
- * Format the time remaining until `expiresAt` as "HHhMMmin", or `expiredLabel`
- * once the deadline has passed. Moved verbatim from
- * (prestataire)/offers/[offerId]/fill.tsx so both the partner fill screen and
- * the client request/offer screens share one countdown format.
+ * Format the time remaining until `expiresAt` as Figma-style "Hh MMmin"
+ * (hours unpadded, minutes zero-padded), or `expiredLabel` once the deadline
+ * has passed. Originally moved from (prestataire)/offers/[offerId]/fill.tsx
+ * so both the partner fill screen and the client request/offer screens share
+ * one countdown format.
  */
 export function formatCountdown(expiresAt: string | null, expiredLabel: string): string {
   if (!expiresAt) return '—';
@@ -13,7 +14,7 @@ export function formatCountdown(expiresAt: string | null, expiredLabel: string):
   const totalSeconds = Math.floor(diff / 1000);
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
-  return `${String(h).padStart(2, '0')}h${String(m).padStart(2, '0')}min`;
+  return `${h}h ${String(m).padStart(2, '0')}min`;
 }
 
 /**

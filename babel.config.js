@@ -21,5 +21,15 @@ module.exports = function (api) {
         },
       ],
     ],
+    env: {
+      // ponytail: jest runs CommonJS, and babel-preset-expo leaves dynamic
+      // import() as native syntax for Metro's own runtime to handle. Node's
+      // Jest VM can't execute a bare import() without --experimental-vm-modules,
+      // so rewrite it to require() under test only (scoped here, not global —
+      // Metro/production bundling must keep the real dynamic import).
+      test: {
+        plugins: ["babel-plugin-dynamic-import-node"],
+      },
+    },
   };
 };

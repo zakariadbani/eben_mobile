@@ -256,6 +256,7 @@ const CategoryResultsScreen: React.FC = () => {
           variant: isWishlisted(item.id) ? "primary" : "secondary",
           leftIcon: isWishlisted(item.id) ? "heart" : "heart-o",
           iconType: "standard",
+          iconTypeName: "FontAwesome",
           iconColor: isWishlisted(item.id) ? Colors.primary : Colors.brand,
           onPress: () => requireClient(
             `/(client)/products/${item.id}`,

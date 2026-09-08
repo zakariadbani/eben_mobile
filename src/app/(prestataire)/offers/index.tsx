@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   ImageBackground,
@@ -8,7 +8,7 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from "react-native";
-import { Tabs, useLocalSearchParams, useRouter } from "expo-router";
+import { Tabs, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import { getPrestataireIncomingRequests, getPrestataireOffers } from "@/api/resources/prestataire";
@@ -43,6 +43,7 @@ export default function PrestataireOffersScreen(): React.ReactElement {
   const [filterVisible, setFilterVisible] = useState(state === "filter");
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [sortAsc, setSortAsc] = useState(false);
+  const loadedRef = useRef(false);
 
   useEffect(() => {
     setFilterVisible(state === "filter");
@@ -61,16 +62,19 @@ export default function PrestataireOffersScreen(): React.ReactElement {
       setOffers(offersResult.data);
       setShippedOfferIds(new Set(shippedResult.data.map((offer) => offer.id)));
     } catch {
-      setError(true);
+      if (!isRefresh) setError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // First focus shows the loading spinner; later focuses (e.g. returning
+  // after filling/shipping an offer) refresh silently in the background.
+  useFocusEffect(useCallback(() => {
+    void load(loadedRef.current);
+    loadedRef.current = true;
+  }, [load]));
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

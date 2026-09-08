@@ -35,12 +35,15 @@ export interface EmptyListComponentProps {
   /** Optional CTA button shown below the message. */
   actionButton?: EmptyListActionButton;
   styleContainer?: ViewStyle;
+  /** Illustration wrapper width/height in px. Defaults to 200. */
+  illustrationSize?: number;
 }
 
 const EmptyListComponent: React.FC<EmptyListComponentProps> = ({
   title,
   actionButton,
   styleContainer,
+  illustrationSize = 200,
 }) => {
   return (
     <View
@@ -48,7 +51,7 @@ const EmptyListComponent: React.FC<EmptyListComponentProps> = ({
       alignItems="center"
     >
       {/* Illustration */}
-      <View style={styles.illustrationWrapper}>
+      <View style={[styles.illustrationWrapper, { width: illustrationSize, height: illustrationSize }]}>
         <Image
           source={require("@/assets/images/others/empty.png")}
           style={styles.illustration}
