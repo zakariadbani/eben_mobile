@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -13,7 +13,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Href, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 
-import { addToWishlist, getCategories, getCategoryTree, getProducts, getRequests, getWishlist, removeWishlistItem } from "@/api";
+import { getCategories, getCategoryTree, getProducts, getRequests } from "@/api";
 import CustomIcon from "@/components/common/CustomIcon";
 import Icon from "@/components/common/Icon";
 import Screen from "@/components/common/Screen";
@@ -22,6 +22,7 @@ import EmptyListComponent from "@/components/screens/shared/app/EmptyListCompone
 import RequestSummaryCard, { isActiveRequest } from "@/components/screens/client/requests/RequestSummaryCard";
 import Colors from "@/constants/Colors";
 import { Role, useSession } from "@/context/AuthContext";
+import { useWishlist } from "@/context/WishlistContext";
 import { clientAuthHref } from "@/constants/clientReturnTo";
 import type { Category } from "@/interfaces/Category";
 import type { Product } from "@/interfaces/Product";
@@ -49,10 +50,7 @@ const HomeScreen: React.FC = () => {
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
   const [requests, setRequests] = useState<RequestSummary[]>([]);
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
-  // ponytail: hearts are category-scoped by contract (WishlistItem has no productId);
-  // per-product hearts need contract addition #13 — see structure/planning/figma-gaps-roadmap-mobile.md
-  const [wishlistMap, setWishlistMap] = useState<Map<number, number>>(new Map()); // categoryId -> wishlistItemId
-  const wishlistMutationRef = useRef(false);
+  const { isWishlisted, toggle } = useWishlist();
   const push = (href: Href) => router.push(href);
 
   const requireClient = (href: string) => {
@@ -81,53 +79,11 @@ const HomeScreen: React.FC = () => {
       setStockProducts(stockResponse?.data ?? []);
       setRecentProducts(recentResponse?.data ?? []);
       setRequests(requestResponse?.data.filter(isActiveRequest).slice(0, 2) ?? []);
-      if (role === Role.CLIENT) {
-        try {
-          const wishlist = await getWishlist();
-          const seeded = new Map<number, number>();
-          for (const item of wishlist.data) {
-            if (item.categoryId !== null) seeded.set(item.categoryId, item.id);
-          }
-          setWishlistMap(seeded);
-        } catch {
-          // ponytail: seeding is best-effort — hearts just start empty on failure.
-        }
-      }
       setState("ready");
     } catch {
       setState("error");
     }
   }, [role]);
-
-  const handleWishlist = async (product: Product) => {
-    if (role !== Role.CLIENT) {
-      requireClient(`/(client)/products/${product.id}`);
-      return;
-    }
-    if (wishlistMutationRef.current) return;
-    wishlistMutationRef.current = true;
-    try {
-      const existingId = wishlistMap.get(product.categoryId);
-      if (existingId !== undefined) {
-        const response = await removeWishlistItem(existingId);
-        if (response.data.id === existingId) {
-          setWishlistMap((prev) => {
-            const next = new Map(prev);
-            next.delete(product.categoryId);
-            return next;
-          });
-        }
-      } else {
-        const response = await addToWishlist(product.id);
-        setWishlistMap((prev) => new Map(prev).set(product.categoryId, response.data.id));
-      }
-    } catch {
-      // ponytail: silent — Home heart is a quick-toggle convenience; the product page
-      // surfaces the same action with a visible error and retry path.
-    } finally {
-      wishlistMutationRef.current = false;
-    }
-  };
 
   useEffect(() => { void load(); }, [load]);
 
@@ -183,7 +139,7 @@ const HomeScreen: React.FC = () => {
   const productCard = (product: Product, recent = false) => {
     const promoPrice = product.promoPrice;
     const hasPromo = promoPrice != null && promoPrice > 0 && promoPrice < product.price && product.price > 0;
-    const isWishlisted = wishlistMap.has(product.categoryId);
+    const wished = isWishlisted(product.id);
     return (
     <TouchableOpacity
       key={product.id}
@@ -194,16 +150,22 @@ const HomeScreen: React.FC = () => {
     >
       {!recent ? (
         <TouchableOpacity
-          onPress={() => void handleWishlist(product)}
+          onPress={() => {
+            if (role !== Role.CLIENT) {
+              requireClient(`/(client)/products/${product.id}`);
+              return;
+            }
+            void toggle(product.id);
+          }}
           style={styles.heart}
           accessibilityRole="button"
-          accessibilityLabel={t(isWishlisted ? "Retirer de la liste de souhaits" : "Ajouter à la liste de souhaits")}
+          accessibilityLabel={t(wished ? "Retirer de la liste de souhaits" : "Ajouter à la liste de souhaits")}
         >
           <Icon
-            name={isWishlisted ? "heart" : "heart-o"}
+            name={wished ? "heart" : "heart-o"}
             type="FontAwesome"
             size={24}
-            iconColor={isWishlisted ? Colors.primary : Colors.brand}
+            iconColor={wished ? Colors.primary : Colors.brand}
           />
         </TouchableOpacity>
       ) : null}

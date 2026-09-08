@@ -44,6 +44,7 @@ export interface ItemSubCategoryActionButton {
   rightIcon?: string;
   leftIcon?: string;
   iconType?: string;
+  iconColor?: string;
   sizeIcon?: number;
   title?: string;
   onPress?: () => void;
@@ -150,6 +151,7 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
               rightIcon={actionButton.rightIcon}
               leftIcon={actionButton.leftIcon}
               iconType={actionButton.iconType}
+              iconColor={actionButton.iconColor}
               sizeIcon={actionButton.sizeIcon ?? 20}
               title={actionButton.title}
               onPress={actionButton.onPress}
@@ -163,6 +165,7 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
               rightIcon={actionButtonTwo.rightIcon}
               leftIcon={actionButtonTwo.leftIcon}
               iconType={actionButtonTwo.iconType}
+              iconColor={actionButtonTwo.iconColor}
               sizeIcon={actionButtonTwo.sizeIcon ?? 20}
               title={actionButtonTwo.title}
               onPress={actionButtonTwo.onPress}

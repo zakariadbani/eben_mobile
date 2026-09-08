@@ -19,6 +19,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Role, useSession } from "@/context/AuthContext";
 import { RequestDraftProvider } from "@/context/RequestDraftContext";
+import { WishlistProvider } from "@/context/WishlistContext";
 import i18n from "@/localization/i18n";
 import HomeScreen from "@/components/screens/client/HomeScreen";
 import CategoriesListScreen from "../categories";
@@ -50,7 +51,11 @@ jest.mock("@/context/NotificationContext", () => ({
 // see CustomModal.tsx). Shadowing `render` keeps every existing call site
 // below working unchanged.
 function render(ui: React.ReactElement) {
-  return rtlRender(<RequestDraftProvider>{ui}</RequestDraftProvider>);
+  return rtlRender(
+    <RequestDraftProvider>
+      <WishlistProvider>{ui}</WishlistProvider>
+    </RequestDraftProvider>,
+  );
 }
 
 const mockPush = jest.fn();
@@ -248,7 +253,7 @@ it("keeps terminal requests out of the active Home carousel", async () => {
   expect(screen.queryByText(i18n.t("home.reference", { value: "REQ-EXPIRED" }))).toBeNull();
 });
 
-it("shows a promo badge with the struck original price and fills every card sharing the tapped heart's category", async () => {
+it("shows a promo badge with the struck original price and only fills the tapped heart's own card", async () => {
   mockedUseSession.mockReturnValue({ role: Role.CLIENT } as ReturnType<typeof useSession>);
   const productB = { ...product, id: 92, title: "Disques live", titleAr: "أقراص حية" };
   mockGetProducts.mockResolvedValueOnce({
@@ -274,13 +279,13 @@ it("shows a promo badge with the struck original price and fills every card shar
   await waitFor(() => expect(mockAddToWishlist).toHaveBeenCalledTimes(1));
   expect(mockAddToWishlist).toHaveBeenCalledWith(91);
 
-  // Both cards share categoryId 12 (WishlistItem has no productId) — the
-  // wishlist entry fills every card in the category, not just the tapped one.
-  const filledHearts = await screen.findAllByLabelText(i18n.t("Retirer de la liste de souhaits"));
-  expect(filledHearts).toHaveLength(2);
-  expect(screen.queryAllByLabelText(i18n.t("Ajouter à la liste de souhaits"))).toHaveLength(0);
+  // Both cards share categoryId 12, but hearts are now keyed by product.id
+  // (device-local) — only the tapped card (product 91) flips, product 92
+  // stays untouched.
+  expect(await screen.findAllByLabelText(i18n.t("Retirer de la liste de souhaits"))).toHaveLength(1);
+  expect(screen.queryAllByLabelText(i18n.t("Ajouter à la liste de souhaits"))).toHaveLength(1);
 
-  fireEvent.press(filledHearts[0]);
+  fireEvent.press(screen.getByLabelText(i18n.t("Retirer de la liste de souhaits")));
   await waitFor(() => expect(mockRemoveWishlistItem).toHaveBeenCalledWith(501));
   expect(await screen.findAllByLabelText(i18n.t("Ajouter à la liste de souhaits"))).toHaveLength(2);
   expect(screen.queryAllByLabelText(i18n.t("Retirer de la liste de souhaits"))).toHaveLength(0);

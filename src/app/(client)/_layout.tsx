@@ -17,6 +17,7 @@ import ConfirmModal from "@/components/common/ConfirmModal";
 import { useSession } from "@/context/AuthContext";
 import { CartProvider, useCart } from "@/context/CartContext";
 import { RequestDraftProvider } from "@/context/RequestDraftContext";
+import { WishlistProvider } from "@/context/WishlistContext";
 import { clientAuthHref } from "@/constants/clientReturnTo";
 
 // Minimal type alias so tabBarIcon/tabBarLabel callbacks are typed without
@@ -682,7 +683,9 @@ export default function ClientLayout() {
   return (
     <CartProvider>
       <RequestDraftProvider>
-        <ClientTabs />
+        <WishlistProvider>
+          <ClientTabs />
+        </WishlistProvider>
       </RequestDraftProvider>
     </CartProvider>
   );

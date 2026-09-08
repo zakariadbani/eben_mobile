@@ -52,7 +52,7 @@ export const Screen: React.FC<ScreenProps> = ({
   const ContainerComponent = avoidKeyboard ? KeyboardAvoidingView : View;
 
   return (
-    <WrapperComponent {...(useSafeArea ? { edges } : {})} style={[styles.container, wrapperStyle]}>
+    <WrapperComponent {...(useSafeArea ? { edges } : {})} style={[styles.container, { backgroundColor }, wrapperStyle]}>
       <StatusBar
         barStyle={statusBarStyle}
         backgroundColor={Platform.OS === "android" ? statusBarColor : undefined}

@@ -43,8 +43,9 @@ import AddToListSheet from "@/components/screens/client/requests/AddToListSheet"
 import Colors from "@/constants/Colors";
 import { clientAuthHref } from '@/constants/clientReturnTo';
 
-import { getProduct, addToBasket, addToWishlist, getWishlist, removeWishlistItem } from "@/api";
+import { getProduct, addToBasket } from "@/api";
 import { Role, useSession } from "@/context/AuthContext";
+import { useWishlist } from "@/context/WishlistContext";
 import type { Product } from "@/interfaces/Product";
 import type { Basket } from "@/interfaces/Basket";
 
@@ -151,8 +152,7 @@ const ProductDetailScreen: React.FC = () => {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [product, setProduct] = useState<Product | null>(null);
   const [qty, setQty] = useState(1);
-  const [wishlisted, setWishlisted] = useState(false);
-  const [wishlistItemId, setWishlistItemId] = useState<number | null>(null);
+  const { isWishlisted, toggle: toggleWishlist } = useWishlist();
   const [basketAfterAdd, setBasketAfterAdd] = useState<Basket | null>(null);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [addToBasketLoading, setAddToBasketLoading] = useState(false);
@@ -174,22 +174,12 @@ const ProductDetailScreen: React.FC = () => {
     try {
       const response = await getProduct(productId);
       setProduct(response.data);
-      if (role === Role.CLIENT) {
-        try {
-          const wishlist = await getWishlist();
-          const existing = wishlist.data.find((item) => item.categoryId === response.data.categoryId);
-          setWishlistItemId(existing?.id ?? null);
-          setWishlisted(existing !== undefined);
-        } catch {
-          setActionError(t("auth.error.generic"));
-        }
-      }
       setLoadState("success");
     } catch {
       setProduct(null);
       setLoadState("error");
     }
-  }, [productId, role, t, validProductId]);
+  }, [productId, validProductId]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -224,27 +214,14 @@ const ProductDetailScreen: React.FC = () => {
       return;
     }
     wishlistMutation.current = true;
-    setActionError(null);
     setWishlistLoading(true);
     try {
-      if (wishlistItemId !== null) {
-        const response = await removeWishlistItem(wishlistItemId);
-        if (response.data.id === wishlistItemId) {
-          setWishlistItemId(null);
-          setWishlisted(false);
-        }
-      } else {
-        const response = await addToWishlist(product.id);
-        setWishlistItemId(response.data.id);
-        setWishlisted(true);
-      }
-    } catch {
-      setActionError(t("auth.error.generic"));
+      await toggleWishlist(product.id);
     } finally {
       setWishlistLoading(false);
       wishlistMutation.current = false;
     }
-  }, [product, productId, wishlistItemId, role, router, t]);
+  }, [product, productId, role, router, toggleWishlist]);
 
   const openPurchase = useCallback(() => {
     if (product?.condition === "occasion") {
@@ -316,6 +293,7 @@ const ProductDetailScreen: React.FC = () => {
 
   const hasPromo = product.promoPrice !== undefined && product.promoPrice !== null && product.promoPrice > 0;
   const activePrice = hasPromo ? product.promoPrice! : product.price;
+  const wished = isWishlisted(product.id);
 
   return (
     <Screen whatsapp={false}>
@@ -530,13 +508,13 @@ const ProductDetailScreen: React.FC = () => {
             <ActivityIndicator size="small" color={Colors.orange} />
           ) : (
             <Icon
-              name={wishlisted ? "heart" : "heart"}
+              name="heart"
               size={22}
-              iconColor={wishlisted ? Colors.red : Colors.grayMidDark}
-              type={wishlisted ? "FontAwesome" : "FontAwesome"}
+              iconColor={wished ? Colors.red : Colors.grayMidDark}
+              type="FontAwesome"
             />
           )}
-          <Text type="small" color={wishlisted ? Colors.red : Colors.grayMidDark} style={styles.wishlistLabel}>
+          <Text type="small" color={wished ? Colors.red : Colors.grayMidDark} style={styles.wishlistLabel}>
             {t("Ma liste")}
           </Text>
         </TouchableOpacity>

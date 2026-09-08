@@ -5,7 +5,6 @@ import type { Href } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import {
-  addToWishlist,
   getCategoryTree,
   getProductsByCategory,
   searchAllPneumatics,
@@ -21,6 +20,7 @@ import PubPlacerDemandeBlockComponent from "@/components/screens/shared/app/PubP
 import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
 import Colors from "@/constants/Colors";
 import { Role, useSession } from "@/context/AuthContext";
+import { useWishlist } from "@/context/WishlistContext";
 import { clientAuthHref } from "@/constants/clientReturnTo";
 import type { Category, CategoryProps } from "@/interfaces/Category";
 import type { Product } from "@/interfaces/Product";
@@ -172,7 +172,7 @@ const CategoryResultsScreen: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category>();
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
-  const [actionError, setActionError] = useState<string | null>(null);
+  const { isWishlisted, toggle: toggleWishlist } = useWishlist();
 
   const load = useCallback(async () => {
     const tyreFilters = isPneumaticSearch
@@ -236,15 +236,6 @@ const CategoryResultsScreen: React.FC = () => {
     action();
   };
 
-  const addWishlist = async (productId: number) => {
-    setActionError(null);
-    try {
-      await addToWishlist(productId);
-    } catch {
-      setActionError(t("auth.error.generic"));
-    }
-  };
-
   const renderItem = ({ item }: { item: ResultItem }) => (
     <ItemSubCategoryComponent
       onPress={() => item.isProduct && router.push({
@@ -262,12 +253,13 @@ const CategoryResultsScreen: React.FC = () => {
         showPrice
         styleContainer={styles.resultCard}
         actionButtonTwo={item.isProduct ? {
-          variant: "secondary",
-          leftIcon: "heart",
+          variant: isWishlisted(item.id) ? "primary" : "secondary",
+          leftIcon: isWishlisted(item.id) ? "heart" : "heart-o",
           iconType: "standard",
+          iconColor: isWishlisted(item.id) ? Colors.primary : Colors.brand,
           onPress: () => requireClient(
             `/(client)/products/${item.id}`,
-            () => { void addWishlist(item.id); },
+            () => { void toggleWishlist(item.id); },
           ),
         } : undefined}
       />
@@ -283,11 +275,6 @@ const CategoryResultsScreen: React.FC = () => {
               ? i18n.language === "ar" ? selectedCategory.titleAr : selectedCategory.title
               : "")}
         </Text>
-        {actionError ? (
-          <Text style={styles.actionError} accessibilityRole="alert" translate={false}>
-            {actionError}
-          </Text>
-        ) : null}
 
         {state === "loading" ? (
           <ActivityIndicator color={Colors.primary} size="large" />
@@ -356,7 +343,6 @@ const CategoryResultsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, paddingVertical: 12 },
   screenTitle: { color: Colors.brand, marginBottom: 16 },
-  actionError: { color: Colors.red, textAlign: "center", marginBottom: 12 },
   productList: { marginBottom: 24 },
   productWrapper: {
     backgroundColor: Colors.white,

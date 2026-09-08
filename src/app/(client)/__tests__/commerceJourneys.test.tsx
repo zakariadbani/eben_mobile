@@ -12,6 +12,7 @@ import { getOrder, placeOrder } from '@/api/resources/orders';
 import { getProfile } from '@/api/resources/users';
 import { CartContext } from '@/context/CartContext';
 import { RequestDraftProvider } from '@/context/RequestDraftContext';
+import { WishlistProvider } from '@/context/WishlistContext';
 import CartScreen from '../cart';
 import CheckoutScreen from '../payment';
 import OrderSuccessScreen from '../payment/success';
@@ -143,7 +144,11 @@ const mockGetOrder = getOrder as jest.MockedFunction<typeof getOrder>;
 // `visible` prop) — shadow `render` so every call site below picks up
 // useRequestDraft() without touching each test.
 function render(ui: React.ReactElement) {
-  return rtlRender(<RequestDraftProvider>{ui}</RequestDraftProvider>);
+  return rtlRender(
+    <RequestDraftProvider>
+      <WishlistProvider>{ui}</WishlistProvider>
+    </RequestDraftProvider>,
+  );
 }
 
 // ponytail: CartScreen/CheckoutScreen call useCart() (throws outside a
