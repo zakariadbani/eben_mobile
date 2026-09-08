@@ -417,8 +417,9 @@ function ClientTabs() {
       <Tabs.Screen
         name="requests/CreateRequestScreen"
         options={{
-          title: t("Placer une demande"),
+          title: t("Votre liste"),
           href: null,
+          header: backHeader,
         }}
       />
       <Tabs.Screen

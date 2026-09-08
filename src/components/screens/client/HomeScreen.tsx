@@ -19,6 +19,7 @@ import Icon from "@/components/common/Icon";
 import Screen from "@/components/common/Screen";
 import { Text } from "@/components/common/Text";
 import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
+import RequestSummaryCard, { isActiveRequest } from "@/components/screens/client/requests/RequestSummaryCard";
 import Colors from "@/constants/Colors";
 import { Role, useSession } from "@/context/AuthContext";
 import { clientAuthHref } from "@/constants/clientReturnTo";
@@ -79,11 +80,7 @@ const HomeScreen: React.FC = () => {
       setCategories(roots);
       setStockProducts(stockResponse?.data ?? []);
       setRecentProducts(recentResponse?.data ?? []);
-      setRequests(
-        requestResponse?.data
-          .filter((request) => ['pending', 'offers_received', 'validated'].includes(request.status))
-          .slice(0, 2) ?? [],
-      );
+      setRequests(requestResponse?.data.filter(isActiveRequest).slice(0, 2) ?? []);
       if (role === Role.CLIENT) {
         try {
           const wishlist = await getWishlist();
@@ -179,44 +176,6 @@ const HomeScreen: React.FC = () => {
         >
           {isArabic ? category.titleAr : category.title}
         </Text>
-      </TouchableOpacity>
-    );
-  };
-
-  const requestCard = (request: RequestSummary) => {
-    const ready = request.status === "validated";
-    return (
-      <TouchableOpacity
-        key={request.id}
-        onPress={() => push(`/(client)/requests/${request.id}` as Href)}
-        style={[styles.requestCard, isArabic && styles.rowReverse]}
-        accessibilityRole="button"
-      >
-        <CustomIcon name={ready ? "orders" : "clock"} size={50} />
-        <View style={styles.requestInfo}>
-          <View style={[styles.referenceRow, isArabic && styles.rowReverse]}>
-            <Text type="label" style={styles.reference}>
-              {t("home.reference", { value: request.reference })}
-            </Text>
-            {ready ? <Text type="defaultTwo" semiBold style={styles.ready}>home.ready</Text> : null}
-          </View>
-          <Text type="defaultTwo" semiBold style={styles.requestStatus}>
-            {ready ? "home.offersReceived" : "home.priceCountdown"}
-          </Text>
-          <Text type="defaultTwo" semiBold style={styles.requestExpiry} translate={false}>
-            {ready
-              ? t("home.expiresIn", { value: request.expiresDisplay ?? "" })
-              : request.expiresDisplay ?? ""}
-          </Text>
-        </View>
-        <View style={styles.requestActionWrap}>
-          <View style={[styles.requestAction, ready ? styles.readyAction : styles.detailAction, isArabic && styles.rowReverse]}>
-            <Text type="defaultTwo" semiBold style={styles.actionText}>
-              {ready ? "home.checkPrices" : "home.details"}
-            </Text>
-            <CustomIcon name={isArabic ? "arrow_left" : "arrow_right"} size={18} />
-          </View>
-        </View>
       </TouchableOpacity>
     );
   };
@@ -367,7 +326,13 @@ const HomeScreen: React.FC = () => {
 
         <View style={styles.requestsSection}>
           {sectionTitle("home.activeRequests", "/(client)/requests/OrdersListScreen")}
-          {requests.map(requestCard)}
+          {requests.map((request) => (
+            <RequestSummaryCard
+              key={request.id}
+              request={request}
+              onPress={() => push(`/(client)/requests/${request.id}` as Href)}
+            />
+          ))}
           <View style={[styles.notice, isArabic && styles.rowReverse]}>
             <CustomIcon name="info" size={28} tintColor={Colors.grayMidDark} />
             <Text type="label" style={styles.noticeText}>home.orderNotice</Text>
@@ -408,18 +373,6 @@ const styles = StyleSheet.create({
   categoryTitle: { fontSize: 13, lineHeight: 18, color: Colors.brand },
   uppercase: { textTransform: "uppercase" },
   requestsSection: { marginBottom: 38 },
-  requestCard: { minHeight: 84, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: Colors.white, borderRadius: 7, marginBottom: 12, paddingHorizontal: 14, paddingVertical: 10, shadowColor: Colors.gray, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.16, shadowRadius: 8, elevation: 4 },
-  requestInfo: { flex: 1, minWidth: 0 },
-  referenceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6 },
-  reference: { color: Colors.greyLight2 },
-  ready: { color: Colors.greenDark, fontSize: 13 },
-  requestStatus: { marginTop: 3, fontSize: 14, lineHeight: 17 },
-  requestExpiry: { marginTop: 11, fontSize: 14, lineHeight: 17 },
-  requestActionWrap: { alignSelf: "flex-end" },
-  requestAction: { minWidth: 96, minHeight: 26, borderRadius: 3, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6 },
-  readyAction: { backgroundColor: Colors.green },
-  detailAction: { backgroundColor: Colors.primary },
-  actionText: { fontSize: 13 },
   notice: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 6, marginTop: 3 },
   noticeText: { flex: 1, color: "#84899F", lineHeight: 19 },
   stockSection: { marginBottom: 38 },

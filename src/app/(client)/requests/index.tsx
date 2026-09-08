@@ -39,13 +39,14 @@ export default function RequestListScreen() {
 
   useEffect(() => { void load(); }, [load]);
 
+  const draftQuantity = draftItems.reduce((sum, item) => sum + item.quantity, 0);
   const draftBanner = draftItems.length > 0 ? (
     <TouchableOpacity
       accessibilityRole="button"
       style={styles.draftBanner}
       onPress={() => router.push("/(client)/requests/CreateRequestScreen" as Href)}
     >
-      <Text semiBold>{t("requestFlow.draftBanner", { count: draftItems.length })}</Text>
+      <Text semiBold>{t("requestFlow.draftBanner", { count: draftQuantity })}</Text>
     </TouchableOpacity>
   ) : null;
 

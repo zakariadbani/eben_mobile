@@ -42,6 +42,7 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
 jest.mock("expo-router", () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace, back: mockBack }),
   useLocalSearchParams: () => mockParams,
+  useFocusEffect: jest.fn(),
 }));
 jest.mock("@react-navigation/core", () => ({
   useNavigation: () => ({ setOptions: mockSetOptions }),
@@ -161,9 +162,15 @@ const leaf = {
   id: 12, parentId: 11, level: 3 as const, title: "Plaquettes", titleAr: "وسادات",
   slug: "plaquettes", sortOrder: 1, status: true, createdAt: "2026-01-01", updatedAt: "2026-01-01",
 };
+// Second leaf sibling — used only by the "list/full" layout test below to
+// prove multiple draft items resolve/render independently; other tests in
+// this file keep addressing "Plaquettes"/"Freins avant" by name, unaffected.
+const leaf2 = {
+  ...leaf, id: 13, parentId: 11, title: "Disques", titleAr: "أقراص", slug: "disques",
+};
 const tree = [{
   ...leaf, id: 10, parentId: null, level: 1 as const, title: "Freins", titleAr: "فرامل",
-  children: [{ ...leaf, id: 11, parentId: 10, level: 2 as const, title: "Freins avant", children: [leaf] }],
+  children: [{ ...leaf, id: 11, parentId: 10, level: 2 as const, title: "Freins avant", children: [leaf, leaf2] }],
 }];
 const vehicle = {
   id: 42, userId: 5, brandId: 1, modelId: 2, motorizationId: null, year: 2021,
@@ -313,6 +320,67 @@ it("keeps listing the draft and offers the add-car CTA when the garage is empty"
   fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.addVehicle") }));
   expect(mockPush).toHaveBeenCalledWith("/(client)/search/add-car");
   expect(mockCreateRequest).not.toHaveBeenCalled();
+});
+
+it("renders the Figma list/full layout for a saved draft", async () => {
+  const draftItem1 = { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 3, condition: "occasion" as const };
+  const draftItem2 = { categoryId: 13, title: "Disques", titleAr: "أقراص", quantity: 1, condition: "occasion" as const };
+  (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([draftItem1, draftItem2]));
+  mockGetRequests.mockResolvedValueOnce({
+    success: true,
+    data: [
+      { id: 101, reference: "REQ-101", status: "pending", expiresDisplay: "3h 00min", createdAt: "2026-09-01" },
+      { id: 102, reference: "REQ-102", status: "validated", expiresDisplay: "1h 00min", createdAt: "2026-09-01" },
+    ],
+    pagination: { ...pagination, total: 2 },
+  });
+  const screen = render(<CreateRequestScreen />);
+
+  expect(await screen.findByText(i18n.t("requestFlow.totalPieces", { count: 4 }))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("requestFlow.chooseCategory"))).toBeNull();
+  expect(screen.getAllByText(i18n.t("requestList.category", { value: "Freins" })).length).toBeGreaterThan(0);
+  expect(screen.getByText(i18n.t(
+    "Les demandes de prix sont ouvertes de 8h à 18h, toute demande envoyée après 18h sera satisfaite à 10h le jour ouvrable suivant.",
+  ))).toBeTruthy();
+  expect(screen.getByText(i18n.t("Ajouter des détails"))).toBeTruthy();
+  expect(screen.getByText(i18n.t("Vos requêtes actives"))).toBeTruthy();
+  expect(screen.getByText(i18n.t("home.checkPrices"))).toBeTruthy();
+  expect(screen.getByText(i18n.t("home.details"))).toBeTruthy();
+
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("Ajouter une pièce") }));
+  expect(await screen.findByText(i18n.t("requestFlow.chooseCategory"))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("requestFlow.totalPieces", { count: 4 }))).toBeNull();
+  expect(screen.queryByText(i18n.t("Ajouter des détails"))).toBeNull();
+  expect(screen.queryByText(i18n.t("Vos requêtes actives"))).toBeNull();
+
+  fireEvent.press(screen.getByLabelText(i18n.t("requestFlow.back")));
+  expect(await screen.findByText(i18n.t("requestFlow.totalPieces", { count: 4 }))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("requestFlow.chooseCategory"))).toBeNull();
+
+  fireEvent.press(screen.getAllByLabelText(i18n.t("requestFlow.removePart"))[0]);
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith("requestDraft", JSON.stringify([draftItem2])));
+  expect(await screen.findByText(i18n.t("requestFlow.totalPieces", { count: 1 }))).toBeTruthy();
+});
+
+it("still renders the list layout when the active-requests fetch fails", async () => {
+  const draftItem1 = { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion" as const };
+  (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([draftItem1]));
+  mockGetRequests.mockRejectedValueOnce(new Error("offline"));
+  const screen = render(<CreateRequestScreen />);
+
+  expect(await screen.findByText(i18n.t("requestFlow.totalPieces", { count: 1 }))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("requestFlow.loadError"))).toBeNull();
+});
+
+it("never calls getRequests for a guest with a saved draft and hides the active-requests section", async () => {
+  mockedUseSession.mockReturnValue({ role: "guest" } as ReturnType<typeof useSession>);
+  const draftItem1 = { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion" as const };
+  (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([draftItem1]));
+  const screen = render(<CreateRequestScreen />);
+
+  expect(await screen.findByText(i18n.t("requestFlow.totalPieces", { count: 1 }))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("Vos requêtes actives"))).toBeNull();
+  expect(mockGetRequests).not.toHaveBeenCalled();
 });
 
 it("shows a draft banner on the Liste tab that opens the request builder", async () => {
