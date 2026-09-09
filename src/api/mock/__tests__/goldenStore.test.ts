@@ -11,6 +11,7 @@ import {
   getRequest,
   sendRequest,
 } from '@/api/resources/requests';
+import { getCategoryBrands } from '@/api/resources/categories';
 import {
   addToBasket,
   getBasket,
@@ -114,6 +115,35 @@ describe('mock golden path', () => {
       categoryTitleAr: expect.any(String),
       categoryImage: expect.anything(),
     }));
+  });
+
+  it('serves linked active brands per leaf, or every active brand when none are linked', async () => {
+    const linked = await getCategoryBrands(100);
+    expect(linked.data.map(({ name }: { name: string }) => name)).toEqual(['RIDEX', 'Brembo', 'Bosch']);
+
+    const unmapped = await getCategoryBrands(103);
+    expect(unmapped.data.map(({ name }: { name: string }) => name)).toEqual(['RIDEX', 'Brembo', 'Bosch', 'TRW', 'Valeo']);
+  });
+
+  it('enriches created request items with brand fields and enforces pair-distinct items', async () => {
+    const created = await createRequest({
+      vehicleId: 1,
+      items: [
+        { categoryId: 100, quantity: 1, condition: 'occasion', brandId: 1 },
+        { categoryId: 100, quantity: 1, condition: 'occasion', brandId: 2 },
+      ],
+    });
+    const items = (await getRequest(created.data.id)).data.items!;
+    expect(items[0]).toEqual(expect.objectContaining({ brandId: 1, brandName: 'RIDEX', brandNameAr: 'ريدكس' }));
+    expect(items[1]).toEqual(expect.objectContaining({ brandId: 2, brandName: 'Brembo', brandNameAr: 'بريمبو' }));
+
+    await expect(createRequest({
+      vehicleId: 1,
+      items: [
+        { categoryId: 100, quantity: 1, condition: 'occasion', brandId: 1 },
+        { categoryId: 100, quantity: 2, condition: 'occasion', brandId: 1 },
+      ],
+    })).rejects.toThrow('Invalid request payload');
   });
 
   it('persists vehicle and address mutations through their route-aware endpoints', () => {

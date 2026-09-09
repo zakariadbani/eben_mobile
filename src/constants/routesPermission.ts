@@ -36,6 +36,7 @@ const allowedRoutes: Record<AllowedRole, string[]> = {
     // Search / Categories tab
     "(client)/categories/index",
     "(client)/categories/[categoryId]/index",
+    "(client)/categories/[categoryId]/brands",
     "(client)/categories/results",
 
     // Tyre / part search screens
@@ -176,6 +177,7 @@ const allowedRoutes: Record<AllowedRole, string[]> = {
     "(client)/index",
     "(client)/categories/index",
     "(client)/categories/[categoryId]/index",
+    "(client)/categories/[categoryId]/brands",
     "(client)/categories/results",
     "(client)/search",
     "(client)/search/index",

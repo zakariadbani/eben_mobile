@@ -8,10 +8,11 @@ import { Text } from "@/components/common/Text";
 import Colors from "@/constants/Colors";
 
 interface SendListSheetItem {
-  key: number;
+  key: string;
   title: string;
   quantity: number;
   image?: ImageSourcePropType;
+  brand?: string | null;
 }
 
 interface SendListSheetProps {
@@ -66,6 +67,11 @@ const SendListSheet: React.FC<SendListSheetProps> = ({ visible, items, note, sen
             )}
             <Text semiBold translate={false}>{`${item.quantity}x`}</Text>
             <Text semiBold translate={false}>{item.title}</Text>
+            {item.brand ? (
+              <Text type="small" color={Colors.gray} translate={false}>
+                {t("requestList.brand", { value: item.brand })}
+              </Text>
+            ) : null}
           </View>
         ))}
         <View>

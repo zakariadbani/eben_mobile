@@ -64,7 +64,7 @@ const ItemCategoryComponent: React.FC<ItemCategoryComponentProps> = ({
         )}
       </View>
       <Text
-        type="label"
+        type="labelTwo"
         semiBold
         center
         numberOfLines={2}
@@ -81,22 +81,17 @@ const ItemCategoryComponent: React.FC<ItemCategoryComponentProps> = ({
 const styles = StyleSheet.create({
   container: {
     alignItems: "center",
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.backgroundGray,
     borderRadius: 8,
-    paddingVertical: 12,
+    paddingVertical: 8,
     paddingHorizontal: 8,
-    shadowColor: Colors.borderLight,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
   },
   imageWrapper: {
-    width: 72,
-    height: 72,
+    width: 48,
+    height: 40,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   image: {
     width: "100%",

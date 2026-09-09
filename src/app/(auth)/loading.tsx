@@ -5,6 +5,7 @@ import {
   View as RNView,
 } from "react-native";
 import { Stack, useRouter } from "expo-router";
+import type { Href } from "expo-router";
 import { Text } from "@/components/common/Text";
 import Colors from "@/constants/Colors";
 
@@ -52,7 +53,7 @@ const LoadingScreen = () => {
       // Phase 4 — hold briefly before navigating
       Animated.delay(600),
     ]).start(() => {
-      router.replace("/(auth)/");
+      router.replace("/(auth)/" as Href);
     });
   }, [logoOpacity, greetingOpacity, router]);
 

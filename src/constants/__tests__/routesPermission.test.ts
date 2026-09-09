@@ -28,6 +28,7 @@ describe("route permissions", () => {
     ["(auth)/prestataire/forgot-password/success"],
     ["(client)/index"],
     ["(client)/categories/index"],
+    ["(client)/categories/[categoryId]/brands"],
     ["(client)/search/index"],
     ["(client)/products/[productId]"],
     ["(client)/products/[productId]/reviews"],
@@ -41,6 +42,7 @@ describe("route permissions", () => {
   it("allows each authenticated role to access its own private routes", () => {
     expect(canAccessRoute("(client)/settings/index", "client")).toBe(true);
     expect(canAccessRoute("(client)/settings", "client")).toBe(true);
+    expect(canAccessRoute("(client)/categories/[categoryId]/brands", "client")).toBe(true);
     expect(canAccessRoute("(client)/requests/[requestId]", "client")).toBe(true);
     expect(canAccessRoute("(client)/settings/pages/Legal", "client")).toBe(true);
     expect(canAccessRoute("(auth)/prestataire/forgot-password")).toBe(true);

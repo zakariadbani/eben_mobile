@@ -6,6 +6,7 @@ import {
   addToWishlist,
   createRequest,
   getCategories,
+  getCategoryBrands,
   getCategoryTree,
   getProduct,
   getProducts,
@@ -24,6 +25,7 @@ import i18n from "@/localization/i18n";
 import HomeScreen from "@/components/screens/client/HomeScreen";
 import CategoriesListScreen from "../categories";
 import CategoryDrillScreen from "../categories/[categoryId]";
+import CategoryBrandsScreen from "../categories/[categoryId]/brands";
 import CategoryResultsScreen from "../categories/results";
 import ProductDetailScreen from "../products/[productId]";
 import ReviewsScreen from "../products/[productId]/reviews";
@@ -97,6 +99,7 @@ jest.mock("@/api", () => ({
   addToWishlist: jest.fn(),
   createRequest: jest.fn(),
   getCategories: jest.fn(),
+  getCategoryBrands: jest.fn(),
   getCategoryTree: jest.fn(),
   getProduct: jest.fn(),
   getProducts: jest.fn(),
@@ -114,6 +117,7 @@ jest.mock("@/context/AuthContext", () => ({
 
 const mockedUseSession = useSession as jest.MockedFunction<typeof useSession>;
 const mockGetCategories = getCategories as jest.MockedFunction<typeof getCategories>;
+const mockGetCategoryBrands = getCategoryBrands as jest.MockedFunction<typeof getCategoryBrands>;
 const mockGetCategoryTree = getCategoryTree as jest.MockedFunction<typeof getCategoryTree>;
 const mockGetProducts = getProducts as jest.MockedFunction<typeof getProducts>;
 const mockGetProductsByCategory = getProductsByCategory as jest.MockedFunction<typeof getProductsByCategory>;
@@ -178,6 +182,9 @@ const product = {
   createdAt: "2026-01-01",
   updatedAt: "2026-01-01",
 };
+const ridexBrand = { id: 1, name: "RIDEX", nameAr: "ريدكس", logo: null, status: true, sortOrder: 1 };
+const boschBrand = { id: 2, name: "Bosch", nameAr: "بوش", logo: null, status: true, sortOrder: 2 };
+const partBrands = [ridexBrand, boschBrand];
 const pagination = { currentPage: 1, lastPage: 1, perPage: 20, total: 1, from: 1, to: 1 };
 
 beforeEach(async () => {
@@ -187,6 +194,7 @@ beforeEach(async () => {
   mockedUseSession.mockReturnValue({ role: "guest" } as ReturnType<typeof useSession>);
   mockGetCategories.mockResolvedValue({ success: true, data: [rootCategory], pagination });
   mockGetCategoryTree.mockResolvedValue({ success: true, data: categoryTree });
+  mockGetCategoryBrands.mockResolvedValue({ success: true, data: partBrands });
   mockGetProducts.mockResolvedValue({ success: true, data: [product], pagination });
   mockGetProductsByCategory.mockResolvedValue({ success: true, data: [product], pagination });
   mockGetProduct.mockResolvedValue({ success: true, data: product });
@@ -680,7 +688,10 @@ it("splits level-3 rows by condition instead of always jumping straight to resul
   mockParams = { categoryId: "11", condition: "occasion" };
   const occasionScreen = render(<CategoryDrillScreen />);
   fireEvent.press(await findActionButton(occasionScreen, i18n.t("Ajoutez à la liste")));
-  expect(mockPush).not.toHaveBeenCalled();
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: "/(client)/categories/[categoryId]/brands",
+    params: { categoryId: "12" },
+  });
   expect(mockGetProductsByCategory).not.toHaveBeenCalled();
   occasionScreen.unmount();
 
@@ -693,48 +704,23 @@ it("splits level-3 rows by condition instead of always jumping straight to resul
   });
 });
 
-it("routes an occasion level-3 row title to the results/Brands list, but its CTA opens the sheet instead", async () => {
+it("routes both the occasion level-3 row body and its CTA to the same Brands screen", async () => {
   mockParams = { categoryId: "11", condition: "occasion" };
   const screen = render(<CategoryDrillScreen />);
 
   fireEvent.press(await screen.findByText("Plaquettes"));
   expect(mockPush).toHaveBeenCalledWith({
-    pathname: "/(client)/categories/results",
-    params: { categoryId: "12", condition: "occasion" },
+    pathname: "/(client)/categories/[categoryId]/brands",
+    params: { categoryId: "12" },
   });
 
   mockPush.mockClear();
   fireEvent.press(getActionButton(screen, i18n.t("Ajoutez à la liste")));
-  expect(mockPush).not.toHaveBeenCalled();
-});
-
-it("guest adds a level-3 category from the sheet without a login redirect", async () => {
-  mockParams = { categoryId: "11", condition: "occasion" };
-  const screen = render(<CategoryDrillScreen />);
-
-  fireEvent.press(await findActionButton(screen, i18n.t("Ajoutez à la liste")));
-  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajouter à la liste") }));
-
-  expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Ajouté à la liste !"));
-  expect(await findActionButton(screen, i18n.t("Ajouté"))).toBeTruthy();
-  expect(mockPush).not.toHaveBeenCalled();
-  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-    "requestDraft",
-    expect.stringContaining("\"categoryId\":12"),
-  ));
-});
-
-it("adds a level-3 category from the sheet as a signed-in client, toasts, with no login redirect", async () => {
-  mockedUseSession.mockReturnValue({ role: Role.CLIENT } as ReturnType<typeof useSession>);
-  mockParams = { categoryId: "11", condition: "occasion" };
-  const screen = render(<CategoryDrillScreen />);
-
-  fireEvent.press(await findActionButton(screen, i18n.t("Ajoutez à la liste")));
-  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajouter à la liste") }));
-
-  expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Ajouté à la liste !"));
-  expect(await findActionButton(screen, i18n.t("Ajouté"))).toBeTruthy();
-  expect(mockPush).not.toHaveBeenCalled();
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: "/(client)/categories/[categoryId]/brands",
+    params: { categoryId: "12" },
+  });
+  expect(screen.queryByRole("button", { name: i18n.t("Ajouter à la liste") })).toBeNull();
 });
 
 it("lists an occasion product's category from product detail instead of adding to the basket", async () => {
@@ -802,21 +788,21 @@ it("renders level-2 children as list rows instead of a grid, and drills deeper o
   });
 });
 
-it("turns an occasion result row into a demande draft line and back via Liste/trash", async () => {
-  mockParams = { categoryId: "12", condition: "occasion" };
-  const screen = render(<CategoryResultsScreen />);
-  await screen.findByText("Plaquettes live");
+it("turns a brand row into a demande draft line and back via Liste/trash", async () => {
+  mockParams = { categoryId: "12" };
+  const screen = render(<CategoryBrandsScreen />);
+  await screen.findByText("RIDEX");
 
   fireEvent.press(await findActionButton(screen, i18n.t("Liste")));
 
   expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Ajouté à la liste !"));
   expect(await findActionButton(screen, i18n.t("Ajouté"))).toBeTruthy();
-  // Draft line is keyed by the category (the demande carries no SKU) —
-  // quantity 1, occasion condition, title = the CATEGORY name (not the
-  // product title), and no price/articleNumber keys.
+  // Draft line is keyed by the leaf category (the demande carries no SKU) —
+  // quantity 1, occasion condition, title = the LEAF name, plus the chosen
+  // brand id/name.
   await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith(
     "requestDraft",
-    JSON.stringify([{ categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion" }]),
+    JSON.stringify([{ categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion", brandId: 1, brandName: "RIDEX", brandNameAr: "ريدكس" }]),
   ));
 
   const trash = getActionButton(screen, i18n.t("Retirer de la liste"));
@@ -831,9 +817,9 @@ it("turns an occasion result row into a demande draft line and back via Liste/tr
 });
 
 it("appends exactly one draft line when Liste is pressed twice in the same frame", async () => {
-  mockParams = { categoryId: "12", condition: "occasion" };
-  const screen = render(<CategoryResultsScreen />);
-  await screen.findByText("Plaquettes live");
+  mockParams = { categoryId: "12" };
+  const screen = render(<CategoryBrandsScreen />);
+  await screen.findByText("RIDEX");
 
   const listButton = await findActionButton(screen, i18n.t("Liste"));
   act(() => {
@@ -846,9 +832,104 @@ it("appends exactly one draft line when Liste is pressed twice in the same frame
   const lastPersisted = JSON.parse(setItemMock.mock.calls[setItemMock.mock.calls.length - 1][1] as string);
   expect(lastPersisted).toHaveLength(1);
   expect(lastPersisted[0].categoryId).toBe(12);
+  expect(lastPersisted[0].brandId).toBe(1);
 });
 
-it("shows price, wishlist heart and the category line for en_stock results, and hides price for occasion", async () => {
+it("adds two brands of the same leaf as two draft lines and removes only one via trash", async () => {
+  mockParams = { categoryId: "12" };
+  const screen = render(<CategoryBrandsScreen />);
+  await screen.findByText("RIDEX");
+  await screen.findByText("Bosch");
+
+  fireEvent.press(await findActionButton(screen, i18n.t("Liste")));
+  await waitFor(() => expect(screen.getAllByRole("button", { name: i18n.t("Liste") })).toHaveLength(1));
+  fireEvent.press(getActionButton(screen, i18n.t("Liste")));
+
+  const setItemMock = AsyncStorage.setItem as jest.Mock;
+  await waitFor(() => {
+    const lastPersisted = JSON.parse(setItemMock.mock.calls[setItemMock.mock.calls.length - 1][1] as string);
+    expect(lastPersisted).toHaveLength(2);
+  });
+  const bothAdded = JSON.parse(setItemMock.mock.calls[setItemMock.mock.calls.length - 1][1] as string) as { brandId: number | null }[];
+  expect(bothAdded.map((entry) => entry.brandId).sort()).toEqual([1, 2]);
+
+  const trashButtons = screen.getAllByRole("button", { name: i18n.t("Retirer de la liste") });
+  expect(trashButtons).toHaveLength(2);
+  fireEvent.press(trashButtons[0]);
+
+  await waitFor(() => {
+    const lastPersisted = JSON.parse(setItemMock.mock.calls[setItemMock.mock.calls.length - 1][1] as string);
+    expect(lastPersisted).toHaveLength(1);
+  });
+});
+
+it("renders a single brandless add-to-list row when the leaf has no linked brands", async () => {
+  mockGetCategoryBrands.mockResolvedValueOnce({ success: true, data: [] });
+  mockParams = { categoryId: "12" };
+  const screen = render(<CategoryBrandsScreen />);
+
+  const listButton = await findActionButton(screen, i18n.t("Liste"));
+  expect(screen.getAllByRole("button", { name: i18n.t("Liste") })).toHaveLength(1);
+  fireEvent.press(listButton);
+
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+    "requestDraft",
+    JSON.stringify([{ categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion", brandId: null, brandName: null, brandNameAr: null }]),
+  ));
+});
+
+it("shows the leaf sublabel and the brand title in both French and Arabic", async () => {
+  mockParams = { categoryId: "12" };
+  const screen = render(<CategoryBrandsScreen />);
+
+  expect(await screen.findByText("RIDEX")).toBeTruthy();
+  expect(screen.getAllByText(i18n.t("home.category", { value: "Plaquettes" })).length).toBeGreaterThan(0);
+  screen.unmount();
+
+  await i18n.changeLanguage("ar");
+  mockParams = { categoryId: "12" };
+  const arScreen = render(<CategoryBrandsScreen />);
+
+  expect(await arScreen.findByText("ريدكس")).toBeTruthy();
+  expect(arScreen.getAllByText(i18n.t("home.category", { value: "وسادات" })).length).toBeGreaterThan(0);
+});
+
+it("lets a signed-in client add a brand without a login redirect", async () => {
+  mockedUseSession.mockReturnValue({ role: Role.CLIENT } as ReturnType<typeof useSession>);
+  mockParams = { categoryId: "12" };
+  const screen = render(<CategoryBrandsScreen />);
+  await screen.findByText("RIDEX");
+
+  fireEvent.press(await findActionButton(screen, i18n.t("Liste")));
+
+  expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Ajouté à la liste !"));
+  expect(await findActionButton(screen, i18n.t("Ajouté"))).toBeTruthy();
+  expect(mockPush).not.toHaveBeenCalled();
+});
+
+it("rejects an invalid brands route id before loading the category tree or brands", async () => {
+  mockParams = { categoryId: "12x" };
+  const screen = render(<CategoryBrandsScreen />);
+
+  expect(await screen.findByText(i18n.t("auth.error.generic"))).toBeTruthy();
+  expect(mockGetCategoryTree).not.toHaveBeenCalled();
+  expect(mockGetCategoryBrands).not.toHaveBeenCalled();
+});
+
+it("renders the generic error and never persists a draft line for a level-1 or level-2 brands route id", async () => {
+  mockParams = { categoryId: "10" };
+  const l1Screen = render(<CategoryBrandsScreen />);
+  expect(await l1Screen.findByText(i18n.t("auth.error.generic"))).toBeTruthy();
+  l1Screen.unmount();
+
+  mockParams = { categoryId: "11" };
+  const l2Screen = render(<CategoryBrandsScreen />);
+  expect(await l2Screen.findByText(i18n.t("auth.error.generic"))).toBeTruthy();
+
+  expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+});
+
+it("always shows price and the wishlist heart, and never renders a Liste button for occasion products", async () => {
   mockParams = { categoryId: "12", condition: "en_stock" };
   const stockScreen = render(<CategoryResultsScreen />);
   await stockScreen.findByText("Plaquettes live");
@@ -862,6 +943,8 @@ it("shows price, wishlist heart and the category line for en_stock results, and 
   const occasionScreen = render(<CategoryResultsScreen />);
   await occasionScreen.findByText("Plaquettes live");
 
-  expect(occasionScreen.queryByText("299 dhs")).toBeNull();
-  expect(occasionScreen.queryByLabelText(i18n.t("Ajouter à la liste de souhaits"))).toBeNull();
+  expect(occasionScreen.getByText("299 dhs")).toBeTruthy();
+  expect(occasionScreen.getByLabelText(i18n.t("Ajouter à la liste de souhaits"))).toBeTruthy();
+  expect(occasionScreen.queryByRole("button", { name: i18n.t("Liste") })).toBeNull();
+  expect(occasionScreen.queryByRole("button", { name: i18n.t("Retirer de la liste") })).toBeNull();
 });

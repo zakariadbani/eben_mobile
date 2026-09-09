@@ -4,7 +4,8 @@
  * Figma refs:
  *   Level-2 & Level-3 list: Search-Secondary-&-Third-categories_En-Stock / _Occasion,
  *                           Search-Body-parts-search_Lvl-2 / Lvl-3
- *   Results entry: navigates to /(client)/categories/results
+ *   Occasion leaf entry: navigates to /(client)/categories/[categoryId]/brands
+ *   En_stock leaf entry: navigates to /(client)/categories/results
  *
  * Drill strategy — every level renders its children as a single vertical
  * list (ItemSubCategoryComponent), keyed on the CHILD's own level:
@@ -12,18 +13,19 @@
  *     drills one level deeper.
  *   - child.level === 3, en_stock → arrow → row; pressing the row (or the
  *     arrow) goes straight to the priced results screen.
- *   - child.level === 3, occasion → an "add to list" CTA opening
- *     AddToListSheet; pressing the row BODY (not the CTA) instead navigates
- *     to the results screen (the generic-parts "Brands" list for that leaf).
+ *   - child.level === 3, occasion → both the row body and the "Ajoutez à la
+ *     liste" CTA navigate to the Brands step (D2) for that leaf, where the
+ *     user picks one or more part brands to add to the demande draft.
  *   - Level 3 (leaf) reached directly via route param, en_stock → immediately
  *     redirects to the results screen.
  *   - Level 3 (leaf) reached directly via route param (DEEP LINK), occasion
- *     → intentionally renders the leaf's PARENT drill instead of the results
- *     screen: the leaf may have zero products, and an empty Brands list
- *     would strand the user with no add-to-list CTA. This redirect applies
+ *     → intentionally renders the leaf's PARENT drill instead of the Brands
+ *     screen: a deep-linked leaf re-renders its parent drill so the user
+ *     keeps the sibling category context instead of landing on one leaf's
+ *     Brands list with no path back to its siblings. This redirect applies
  *     only to the direct deep-link load — tapping a level-3 occasion row
- *     from within a drill still goes to the results/Brands list (see the
- *     bullet above).
+ *     from within a drill still goes to the Brands step (see the bullet
+ *     above).
  *
  * Condition and the breadcrumb path (parentTitle) are carried via router params.
  */
@@ -42,7 +44,6 @@ import ItemSubCategoryComponent from "@/components/screens/shared/app/ItemSubCat
 import SliderBlockComponent from "@/components/screens/shared/app/SliderBlockComponent";
 import PubPlacerDemandeBlockComponent from "@/components/screens/shared/app/PubPlacerDemandeBlockComponent";
 import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
-import AddToListSheet from "@/components/screens/client/requests/AddToListSheet";
 import Colors from "@/constants/Colors";
 import { getCategoryTree } from "@/api";
 import { useRequestDraft } from "@/context/RequestDraftContext";
@@ -121,7 +122,6 @@ const CategoryDrillScreen: React.FC = () => {
   const [children, setChildren] = useState<Category[]>([]);
   const [levelOneCategories, setLevelOneCategories] = useState<Category[]>([]);
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
-  const [sheetItem, setSheetItem] = useState<{ categoryId: number; title: string; titleAr: string; image?: Category["image"] | null } | null>(null);
   const { items: draftItems } = useRequestDraft();
 
   const validCategoryId = Number.isSafeInteger(categoryId) && categoryId > 0;
@@ -160,14 +160,15 @@ const CategoryDrillScreen: React.FC = () => {
         return;
       }
       // Intentional: a level-3 occasion leaf reached by DEEP LINK renders its
-      // PARENT drill instead of the results screen — an empty Brands list
-      // (the leaf may have zero products) would strand the user with no
-      // add-to-list CTA. Tapping a level-3 occasion row from within a drill
-      // still goes to the results/Brands list (handleRowPress below); this
-      // redirect applies only to the direct deep-link load. When the parent
-      // itself cannot be resolved from the tree (stale/broken chain), fall
-      // back to rendering the leaf as a single add-to-list row rather than
-      // the empty state.
+      // PARENT drill instead of the Brands screen — a deep-linked leaf
+      // re-renders its parent drill so the user keeps the sibling category
+      // context instead of landing on one leaf's Brands list with no path
+      // back to its siblings.
+      // Tapping a level-3 occasion row from within a drill still goes to the
+      // Brands step (handleChildPress below); this redirect applies only to
+      // the direct deep-link load. When the parent itself cannot be resolved
+      // from the tree (stale/broken chain), fall back to rendering the leaf
+      // as a single add-to-list row rather than the empty state.
       const parent = findParent(response.data, found.id);
       if (parent) {
         found = parent;
@@ -203,9 +204,13 @@ const CategoryDrillScreen: React.FC = () => {
   const handleChildPress = (child: Category) => {
     if (child.level === 3) {
       if (condition === "occasion") {
-        // Generic part — add the category itself to the request draft, no
-        // product/results detour and no auth gate (guests can add too).
-        setSheetItem({ categoryId: child.id, title: child.title, titleAr: child.titleAr, image: child.image });
+        // Generic part — the Brands step is the demande add-to-list surface
+        // now (D2); no product/results detour and no auth gate (guests can
+        // add too). Same target from the row body and the CTA.
+        router.push({
+          pathname: "/(client)/categories/[categoryId]/brands",
+          params: { categoryId: String(child.id) },
+        } as never);
         return;
       }
       // Leaf — go straight to results.
@@ -220,21 +225,6 @@ const CategoryDrillScreen: React.FC = () => {
         params: { categoryId: String(child.id), condition },
       } as never);
     }
-  };
-
-  // Row-body press: same destination as handleChildPress, except a level-3
-  // leaf in occasion mode — its CTA opens the add-to-list sheet, but tapping
-  // the row itself instead reaches the generic-parts "Brands" results list
-  // for that leaf (Figma: row body → results, CTA → sheet).
-  const handleRowPress = (child: Category) => {
-    if (child.level === 3 && condition === "occasion") {
-      router.push({
-        pathname: "/(client)/categories/results",
-        params: { categoryId: String(child.id), condition },
-      } as never);
-      return;
-    }
-    handleChildPress(child);
   };
 
   const handleOtherCategoryPress = (cat: Category) => {
@@ -253,25 +243,30 @@ const CategoryDrillScreen: React.FC = () => {
   // ── Render every child as a list row, keyed on the CHILD's own level ──────
   //    level < 3            → arrow → row, drills one level deeper.
   //    level === 3, en_stock → arrow → row, goes to results.
-  //    level === 3, occasion → "add to list" CTA (row body goes to results).
+  //    level === 3, occasion → CTA + row body both go to the Brands step.
   const renderListItem = ({ item }: { item: Category }) => {
     const isOccasionLeaf = item.level === 3 && condition === "occasion";
-    const isAdded = isOccasionLeaf && draftItems.some((draft) => draft.categoryId === item.id);
+    // Display indicator only ("some brand of this leaf is in the draft") —
+    // not a dedupe site; the Brands screen dedupes per (categoryId, brandId)
+    // pair via draftKey.
+    const isAdded = isOccasionLeaf && draftItems.some((draft) => draft.categoryId === item.id && draft.condition === "occasion");
     return (
       <ItemSubCategoryComponent
         item={toSubCategoryItem(item)}
+        compact
         actionButton={isOccasionLeaf
           ? (isAdded
-            ? { variant: "green", leftIcon: "check", sizeIcon: 14, title: t("Ajouté"), onPress: () => handleChildPress(item) }
-            : { variant: "primary", title: t("Ajoutez à la liste"), onPress: () => handleChildPress(item) })
+            ? { variant: "green", title: t("Ajouté"), rightIcon: "liste_plus", iconType: "custom", sizeIcon: 18, onPress: () => handleChildPress(item) }
+            : { variant: "primary", title: t("Ajoutez à la liste"), rightIcon: "liste", iconType: "custom", sizeIcon: 18, onPress: () => handleChildPress(item) })
           : {
-            variant: "secondary",
-            rightIcon: "arrow-right",
-            iconType: "standard",
-            sizeIcon: 14,
+            rightIcon: isArabic ? "arrow_left" : "arrow_right",
+            iconType: "custom",
+            sizeIcon: 22,
             onPress: () => handleChildPress(item),
+            accessibilityLabel: "arrow-right",
+            style: styles.chevronBtn,
           }}
-        onPress={() => handleRowPress(item)}
+        onPress={() => handleChildPress(item)}
         styleContainer={styles.listRow}
       />
     );
@@ -327,13 +322,11 @@ const CategoryDrillScreen: React.FC = () => {
               seeAllNavigate="/(client)/categories"
               data={levelOneCategories}
               renderItem={({ item }) => (
-                <View style={styles.sliderCell}>
-                  <ItemCategoryComponent
-                    item={toCategoryProps(item)}
-                    onPress={() => handleOtherCategoryPress(item)}
-                    styleItem={styles.sliderItem}
-                  />
-                </View>
+                <ItemCategoryComponent
+                  item={toCategoryProps(item)}
+                  onPress={() => handleOtherCategoryPress(item)}
+                  styleItem={styles.sliderItem}
+                />
               )}
             />
           </View>
@@ -358,7 +351,6 @@ const CategoryDrillScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </View>
-      <AddToListSheet item={sheetItem} onClose={() => setSheetItem(null)} />
     </Screen>
   );
 };
@@ -380,17 +372,23 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   separator: {
-    height: 8,
+    height: 12,
+  },
+  chevronBtn: {
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    minWidth: 0,
+    minHeight: 0,
+    padding: 0,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
   },
   // Other categories horizontal slider
   otherBlock: {
     marginBottom: 24,
   },
-  sliderCell: {
-    marginRight: 12,
-  },
   sliderItem: {
-    width: 110,
+    width: 124,
   },
   // Bottom banner
   pubBlock: {

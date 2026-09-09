@@ -364,6 +364,16 @@ function ClientTabs() {
         }}
       />
 
+      {/* Hidden: category brands (occasion cascade final step) — yellow header + back arrow */}
+      <Tabs.Screen
+        name="categories/[categoryId]/brands"
+        options={{
+          title: t("Recherche"),
+          href: null,
+          header: backHeader,
+        }}
+      />
+
       {/* Hidden: category results (browse + search entry point) — yellow header + back arrow */}
       <Tabs.Screen
         name="categories/results"

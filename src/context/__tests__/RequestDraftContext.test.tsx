@@ -1,7 +1,7 @@
 import React, { type PropsWithChildren } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { RequestDraftProvider, useRequestDraft, type DraftItem } from "@/context/RequestDraftContext";
+import { RequestDraftProvider, useRequestDraft, draftKey, type DraftItem } from "@/context/RequestDraftContext";
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn(),
@@ -28,6 +28,9 @@ const freshItem: DraftItem = {
   titleAr: "وسادات",
   quantity: 1,
   condition: "occasion",
+  brandId: null,
+  brandName: null,
+  brandNameAr: null,
 };
 
 describe("RequestDraftContext", () => {
@@ -53,5 +56,22 @@ describe("RequestDraftContext", () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.items).toEqual([freshItem]);
+  });
+
+  it("hydrates a legacy draft item without brand fields as a brandless line", async () => {
+    mockedGetItem.mockResolvedValue(JSON.stringify([
+      { categoryId: 9, title: "Stale", titleAr: "قديم", quantity: 1, condition: "occasion" },
+    ]));
+
+    const { result } = renderHook(() => useRequestDraft(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.items).toEqual([
+      { categoryId: 9, title: "Stale", titleAr: "قديم", quantity: 1, condition: "occasion", brandId: null, brandName: null, brandNameAr: null },
+    ]);
+  });
+
+  it("draftKey distinguishes a brandless line from a branded line of the same category", () => {
+    expect(draftKey({ categoryId: 9, brandId: null })).not.toBe(draftKey({ categoryId: 9, brandId: 3 }));
   });
 });

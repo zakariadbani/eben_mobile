@@ -10,6 +10,8 @@ import Colors from "@/constants/Colors";
 interface RequestPartCardProps {
   title: string;
   categoryLabel: string | null;
+  /** Chosen part brand (D1), rendered as a gray line under the title. */
+  brandLabel?: string | null;
   image: ImageSourcePropType | undefined;
   quantity: number;
   conditionLabel: string;
@@ -27,6 +29,7 @@ interface RequestPartCardProps {
 const RequestPartCard: React.FC<RequestPartCardProps> = ({
   title,
   categoryLabel,
+  brandLabel,
   image,
   quantity,
   conditionLabel,
@@ -52,6 +55,11 @@ const RequestPartCard: React.FC<RequestPartCardProps> = ({
           </Text>
         ) : null}
         <Text type="defaultTwo" semiBold translate={false}>{title}</Text>
+        {brandLabel ? (
+          <Text type="small" color={Colors.gray} translate={false}>
+            {t("requestList.brand", { value: brandLabel })}
+          </Text>
+        ) : null}
         <Text type="small" color={Colors.gray} translate={false}>
           {`${t("requestFlow.quantity", { count: quantity })} · ${conditionLabel}`}
         </Text>

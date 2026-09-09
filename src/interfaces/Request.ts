@@ -45,6 +45,11 @@ export interface RequestItem {
   categoryTitle?: string;
   categoryTitleAr?: string;
   categoryImage?: string | null;
+  /** Nullable part-brand line (D1/D3). Backend adds these fields in Part D. */
+  brandId?: number | null;
+  brandName?: string | null;
+  brandNameAr?: string | null;
+  brandLogo?: string | null;
 }
 
 /**

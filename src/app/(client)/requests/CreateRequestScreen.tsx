@@ -26,7 +26,7 @@ import { createRequest, getRequests, sendRequest } from "@/api/resources/request
 import { ApiClientError } from "@/api/types";
 import { useStorageState } from "@/context/useStorageState";
 import { Role, useSession } from "@/context/AuthContext";
-import { useRequestDraft } from "@/context/RequestDraftContext";
+import { useRequestDraft, draftKey, type DraftItem } from "@/context/RequestDraftContext";
 import type { Category } from "@/interfaces/Category";
 import type { PartCondition, RequestSummary } from "@/interfaces/Request";
 import type { Vehicle } from "@/interfaces/Vehicle";
@@ -113,7 +113,7 @@ export default function CreateRequestScreen() {
       setVehicleId(selectedVehicle);
       setRequests(requestResponse?.data.filter(isActiveRequest) ?? []);
 
-      if (params.categoryId !== undefined) {
+        if (params.categoryId !== undefined) {
         const routeCategoryId = positiveId(params.categoryId);
         const leaf = routeCategoryId === null
           ? undefined
@@ -122,15 +122,19 @@ export default function CreateRequestScreen() {
           setError(t("requestFlow.invalidCategory"));
         } else {
           const prefillCondition: PartCondition = params.condition === "en_stock" ? "en_stock" : "occasion";
-          setDraftItems((current) => current.some((item) => item.categoryId === leaf.id)
+          const newItem: DraftItem = {
+            categoryId: leaf.id,
+            title: leaf.title,
+            titleAr: leaf.titleAr,
+            quantity: 1,
+            condition: prefillCondition,
+            brandId: null,
+            brandName: null,
+            brandNameAr: null,
+          };
+          setDraftItems((current) => current.some((item) => draftKey(item) === draftKey(newItem))
             ? current
-            : [...current, {
-              categoryId: leaf.id,
-              title: leaf.title,
-              titleAr: leaf.titleAr,
-              quantity: 1,
-              condition: prefillCondition,
-            }]);
+            : [...current, newItem]);
         }
       }
       loadedRef.current = true;
@@ -174,15 +178,19 @@ export default function CreateRequestScreen() {
       setError(t("requestFlow.invalidCategory"));
       return;
     }
-    setDraftItems((current) => current.some((item) => item.categoryId === leaf.id)
+    const newItem: DraftItem = {
+      categoryId: leaf.id,
+      title: leaf.title,
+      titleAr: leaf.titleAr,
+      quantity: 1,
+      condition,
+      brandId: null,
+      brandName: null,
+      brandNameAr: null,
+    };
+    setDraftItems((current) => current.some((item) => draftKey(item) === draftKey(newItem))
       ? current
-      : [...current, {
-        categoryId: leaf.id,
-        title: leaf.title,
-        titleAr: leaf.titleAr,
-        quantity: 1,
-        condition,
-      }]);
+      : [...current, newItem]);
     setStep(1);
     setAdding(false);
   };
@@ -214,10 +222,11 @@ export default function CreateRequestScreen() {
       if (id === null) {
         const response = await createRequest({
           vehicleId,
-          items: draftItems.map(({ categoryId, quantity, condition: itemCondition }) => ({
+          items: draftItems.map(({ categoryId, quantity, condition: itemCondition, brandId }) => ({
             categoryId,
             quantity,
             condition: itemCondition,
+            ...(brandId != null ? { brandId } : {}),
           })),
           notes: note.trim() || null,
           images: paths,
@@ -354,8 +363,9 @@ export default function CreateRequestScreen() {
                 const categoryTitle = (isArabic ? info?.categoryTitleAr : info?.categoryTitle) ?? "";
                 const thumbnail = resolveImageSource(info?.image);
                 const imageBroken = brokenImages.has(item.categoryId);
+                const brandLabel = isArabic ? (item.brandNameAr || item.brandName) : item.brandName;
                 return (
-                  <View key={item.categoryId} flexDirection="row" gap={10} style={styles.itemCard}>
+                  <View key={draftKey(item)} flexDirection="row" gap={10} style={styles.itemCard}>
                     {thumbnail && !imageBroken ? (
                       <Image
                         source={thumbnail}
@@ -373,6 +383,11 @@ export default function CreateRequestScreen() {
                         </Text>
                       ) : null}
                       <Text semiBold translate={false}>{isArabic ? item.titleAr : item.title}</Text>
+                      {brandLabel ? (
+                        <Text type="small" color={Colors.gray} translate={false}>
+                          {t("requestList.brand", { value: brandLabel })}
+                        </Text>
+                      ) : null}
                       <Text type="small" color={Colors.gray} translate={false}>
                         {t("requestList.condition", { condition: t(`requestFlow.condition.${item.condition}`) })}
                       </Text>
@@ -380,13 +395,13 @@ export default function CreateRequestScreen() {
                     <View alignItems="center" gap={8}>
                       <QtyStepper
                         value={item.quantity}
-                        onChange={(next) => setDraftItems((current) => current.map((entry) => entry.categoryId === item.categoryId ? { ...entry, quantity: next } : entry))}
+                        onChange={(next) => setDraftItems((current) => current.map((entry) => draftKey(entry) === draftKey(item) ? { ...entry, quantity: next } : entry))}
                       />
                       <TouchableOpacity
                         accessibilityRole="button"
                         accessibilityLabel={t("requestFlow.removePart")}
                         style={styles.trashBtn}
-                        onPress={() => setDraftItems((current) => current.filter((entry) => entry.categoryId !== item.categoryId))}
+                        onPress={() => setDraftItems((current) => current.filter((entry) => draftKey(entry) !== draftKey(item)))}
                       >
                         <CustomIcon name="trash" size={20} />
                       </TouchableOpacity>
@@ -451,10 +466,11 @@ export default function CreateRequestScreen() {
       <SendListSheet
         visible={verifying}
         items={draftItems.map((item) => ({
-          key: item.categoryId,
+          key: draftKey(item),
           title: isArabic ? item.titleAr : item.title,
           quantity: item.quantity,
           image: resolveImageSource(categoryLookup.get(item.categoryId)?.image),
+          brand: item.brandName ? (isArabic ? (item.brandNameAr || item.brandName) : item.brandName) : null,
         }))}
         note={note}
         sending={submitting}

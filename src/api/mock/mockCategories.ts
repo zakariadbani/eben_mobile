@@ -8,7 +8,7 @@
  * Bilingual: title (French) + titleAr (Arabic). CONFIRMED A-16.
  */
 
-import type { Category } from '@/interfaces/Category';
+import type { Category, PartBrand } from '@/interfaces/Category';
 
 export const mockCategories: Category[] = [
   // ── Level 1 — Main categories ──────────────────────────────────────────────
@@ -241,4 +241,34 @@ export function buildCategoryTree(flat: Category[]): Category[] {
     }
   });
   return roots;
+}
+
+/** Mock part-brand catalog (D1) — RIDEX/Brembo/Bosch/TRW/Valeo active, Gates retired. */
+export const mockPartBrands: PartBrand[] = [
+  { id: 1, name: 'RIDEX', nameAr: 'ريدكس', logo: null, status: true, sortOrder: 1 },
+  { id: 2, name: 'Brembo', nameAr: 'بريمبو', logo: null, status: true, sortOrder: 2 },
+  { id: 3, name: 'Bosch', nameAr: 'بوش', logo: null, status: true, sortOrder: 3 },
+  { id: 4, name: 'TRW', nameAr: 'تي آر دبليو', logo: null, status: true, sortOrder: 4 },
+  { id: 5, name: 'Valeo', nameAr: 'فاليو', logo: null, status: true, sortOrder: 5 },
+  { id: 6, name: 'Gates', nameAr: 'غيتس', logo: null, status: false, sortOrder: 6 },
+];
+
+/**
+ * Leaf category id -> linked part-brand ids. A leaf absent from this map
+ * gets every active brand — mirrors the `/categories/:id/brands` server
+ * fallback rule (D1).
+ */
+const CATEGORY_BRAND_LINKS: Record<number, number[]> = {
+  100: [1, 2, 3],
+  101: [1, 5],
+  102: [2, 3, 4],
+};
+
+export function mockBrandsForCategory(categoryId: number): PartBrand[] {
+  const active = mockPartBrands.filter((brand) => brand.status);
+  const linked = CATEGORY_BRAND_LINKS[categoryId];
+  if (!linked) return active;
+  return linked
+    .map((id) => active.find((brand) => brand.id === id))
+    .filter((brand): brand is PartBrand => brand != null);
 }

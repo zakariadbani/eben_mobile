@@ -23,6 +23,10 @@ export interface DraftItem {
   titleAr: string;
   quantity: number;
   condition: PartCondition;
+  /** Nullable part-brand pick (D1/D3) — one draft line per (categoryId, brandId). */
+  brandId: number | null;
+  brandName: string | null;
+  brandNameAr: string | null;
 }
 
 const STORAGE_KEY = "requestDraft";
@@ -37,23 +41,48 @@ interface RequestDraftContextValue {
 
 const RequestDraftContext = createContext<RequestDraftContextValue | undefined>(undefined);
 
-function isDraftItem(value: unknown): value is DraftItem {
-  if (value === null || typeof value !== "object") return false;
+/** Draft identity — one line per (categoryId, brandId) pair (D3). */
+export function draftKey(item: Pick<DraftItem, "categoryId" | "brandId">): string {
+  return `${item.categoryId}:${item.brandId ?? "none"}`;
+}
+
+/**
+ * Validates and normalizes a raw persisted value into a DraftItem. Legacy
+ * persisted drafts written before brand fields existed hydrate as brandless
+ * lines (brandId/brandName/brandNameAr -> null) instead of being dropped.
+ */
+function toDraftItem(value: unknown): DraftItem | null {
+  if (value === null || typeof value !== "object") return null;
   const item = value as Partial<DraftItem>;
-  return (
-    typeof item.categoryId === "number" &&
-    typeof item.title === "string" &&
-    typeof item.titleAr === "string" &&
-    typeof item.quantity === "number" &&
-    (item.condition === "occasion" || item.condition === "en_stock")
-  );
+  if (
+    typeof item.categoryId !== "number" ||
+    typeof item.title !== "string" ||
+    typeof item.titleAr !== "string" ||
+    typeof item.quantity !== "number" ||
+    (item.condition !== "occasion" && item.condition !== "en_stock")
+  ) return null;
+  return {
+    categoryId: item.categoryId,
+    title: item.title,
+    titleAr: item.titleAr,
+    quantity: item.quantity,
+    condition: item.condition,
+    brandId: typeof item.brandId === "number" ? item.brandId : null,
+    brandName: typeof item.brandName === "string" ? item.brandName : null,
+    brandNameAr: typeof item.brandNameAr === "string" ? item.brandNameAr : null,
+  };
 }
 
 function parseDraft(raw: string | null): DraftItem[] {
   if (!raw) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter(isDraftItem) : [];
+    return Array.isArray(parsed)
+      ? parsed.flatMap((entry) => {
+          const item = toDraftItem(entry);
+          return item ? [item] : [];
+        })
+      : [];
   } catch {
     return [];
   }

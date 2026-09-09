@@ -1121,6 +1121,7 @@
   "requestList.condition": "الحالة: {{condition}}",
   "requestList.quantity": "الكمية: {{count}}",
   "requestList.category": "الفئة : {{value}}",
+  "requestList.brand": "العلامة التجارية : {{value}}",
   "requestFlow.detailTitle": "قائمتك - {{reference}}",
   "requestFlow.offersCount": "X{{count}}",
   "requestFlow.noOffer": "لا يوجد عرض",

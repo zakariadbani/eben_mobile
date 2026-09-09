@@ -1,6 +1,7 @@
 import {
   getBrandModels,
   getCarYears,
+  getCategoryBrands,
   getCategoryTree,
   getMotorizations,
   getPaymentMethods,
@@ -114,6 +115,14 @@ it('returns the category tree envelope unchanged', async () => {
   expect(get).toHaveBeenCalledWith('/categories/tree');
 });
 
+it('calls the categories/:id/brands endpoint', async () => {
+  const response = { success: true, data: [{ id: 1, name: 'RIDEX', nameAr: 'ريدكس', logo: null, status: true, sortOrder: 1 }] };
+  get.mockResolvedValue(response);
+
+  await expect(getCategoryBrands(100)).resolves.toEqual(response);
+  expect(get).toHaveBeenCalledWith('/categories/100/brands');
+});
+
 it('gets models scoped to a brand', async () => {
   await getBrandModels(4);
 
@@ -142,6 +151,7 @@ it.each([
   ['product list category', () => getProducts({ categoryId: Number.NaN })],
   ['brand models', () => getBrandModels(-1)],
   ['reviews', () => getReviews(1.5)],
+  ['category brands', () => getCategoryBrands(0)],
 ] as const)('rejects an invalid %s id before networking', async (_name, load) => {
   await expect(load()).rejects.toThrow('must be a positive integer');
   expect(get).not.toHaveBeenCalled();

@@ -13,7 +13,7 @@ import { mockBasket, mockProducts, mockReviews } from './mockProducts';
 import { mockVehicles, mockCarBrands, mockCarModels, mockCarMotorizations } from './mockVehicles';
 import { mockAddresses } from './mockOrders';
 import { mockPneumatics } from './mockPneumatics';
-import { mockCategories } from './mockCategories';
+import { mockCategories, mockPartBrands } from './mockCategories';
 import { mockOffers, mockRequests } from './mockRequests';
 import { categoryImageFor } from './categoryImage';
 import type { PlaceOrderPayload } from '../resources/orders';
@@ -135,25 +135,33 @@ const toPrestataireOffer = (offer: Offer): PrestataireOffer => {
 };
 
 function createRequest(payload: CreateRequestPayload) {
+  const pairKey = (categoryId: number, brandId: number | null | undefined) => `${categoryId}:${brandId ?? 'none'}`;
   if (
     !Number.isInteger(payload.vehicleId) || payload.vehicleId <= 0 ||
     !payload.items.length ||
-    payload.items.some(({ categoryId, quantity }) =>
+    payload.items.some(({ categoryId, quantity, brandId }) =>
       !Number.isInteger(categoryId) || categoryId <= 0 ||
-      !Number.isInteger(quantity) || quantity <= 0
-    )
+      !Number.isInteger(quantity) || quantity <= 0 ||
+      (brandId != null && (!Number.isInteger(brandId) || brandId <= 0))
+    ) ||
+    new Set(payload.items.map((item) => pairKey(item.categoryId, item.brandId))).size !== payload.items.length
   ) throw new Error('Invalid request payload');
   const id = nextId(state.requests);
   const timestamp = now();
   let itemId = nextId(state.requests.flatMap((row) => row.items ?? []));
   const items: RequestItem[] = payload.items.map((item) => {
     const category = mockCategories.find(({ id: categoryId }) => categoryId === item.categoryId);
+    const brand = item.brandId != null ? mockPartBrands.find(({ id: brandId }) => brandId === item.brandId) : undefined;
     return {
       id: itemId++, requestId: id, categoryId: item.categoryId, quantity: item.quantity,
       condition: item.condition, notes: item.notes ?? null, createdAt: timestamp, updatedAt: timestamp,
       categoryTitle: category?.title ?? item.categoryTitle,
       categoryTitleAr: category?.titleAr ?? item.categoryTitleAr,
       categoryImage: categoryImageFor(item.categoryId),
+      brandId: item.brandId ?? null,
+      brandName: brand?.name ?? null,
+      brandNameAr: brand?.nameAr ?? null,
+      brandLogo: brand?.logo ?? null,
     };
   });
   const row: Request = {

@@ -10,8 +10,8 @@
 import type { ApiResponse, Paginated } from '../types';
 import { DEFAULT_PAGE_SIZE } from '../config';
 
-import { mockCategoriesLevel1, mockCategories, buildCategoryTree } from './mockCategories';
-import type { Category } from '@/interfaces/Category';
+import { mockCategoriesLevel1, mockCategories, buildCategoryTree, mockBrandsForCategory } from './mockCategories';
+import type { Category, PartBrand } from '@/interfaces/Category';
 import {
   mockCarBrands,
   mockCarModels,
@@ -318,4 +318,9 @@ export const mockRegistry: Record<string, MockHandler> = {
 for (const { id } of mockCarBrands) {
   mockRegistry[`GET:/brands/${id}/models`] = () =>
     paginated<CarModel>(mockCarModels.filter(({ brandId }) => brandId === id));
+}
+
+for (const leaf of mockCategories.filter((c) => c.level === 3)) {
+  mockRegistry[`GET:/categories/${leaf.id}/brands`] = () =>
+    single<PartBrand[]>(mockBrandsForCategory(leaf.id));
 }

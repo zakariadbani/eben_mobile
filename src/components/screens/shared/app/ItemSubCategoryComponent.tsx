@@ -73,6 +73,19 @@ export interface ItemSubCategoryComponentProps {
   /** Container style override. */
   styleContainer?: ViewStyle;
   onPress?: () => void;
+  /** Dense row: 32×32 thumbnail + tighter vertical padding (used by the drill screen). */
+  compact?: boolean;
+  /**
+   * Vertical alignment of the trailing actions column within the row.
+   * Default "center" (unchanged, row-centred). "bottom" pins the actions to the row's bottom
+   * edge (Figma Brands step "Liste" button).
+   */
+  actionsAlign?: "center" | "bottom";
+  /**
+   * Extra action rendered as a bare glyph, absolutely positioned in the row's top corner
+   * (top-right; top-left when Arabic, since RTL here is `row-reverse` not `I18nManager`).
+   */
+  cornerAction?: ItemSubCategoryActionButton;
 }
 
 const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
@@ -85,6 +98,9 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
   trailing,
   styleContainer,
   onPress,
+  compact = false,
+  actionsAlign = "center",
+  cornerAction,
 }) => {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === "ar";
@@ -104,11 +120,11 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
       onPress={onPress}
       activeOpacity={onPress ? 0.75 : 1}
       accessibilityRole={onPress ? "button" : undefined}
-      style={[styles.container, styleContainer]}
+      style={[styles.container, compact && styles.containerCompact, styleContainer]}
     >
       <View flexDirection="row" alignItems="center" gap={10} style={styles.inner}>
         {/* Thumbnail */}
-        <View style={styles.imageWrapper}>
+        <View style={[styles.imageWrapper, compact && styles.imageWrapperCompact]}>
           {imageSource ? (
             <Image source={imageSource} style={styles.image} resizeMode="contain" />
           ) : (
@@ -128,7 +144,7 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
               {t("home.category", { value: isArabic ? item.categoryNameAr ?? item.categoryName : item.categoryName })}
             </Text>
           )}
-          <Text type="label" semiBold style={styles.title} numberOfLines={2}>
+          <Text type="labelTwo" semiBold style={styles.title} numberOfLines={2}>
             {displayTitle}
           </Text>
           {showState && item.condition != null && (
@@ -151,7 +167,12 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
         </View>
 
         {/* Trailing actions */}
-        <View flexDirection="row" alignItems="center" gap={6}>
+        <View
+          flexDirection="row"
+          alignItems="center"
+          gap={6}
+          style={actionsAlign === "bottom" ? styles.actionsBottom : undefined}
+        >
           {isAdded && !actionButton && !actionButtonTwo && (
             <View style={styles.addedBadge}>
               <Text type="small" color={Colors.greenDark}>
@@ -171,6 +192,7 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
               title={actionButton.title}
               onPress={actionButton.onPress}
               style={mergeStyles(styles.actionBtn, actionButton.style)}
+              styleTitle={styles.actionBtnTitle}
               accessibilityLabel={actionButton.accessibilityLabel}
               fit
             />
@@ -187,6 +209,7 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
               title={actionButtonTwo.title}
               onPress={actionButtonTwo.onPress}
               style={mergeStyles(styles.actionBtn, actionButtonTwo.style)}
+              styleTitle={styles.actionBtnTitle}
               accessibilityLabel={actionButtonTwo.accessibilityLabel}
               fit
             />
@@ -194,6 +217,28 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
           {trailing}
         </View>
       </View>
+
+      {cornerAction && (
+        <Button
+          variant={cornerAction.variant ?? "primary"}
+          rightIcon={cornerAction.rightIcon}
+          leftIcon={cornerAction.leftIcon}
+          iconType={cornerAction.iconType}
+          iconTypeName={cornerAction.iconTypeName}
+          iconColor={cornerAction.iconColor}
+          sizeIcon={cornerAction.sizeIcon ?? 18}
+          title={cornerAction.title}
+          onPress={cornerAction.onPress}
+          style={mergeStyles(
+            styles.cornerActionBtn,
+            isArabic ? styles.cornerActionLeft : styles.cornerActionRight,
+            cornerAction.style,
+          )}
+          accessibilityLabel={cornerAction.accessibilityLabel}
+          hitSlop={{ top: 14, right: 14, bottom: 14, left: 14 }}
+          fit
+        />
+      )}
     </TouchableOpacity>
   );
 };
@@ -205,10 +250,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 10,
     shadowColor: Colors.borderLight,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  containerCompact: {
+    paddingVertical: 7,
   },
   inner: {
     alignItems: "center",
@@ -218,9 +266,12 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 6,
     overflow: "hidden",
-    backgroundColor: Colors.backgroundGray,
     justifyContent: "center",
     alignItems: "center",
+  },
+  imageWrapperCompact: {
+    width: 32,
+    height: 32,
   },
   image: {
     width: "100%",
@@ -243,11 +294,34 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 12,
   },
+  actionsBottom: {
+    alignSelf: "flex-end",
+  },
   actionBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    minWidth: 36,
-    minHeight: 36,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    minWidth: 28,
+    minHeight: 28,
+  },
+  actionBtnTitle: {
+    fontSize: 13,
+  },
+  cornerActionBtn: {
+    position: "absolute",
+    top: 8,
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    minWidth: 0,
+    minHeight: 0,
+    padding: 0,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+  },
+  cornerActionRight: {
+    right: 8,
+  },
+  cornerActionLeft: {
+    left: 8,
   },
 });
 

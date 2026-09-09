@@ -9,7 +9,7 @@ import QtyStepper from "@/components/common/QtyStepper";
 import PickerInput from "@/components/common/PickerInput";
 import Colors from "@/constants/Colors";
 import { resolveImageSource } from "@/helpers/categoryLookup";
-import { useRequestDraft, type DraftItem } from "@/context/RequestDraftContext";
+import { useRequestDraft, draftKey, type DraftItem } from "@/context/RequestDraftContext";
 import { useNotification } from "@/context/NotificationContext";
 import type { Category } from "@/interfaces/Category";
 import type { PartCondition } from "@/interfaces/Request";
@@ -45,7 +45,7 @@ const AddToListSheet: React.FC<AddToListSheetProps> = ({ item, onClose }) => {
 
   useEffect(() => {
     if (!item) return;
-    const existing = items.find((draft) => draft.categoryId === item.categoryId);
+    const existing = items.find((draft) => draftKey(draft) === draftKey({ categoryId: item.categoryId, brandId: null }));
     setQuantity(existing?.quantity ?? 1);
     setCondition(existing?.condition ?? "occasion");
     // Reseed only when a *different* leaf opens, not on every draft mutation
@@ -66,13 +66,16 @@ const AddToListSheet: React.FC<AddToListSheetProps> = ({ item, onClose }) => {
   const handleAdd = () => {
     if (!item) return;
     setItems((current) => {
-      const existingIndex = current.findIndex((draft) => draft.categoryId === item.categoryId);
+      const existingIndex = current.findIndex((draft) => draftKey(draft) === draftKey({ categoryId: item.categoryId, brandId: null }));
       const nextItem: DraftItem = {
         categoryId: item.categoryId,
         title: item.title,
         titleAr: item.titleAr,
         quantity,
         condition,
+        brandId: null,
+        brandName: null,
+        brandNameAr: null,
       };
       if (existingIndex === -1) return [...current, nextItem];
       const next = [...current];

@@ -7,6 +7,15 @@ export interface CategoryLookupEntry {
   categoryTitleAr: string;
 }
 
+export function categoryById(categories: Category[], id: number): Category | undefined {
+  for (const category of categories) {
+    if (category.id === id) return category;
+    const nested = categoryById(category.children ?? [], id);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
 /** Maps every category node (any level) to its image + nearest-ancestor title,
  * so a saved DraftItem (which only stores categoryId/title/titleAr) can
  * resolve a thumbnail/"Catégorie" line at render time from the already

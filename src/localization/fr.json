@@ -891,6 +891,7 @@
   "requestList.condition": "État : {{condition}}",
   "requestList.quantity": "Qté : {{count}}",
   "requestList.category": "Catégorie : {{value}}",
+  "requestList.brand": "Marque : {{value}}",
   "Explorer les produits": "Explorer les produits",
   "Ajouter une pièce": "Ajouter une pièce",
   "Ajouter des détails": "Ajouter des détails",

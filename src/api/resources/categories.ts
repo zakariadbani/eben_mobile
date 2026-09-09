@@ -1,7 +1,8 @@
 import { apiClient } from '../client';
 import type { Paginated, ApiResponse } from '../types';
-import type { Category } from '@/interfaces/Category';
+import type { Category, PartBrand } from '@/interfaces/Category';
 import { getAllPages } from './paginate';
+import { assertPositiveId } from './validate';
 
 // ponytail: cache-bust via updatedAt — backend keeps the same URL when an admin
 // replaces a category image, so the native Image cache serves stale bytes. Bumping
@@ -34,4 +35,13 @@ export async function getCategories(): Promise<Paginated<Category>> {
 export async function getCategoryTree(): Promise<ApiResponse<Category[]>> {
   const res = await (apiClient.get<Category[]>('/categories/tree') as Promise<ApiResponse<Category[]>>);
   return { ...res, data: res.data ? res.data.map(bustCategoryImage) : res.data };
+}
+
+/**
+ * Part brands linked to a leaf (level-3) category, or every active part
+ * brand when the leaf has no links — server rule (D1), mobile stays dumb.
+ */
+export async function getCategoryBrands(categoryId: number): Promise<ApiResponse<PartBrand[]>> {
+  assertPositiveId(categoryId, 'categoryId');
+  return apiClient.get<PartBrand[]>(`/categories/${categoryId}/brands`) as Promise<ApiResponse<PartBrand[]>>;
 }

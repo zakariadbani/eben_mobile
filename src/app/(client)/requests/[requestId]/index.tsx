@@ -41,6 +41,7 @@ interface EnrichedItem {
   item: RequestItem;
   title: string;
   categoryLabel: string | null;
+  brandLabel: string | null;
   image: ReturnType<typeof resolveImageSource>;
   conditionLabel: string;
 }
@@ -129,9 +130,10 @@ export default function RequestDetailScreen() {
     const info = lookup.get(item.categoryId);
     const title = (isArabic ? item.categoryTitleAr ?? item.categoryTitle : item.categoryTitle) ?? "";
     const categoryLabel = (isArabic ? info?.categoryTitleAr : info?.categoryTitle) ?? null;
+    const brandLabel = (isArabic ? (item.brandNameAr || item.brandName) : item.brandName) ?? null;
     const image = resolveImageSource(item.categoryImage ?? info?.image);
     const conditionLabel = t(`requestFlow.condition.${item.condition}`);
-    return { item, title, categoryLabel, image, conditionLabel };
+    return { item, title, categoryLabel, brandLabel, image, conditionLabel };
   });
 
   const groups: { title: string; entries: EnrichedItem[] }[] = [];
@@ -187,11 +189,12 @@ export default function RequestDetailScreen() {
         <Text type="titleSection" color={Colors.brand} style={styles.sectionHeading}>requestFlow.parts</Text>
         {enrichedItems.length === 0 ? <Text color={Colors.gray}>requestFlow.noParts</Text> : null}
 
-        {!hasOffers ? enrichedItems.map(({ item, title, categoryLabel, image, conditionLabel }) => (
+        {!hasOffers ? enrichedItems.map(({ item, title, categoryLabel, brandLabel, image, conditionLabel }) => (
           <RequestPartCard
             key={item.id}
             title={title}
             categoryLabel={categoryLabel}
+            brandLabel={brandLabel}
             image={image}
             quantity={item.quantity}
             conditionLabel={conditionLabel}
@@ -201,11 +204,12 @@ export default function RequestDetailScreen() {
             {group.title ? (
               <Text type="textTwo" semiBold translate={false} style={styles.groupTitle}>{group.title}</Text>
             ) : null}
-            {group.entries.map(({ item, title, categoryLabel, image, conditionLabel }) => (
+            {group.entries.map(({ item, title, categoryLabel, brandLabel, image, conditionLabel }) => (
               <RequestPartCard
                 key={item.id}
                 title={title}
                 categoryLabel={categoryLabel}
+                brandLabel={brandLabel}
                 image={image}
                 quantity={item.quantity}
                 conditionLabel={conditionLabel}

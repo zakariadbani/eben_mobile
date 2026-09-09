@@ -121,7 +121,7 @@ const CategoriesListScreen: React.FC = () => {
         </Text>
 
         {/* ── Condition selector (segmented toggle) ──────────── */}
-        <View flexDirection="row" style={styles.toggleRow} gap={8}>
+        <View flexDirection="row" style={styles.toggleRow} gap={12}>
           {CONDITIONS.map(({ key, labelKey }) => {
             const active = condition === key;
             return (
@@ -135,7 +135,7 @@ const CategoriesListScreen: React.FC = () => {
                 activeOpacity={0.8}
               >
                 <Text
-                  type="label"
+                  type="defaultTwo"
                   semiBold
                   style={active ? styles.toggleLabelActive : styles.toggleLabelInactive}
                   translate={false}
@@ -202,7 +202,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   toggleRow: {
-    marginBottom: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray,
+    marginBottom: 12,
   },
   toggleBtn: {
     flex: 1,
@@ -213,6 +216,11 @@ const styles = StyleSheet.create({
   },
   toggleBtnActive: {
     backgroundColor: Colors.primary,
+    shadowColor: Colors.borderLight,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   toggleBtnInactive: {
     backgroundColor: Colors.backgroundGray,
@@ -221,7 +229,7 @@ const styles = StyleSheet.create({
     color: Colors.brand,
   },
   toggleLabelInactive: {
-    color: Colors.grayDark,
+    color: Colors.brand,
   },
   grid: {
     marginBottom: 24,

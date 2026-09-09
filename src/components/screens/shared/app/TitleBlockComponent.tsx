@@ -55,7 +55,7 @@ const TitleBlockComponent: React.FC<TitleBlockComponentProps> = ({
             <Text type="small" style={styles.seeAllText}>
               {t("Voir tous")}
             </Text>
-            <CustomIcon name={i18n.language === "ar" ? "arrow_left" : "arrow_right"} size={14} tintColor={Colors.primary} />
+            <CustomIcon name={i18n.language === "ar" ? "arrow_left" : "arrow_right"} size={16} tintColor={Colors.grayMidDark} />
           </View>
         </Button>
       ) : null}
@@ -71,7 +71,8 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   seeAllText: {
-    fontSize: 13,
+    fontSize: 14,
+    color: Colors.grayMidDark,
   },
 });
 

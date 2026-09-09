@@ -329,6 +329,45 @@ it("hydrates the builder from a persisted draft, upserts the param prefill, and 
   await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith("requestDraft", "[]"));
 });
 
+it("shows the requestList.brand line and sends brandId for a branded draft item", async () => {
+  (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([
+    { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion", brandId: 1, brandName: "RIDEX", brandNameAr: "ريدكس" },
+  ]));
+  const screen = render(<CreateRequestScreen />);
+
+  expect(await screen.findByText(i18n.t("requestList.brand", { value: "RIDEX" }))).toBeTruthy();
+
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.verify") }));
+  const send = await screen.findByRole("button", { name: i18n.t("requestFlow.send") });
+  fireEvent.press(send);
+
+  await waitFor(() => expect(mockCreateRequest).toHaveBeenCalledWith({
+    vehicleId: 42,
+    items: [{ categoryId: 12, quantity: 1, condition: "occasion", brandId: 1 }],
+    notes: null,
+    images: [],
+  }));
+});
+
+it("keeps a branded and a brandless line of the same leaf as two rows, and removes only one", async () => {
+  (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([
+    { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion", brandId: null, brandName: null, brandNameAr: null },
+    { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion", brandId: 1, brandName: "RIDEX", brandNameAr: "ريدكس" },
+  ]));
+  const screen = render(<CreateRequestScreen />);
+
+  expect(await screen.findByText(i18n.t("requestFlow.totalPieces", { count: 2 }))).toBeTruthy();
+  expect(screen.getAllByText("Plaquettes")).toHaveLength(2);
+  expect(screen.getByText(i18n.t("requestList.brand", { value: "RIDEX" }))).toBeTruthy();
+
+  const removeButtons = screen.getAllByLabelText(i18n.t("requestFlow.removePart"));
+  expect(removeButtons).toHaveLength(2);
+  fireEvent.press(removeButtons[0]);
+
+  await waitFor(() => expect(screen.getAllByText("Plaquettes")).toHaveLength(1));
+  expect(await screen.findByText(i18n.t("requestFlow.totalPieces", { count: 1 }))).toBeTruthy();
+});
+
 it("pushes a guest submit to login-to-send instead of creating a request", async () => {
   mockedUseSession.mockReturnValue({ role: "guest" } as ReturnType<typeof useSession>);
   (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([
@@ -364,7 +403,7 @@ it("keeps listing the draft and offers the add-car CTA when the garage is empty"
 
 it("renders the Figma list/full layout for a saved draft", async () => {
   const draftItem1 = { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 3, condition: "occasion" as const };
-  const draftItem2 = { categoryId: 13, title: "Disques", titleAr: "أقراص", quantity: 1, condition: "occasion" as const };
+  const draftItem2 = { categoryId: 13, title: "Disques", titleAr: "أقراص", quantity: 1, condition: "occasion" as const, brandId: null, brandName: null, brandNameAr: null };
   (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([draftItem1, draftItem2]));
   mockGetRequests.mockResolvedValueOnce({
     success: true,

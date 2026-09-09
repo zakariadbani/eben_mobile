@@ -42,6 +42,8 @@ export interface CreateRequestPayload {
     categoryId: number;
     quantity: number;
     condition: PartCondition;
+    /** Nullable part-brand pick (D1/D3). */
+    brandId?: number | null;
     notes?: string | null;
     /** Mock-only display enrichment; production callers should send categoryId only. */
     categoryTitle?: string;

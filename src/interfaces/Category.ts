@@ -45,3 +45,16 @@ export interface Category {
 // CategoryProps is intentionally kept as a separate, narrower type because screens
 // that display categories only need id/title/title_ar/image.
 
+/**
+ * PartBrand — a part-brand entity linked per leaf (level-3) category (D1).
+ * Distinct from CarBrand (vehicle brands, `GET /brands`) — never a category
+ * level itself.
+ */
+export interface PartBrand {
+  id: number;
+  name: string;
+  nameAr: string;
+  logo: string | null;
+  status: boolean;
+  sortOrder: number;
+}
