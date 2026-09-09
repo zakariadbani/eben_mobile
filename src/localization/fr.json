@@ -110,6 +110,8 @@
   "Ajout...": "Ajout...",
   "Ajouté au panier !": "Ajouté au panier !",
   "Ajouté à la liste !": "Ajouté à la liste !",
+  "Retiré de la liste": "Retiré de la liste",
+  "Retirer de la liste": "Retirer de la liste",
   "Voir le panier": "Voir le panier",
   "Continuer": "Continuer",
   "Phone": "Numéro de téléphone",
@@ -1107,6 +1109,7 @@
   ,"settings.wishlist.explore": "Explorer les produits"
   ,"settings.wishlist.loadError": "Impossible de charger la liste de souhaits"
   ,"settings.wishlist.removeError": "Impossible de retirer cet article"
+  ,"settings.wishlist.searchPlaceholder": "Rechercher"
   ,"settings.orders.loadError": "Impossible de charger les commandes"
   ,"settings.orders.loadDetailError": "Impossible de charger la commande"
   ,"settings.orders.invalid": "Lien de commande invalide"

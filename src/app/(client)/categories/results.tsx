@@ -15,12 +15,15 @@ import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
 import SliderBlockComponent from "@/components/screens/shared/app/SliderBlockComponent";
 import ItemSubCategoryComponent from "@/components/screens/shared/app/ItemSubCategoryComponent";
+import WishlistHeart from "@/components/common/WishlistHeart";
 import ItemCategoryComponent from "@/components/screens/shared/app/ItemCategoryComponent";
 import PubPlacerDemandeBlockComponent from "@/components/screens/shared/app/PubPlacerDemandeBlockComponent";
 import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
 import Colors from "@/constants/Colors";
 import { Role, useSession } from "@/context/AuthContext";
 import { useWishlist } from "@/context/WishlistContext";
+import { useRequestDraft } from "@/context/RequestDraftContext";
+import { useNotification } from "@/context/NotificationContext";
 import { clientAuthHref } from "@/constants/clientReturnTo";
 import type { Category, CategoryProps } from "@/interfaces/Category";
 import type { Product } from "@/interfaces/Product";
@@ -35,6 +38,9 @@ interface ResultItem {
   price: number;
   image: string | null;
   isProduct: boolean;
+  categoryId: number | null;
+  categoryName: string | null;
+  categoryNameAr: string | null;
 }
 
 const SEASONS: Record<string, PneumaticSearchParams["season"]> = {
@@ -128,6 +134,9 @@ function productResult(product: Product): ResultItem {
     price: product.promoPrice != null && product.promoPrice > 0 ? product.promoPrice : product.price,
     image: product.images[0] ?? null,
     isProduct: true,
+    categoryId: product.categoryId,
+    categoryName: product.categoryName,
+    categoryNameAr: product.categoryNameAr,
   };
 }
 
@@ -140,6 +149,9 @@ function pneumaticResult(item: Pneumatic): ResultItem {
     price: item.price,
     image: item.image,
     isProduct: false,
+    categoryId: null,
+    categoryName: null,
+    categoryNameAr: null,
   };
 }
 
@@ -173,6 +185,8 @@ const CategoryResultsScreen: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<Category>();
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
   const { isWishlisted, toggle: toggleWishlist } = useWishlist();
+  const { items: draftItems, setItems: setDraftItems } = useRequestDraft();
+  const { showNotification } = useNotification();
 
   const load = useCallback(async () => {
     const tyreFilters = isPneumaticSearch
@@ -236,35 +250,76 @@ const CategoryResultsScreen: React.FC = () => {
     action();
   };
 
-  const renderItem = ({ item }: { item: ResultItem }) => (
-    <ItemSubCategoryComponent
-      onPress={() => item.isProduct && router.push({
-        pathname: "/(client)/products/[productId]",
-        params: { productId: String(item.id) },
-      } as Href)}
+  const renderItem = ({ item }: { item: ResultItem }) => {
+    // Occasion is a generic-part demande flow (products only) — priced tyres
+    // and en_stock products keep the unchanged price/wishlist card.
+    const isOccasionProduct = item.isProduct && condition === "occasion";
+    const isAdded = isOccasionProduct && item.categoryId != null
+      && draftItems.some((draft) => draft.categoryId === item.categoryId);
+
+    const handleAddToDraft = () => {
+      if (item.categoryId == null) return;
+      const categoryId = item.categoryId;
+      setDraftItems((current) => {
+        if (current.some((draft) => draft.categoryId === categoryId)) return current;
+        return [
+          ...current,
+          {
+            categoryId,
+            title: item.categoryName ?? item.title,
+            titleAr: item.categoryNameAr ?? item.categoryName ?? item.titleAr,
+            quantity: 1,
+            condition: "occasion",
+          },
+        ];
+      });
+      showNotification(t("Ajouté à la liste !"));
+    };
+
+    const handleRemoveFromDraft = () => {
+      setDraftItems((current) => current.filter((draft) => draft.categoryId !== item.categoryId));
+      showNotification(t("Retiré de la liste"));
+    };
+
+    return (
+      <ItemSubCategoryComponent
+        onPress={() => item.isProduct && router.push({
+          pathname: "/(client)/products/[productId]",
+          params: { productId: String(item.id) },
+        } as Href)}
         item={{
           id: item.id,
           title: item.title,
           title_ar: item.titleAr,
           image: item.image,
           price: item.price,
-          articleNumber: item.articleNumber,
+          articleNumber: isOccasionProduct ? undefined : item.articleNumber,
+          categoryName: item.categoryName ?? undefined,
+          categoryNameAr: item.categoryNameAr ?? undefined,
         }}
-        showPrice
+        showPrice={!isOccasionProduct}
         styleContainer={styles.resultCard}
-        actionButtonTwo={item.isProduct ? {
-          variant: isWishlisted(item.id) ? "primary" : "secondary",
-          leftIcon: isWishlisted(item.id) ? "heart" : "heart-o",
-          iconType: "standard",
-          iconTypeName: "FontAwesome",
-          iconColor: isWishlisted(item.id) ? Colors.primary : Colors.brand,
-          onPress: () => requireClient(
-            `/(client)/products/${item.id}`,
-            () => { void toggleWishlist(item.id); },
-          ),
-        } : undefined}
+        actionButton={isOccasionProduct
+          ? (isAdded
+            ? { variant: "green", leftIcon: "check", sizeIcon: 14, title: t("Ajouté") }
+            : { variant: "primary", title: t("Liste"), rightIcon: "liste", iconType: "custom", sizeIcon: 14, onPress: handleAddToDraft })
+          : undefined}
+        actionButtonTwo={isOccasionProduct && isAdded
+          ? { variant: "red", leftIcon: "trash", iconType: "custom", sizeIcon: 14, onPress: handleRemoveFromDraft, accessibilityLabel: t("Retirer de la liste") }
+          : undefined}
+        trailing={!isOccasionProduct && item.isProduct ? (
+          <WishlistHeart
+            active={isWishlisted(item.id)}
+            onPress={() => requireClient(
+              `/(client)/products/${item.id}`,
+              () => { void toggleWishlist(item.id); },
+            )}
+            accessibilityLabel={t(isWishlisted(item.id) ? "Retirer de la liste de souhaits" : "Ajouter à la liste de souhaits")}
+          />
+        ) : undefined}
       />
-  );
+    );
+  };
 
   return (
     <Screen scrollable padding whatsapp={false}>
@@ -345,16 +400,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingVertical: 12 },
   screenTitle: { color: Colors.brand, marginBottom: 16 },
   productList: { marginBottom: 24 },
-  productWrapper: {
-    backgroundColor: Colors.white,
-    borderRadius: 8,
-    overflow: "hidden",
-    shadowColor: Colors.borderLight,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
-    elevation: 2,
-  },
   resultCard: { minHeight: 102, paddingVertical: 12 },
   separator: { height: 10 },
   otherBlock: { marginBottom: 24 },

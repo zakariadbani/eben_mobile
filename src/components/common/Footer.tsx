@@ -1,11 +1,13 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
 import { Text } from "@/components/common/Text"; // Assuming you have a custom Text component
-import * as Application from "expo-application";
+import Constants from "expo-constants";
 import Colors from "@/constants/Colors";
 
 const Footer = () => {
-  const appVersion = Application.nativeApplicationVersion || "1.0.0";
+  // app.json version + android.versionCode; same value in Expo Go and release builds
+  const { version = "1.0.0", android } = Constants.expoConfig ?? {};
+  const appVersion = android?.versionCode ? `${version} (${android.versionCode})` : version;
 
   return (
     <View style={styles.container}>

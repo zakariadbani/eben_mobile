@@ -105,7 +105,7 @@ const AddToListSheet: React.FC<AddToListSheetProps> = ({ item, onClose }) => {
           )}
           <Text semiBold translate={false} flex>{displayTitle}</Text>
         </View>
-        <View>
+        <View alignItems="flex-start">
           <Text type="textTwo" semiBold style={styles.label}>{t("Quantité")}</Text>
           <QtyStepper value={quantity} onChange={setQuantity} />
         </View>

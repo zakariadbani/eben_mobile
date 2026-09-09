@@ -1,6 +1,6 @@
 import React from "react";
 import { ActivityIndicator } from "react-native";
-import { fireEvent, render as rtlRender, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render as rtlRender, waitFor } from "@testing-library/react-native";
 import {
   addToBasket,
   addToWishlist,
@@ -56,6 +56,26 @@ function render(ui: React.ReactElement) {
       <WishlistProvider>{ui}</WishlistProvider>
     </RequestDraftProvider>,
   );
+}
+
+/**
+ * ItemSubCategoryComponent's row TouchableOpacity now also carries
+ * accessibilityRole="button" whenever it has its own onPress (a11y fix).
+ * RNTL's byRole `name` match checks whether the queried text/label exists
+ * *anywhere inside* a candidate's subtree, not whether the candidate itself
+ * is named that — so a plain getByRole/findByRole lookup for an action
+ * button's label also matches the row wrapping it. Action buttons
+ * (Button.tsx) always set accessibilityLabel explicitly; the row never
+ * does — filter on that to grab the actual button, not its row.
+ */
+function getActionButton(container: ReturnType<typeof rtlRender>, name: string) {
+  const button = container.getAllByRole("button", { name }).find((el) => el.props.accessibilityLabel === name);
+  if (!button) throw new Error(`No action button found for role button, name: ${name}`);
+  return button;
+}
+async function findActionButton(container: ReturnType<typeof rtlRender>, name: string) {
+  await container.findAllByRole("button", { name });
+  return getActionButton(container, name);
 }
 
 const mockPush = jest.fn();
@@ -599,6 +619,20 @@ it("shows an honest empty-media state without photo-specific occasion guidance",
   expect(screen.queryByText(i18n.t("Pièce d'occasion — état conforme à la photo"))).toBeNull();
   expect(screen.queryByText(i18n.t("Vérifiez les photos avant de confirmer votre achat."))).toBeNull();
 });
+it("slides through multiple gallery photos via the shared image slider", async () => {
+  mockParams = { productId: "91" };
+  mockGetProduct.mockResolvedValueOnce({
+    success: true,
+    data: {
+      ...product,
+      images: ["https://cdn.example.test/1.jpg", "https://cdn.example.test/2.jpg"],
+    },
+  });
+  const screen = render(<ProductDetailScreen />);
+
+  expect(await screen.findByTestId("image-slider")).toBeTruthy();
+  expect(screen.getByTestId("image-slide-1")).toBeTruthy();
+});
 it("routes guest basket and wishlist actions to Client login without protected calls", async () => {
   mockParams = { productId: "91" };
   const screen = render(<ProductDetailScreen />);
@@ -645,29 +679,44 @@ it("allows a Client detail mutation to call the protected resource", async () =>
 it("splits level-3 rows by condition instead of always jumping straight to results", async () => {
   mockParams = { categoryId: "11", condition: "occasion" };
   const occasionScreen = render(<CategoryDrillScreen />);
-  fireEvent.press(await occasionScreen.findByRole("button", { name: i18n.t("Ajoutez à la liste") }));
+  fireEvent.press(await findActionButton(occasionScreen, i18n.t("Ajoutez à la liste")));
   expect(mockPush).not.toHaveBeenCalled();
   expect(mockGetProductsByCategory).not.toHaveBeenCalled();
   occasionScreen.unmount();
 
   mockParams = { categoryId: "11", condition: "en_stock" };
   const stockScreen = render(<CategoryDrillScreen />);
-  fireEvent.press(await stockScreen.findByRole("button", { name: "arrow-right" }));
+  fireEvent.press(await findActionButton(stockScreen, "arrow-right"));
   expect(mockPush).toHaveBeenCalledWith({
     pathname: "/(client)/categories/results",
     params: { categoryId: "12", condition: "en_stock" },
   });
 });
 
+it("routes an occasion level-3 row title to the results/Brands list, but its CTA opens the sheet instead", async () => {
+  mockParams = { categoryId: "11", condition: "occasion" };
+  const screen = render(<CategoryDrillScreen />);
+
+  fireEvent.press(await screen.findByText("Plaquettes"));
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: "/(client)/categories/results",
+    params: { categoryId: "12", condition: "occasion" },
+  });
+
+  mockPush.mockClear();
+  fireEvent.press(getActionButton(screen, i18n.t("Ajoutez à la liste")));
+  expect(mockPush).not.toHaveBeenCalled();
+});
+
 it("guest adds a level-3 category from the sheet without a login redirect", async () => {
   mockParams = { categoryId: "11", condition: "occasion" };
   const screen = render(<CategoryDrillScreen />);
 
-  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajoutez à la liste") }));
+  fireEvent.press(await findActionButton(screen, i18n.t("Ajoutez à la liste")));
   fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajouter à la liste") }));
 
   expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Ajouté à la liste !"));
-  expect(await screen.findByRole("button", { name: i18n.t("Ajouté") })).toBeTruthy();
+  expect(await findActionButton(screen, i18n.t("Ajouté"))).toBeTruthy();
   expect(mockPush).not.toHaveBeenCalled();
   await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith(
     "requestDraft",
@@ -680,11 +729,11 @@ it("adds a level-3 category from the sheet as a signed-in client, toasts, with n
   mockParams = { categoryId: "11", condition: "occasion" };
   const screen = render(<CategoryDrillScreen />);
 
-  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajoutez à la liste") }));
+  fireEvent.press(await findActionButton(screen, i18n.t("Ajoutez à la liste")));
   fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajouter à la liste") }));
 
   expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Ajouté à la liste !"));
-  expect(await screen.findByRole("button", { name: i18n.t("Ajouté") })).toBeTruthy();
+  expect(await findActionButton(screen, i18n.t("Ajouté"))).toBeTruthy();
   expect(mockPush).not.toHaveBeenCalled();
 });
 
@@ -694,7 +743,11 @@ it("lists an occasion product's category from product detail instead of adding t
   const screen = render(<ProductDetailScreen />);
 
   fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajoutez à la liste") }));
-  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajouter à la liste") }));
+  // Two "Ajouter à la liste" buttons now coexist here: the page's wishlist
+  // heart (shares this exact label, unrelated to this flow) and the sheet's
+  // confirm button opened above — the sheet's is the one rendered last.
+  const addToListButtons = await screen.findAllByRole("button", { name: i18n.t("Ajouter à la liste") });
+  fireEvent.press(addToListButtons[addToListButtons.length - 1]);
 
   await waitFor(() => expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Ajouté à la liste !")));
   expect(addToBasket).not.toHaveBeenCalled();
@@ -717,7 +770,7 @@ it("does not redirect an occasion level-3 deep load to the priced results screen
   mockParams = { categoryId: "12", condition: "occasion" };
   const screen = render(<CategoryDrillScreen />);
 
-  expect(await screen.findByRole("button", { name: i18n.t("Ajoutez à la liste") })).toBeTruthy();
+  expect(await findActionButton(screen, i18n.t("Ajoutez à la liste"))).toBeTruthy();
   expect(mockPush).not.toHaveBeenCalled();
   expect(mockReplace).not.toHaveBeenCalled();
 });
@@ -727,8 +780,88 @@ it("renders the leaf itself as an add-to-list row when its parent is absent from
   mockParams = { categoryId: "13", condition: "occasion" };
   const screen = render(<CategoryDrillScreen />);
 
-  expect(await screen.findByRole("button", { name: i18n.t("Ajoutez à la liste") })).toBeTruthy();
+  expect(await findActionButton(screen, i18n.t("Ajoutez à la liste"))).toBeTruthy();
   expect(screen.queryByText(i18n.t("Aucune catégorie disponible"))).toBeNull();
   expect(mockPush).not.toHaveBeenCalled();
   expect(mockReplace).not.toHaveBeenCalled();
+});
+
+it("renders level-2 children as list rows instead of a grid, and drills deeper on press", async () => {
+  mockParams = { categoryId: "10", condition: "occasion" };
+  const screen = render(<CategoryDrillScreen />);
+
+  // A grid cell (ItemCategoryComponent) never renders an "arrow-right"
+  // action button — finding one here proves level-2 now renders as a list
+  // row (ItemSubCategoryComponent), not the old 2-column grid.
+  const arrow = await findActionButton(screen, "arrow-right");
+  fireEvent.press(arrow);
+
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: "/(client)/categories/[categoryId]",
+    params: { categoryId: "11", condition: "occasion" },
+  });
+});
+
+it("turns an occasion result row into a demande draft line and back via Liste/trash", async () => {
+  mockParams = { categoryId: "12", condition: "occasion" };
+  const screen = render(<CategoryResultsScreen />);
+  await screen.findByText("Plaquettes live");
+
+  fireEvent.press(await findActionButton(screen, i18n.t("Liste")));
+
+  expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Ajouté à la liste !"));
+  expect(await findActionButton(screen, i18n.t("Ajouté"))).toBeTruthy();
+  // Draft line is keyed by the category (the demande carries no SKU) —
+  // quantity 1, occasion condition, title = the CATEGORY name (not the
+  // product title), and no price/articleNumber keys.
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+    "requestDraft",
+    JSON.stringify([{ categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion" }]),
+  ));
+
+  const trash = getActionButton(screen, i18n.t("Retirer de la liste"));
+  fireEvent.press(trash);
+
+  expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Retiré de la liste"));
+  expect(await findActionButton(screen, i18n.t("Liste"))).toBeTruthy();
+  expect(screen.queryByRole("button", { name: i18n.t("Ajouté") })).toBeNull();
+  expect(AsyncStorage.setItem).toHaveBeenCalledWith("requestDraft", JSON.stringify([]));
+  // Guests can add/remove the draft line — no auth redirect anywhere in the flow.
+  expect(mockPush).not.toHaveBeenCalled();
+});
+
+it("appends exactly one draft line when Liste is pressed twice in the same frame", async () => {
+  mockParams = { categoryId: "12", condition: "occasion" };
+  const screen = render(<CategoryResultsScreen />);
+  await screen.findByText("Plaquettes live");
+
+  const listButton = await findActionButton(screen, i18n.t("Liste"));
+  act(() => {
+    fireEvent.press(listButton);
+    fireEvent.press(listButton);
+  });
+
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalled());
+  const setItemMock = AsyncStorage.setItem as jest.Mock;
+  const lastPersisted = JSON.parse(setItemMock.mock.calls[setItemMock.mock.calls.length - 1][1] as string);
+  expect(lastPersisted).toHaveLength(1);
+  expect(lastPersisted[0].categoryId).toBe(12);
+});
+
+it("shows price, wishlist heart and the category line for en_stock results, and hides price for occasion", async () => {
+  mockParams = { categoryId: "12", condition: "en_stock" };
+  const stockScreen = render(<CategoryResultsScreen />);
+  await stockScreen.findByText("Plaquettes live");
+
+  expect(stockScreen.getByText(i18n.t("home.category", { value: "Plaquettes" }))).toBeTruthy();
+  expect(stockScreen.getByText("299 dhs")).toBeTruthy();
+  expect(stockScreen.getByLabelText(i18n.t("Ajouter à la liste de souhaits"))).toBeTruthy();
+  stockScreen.unmount();
+
+  mockParams = { categoryId: "12", condition: "occasion" };
+  const occasionScreen = render(<CategoryResultsScreen />);
+  await occasionScreen.findByText("Plaquettes live");
+
+  expect(occasionScreen.queryByText("299 dhs")).toBeNull();
+  expect(occasionScreen.queryByLabelText(i18n.t("Ajouter à la liste de souhaits"))).toBeNull();
 });

@@ -13,12 +13,8 @@ import { addToWishlist, removeWishlistItem } from "@/api";
 const STORAGE_KEY = "wishlistProducts";
 
 // ponytail: per-device store, not per-user (no session-scoped key). Backend
-// WishlistItem stays category-keyed (no productId), so removing product X
-// locally may drop the shared backend category entry while a sibling
-// product Y in the same category is still locally wishlisted — the two can
-// drift out of sync. Upgrade path: backend contract addition #13
-// (productId on WishlistItem), then this store can trust the backend id
-// per product instead of best-effort local bookkeeping.
+// WishlistItem is now product-keyed, so the stored backend id maps 1:1 to
+// this map's productId key — no drift risk.
 
 /** productId -> backend WishlistItem id (null when the add call failed but the heart stays filled locally). */
 type WishlistMap = Map<number, number | null>;

@@ -111,17 +111,6 @@ jest.mock('@/components/screens/client/addresses/ItemAddressComponent', () => {
   };
 });
 
-jest.mock('@/components/screens/shared/app/ItemSubCategoryComponent', () => {
-  const ReactModule = require('react') as typeof React;
-  const { Text, TouchableOpacity, View } = require('react-native') as typeof import('react-native');
-  return function MockWishlistItem({ item, actionButtonTwo }: { item: { id: number; title: string }; actionButtonTwo?: { onPress?: () => void } }) {
-    return ReactModule.createElement(View, null,
-      ReactModule.createElement(Text, null, item.title),
-      ReactModule.createElement(TouchableOpacity, { accessible: true, accessibilityRole: 'button', accessibilityLabel: `remove-${item.id}`, onPress: actionButtonTwo?.onPress }),
-    );
-  };
-});
-
 const mockGet = apiClient.get as jest.Mock;
 const mockPost = apiClient.post as jest.Mock;
 const mockPut = apiClient.put as jest.Mock;
@@ -377,6 +366,30 @@ it('does not invent a wishlist condition or price when the API omits them', asyn
   await screen.findByText('Freins');
   expect(screen.queryByText(/Occasion/)).toBeNull();
   expect(screen.queryByText('2,999 dhs')).toBeNull();
+});
+
+it('renders the full product wishlist card: title, article number, category, discount and prices', async () => {
+  mockGet.mockImplementation((path: string) => {
+    if (path === '/wishlist') return Promise.resolve({
+      success: true,
+      data: [{
+        id: 52, userId: 5, categoryId: 71, pneumaticId: null, createdAt: '2026-01-01',
+        categoryTitle: 'Freins', categoryTitleAr: 'فرامل',
+        productTitle: 'RIDEX 402B1190 Jeu de plaquettes de frein', productTitleAr: 'RIDEX',
+        articleNumber: '18348', price: 100, promoPrice: 80,
+      }],
+      pagination,
+    });
+    return Promise.reject(new Error(`Unexpected GET ${path}`));
+  });
+  const screen = render(<WishlistScreen />);
+
+  expect(await screen.findByText('RIDEX 402B1190 Jeu de plaquettes de frein')).toBeTruthy();
+  expect(screen.getByText('N° Article: 18348')).toBeTruthy();
+  expect(screen.getByText(i18n.t('home.category', { value: 'Freins' }))).toBeTruthy();
+  expect(screen.getByText('-20%')).toBeTruthy();
+  expect(screen.getByText(/80[.,]00 Dhs/)).toBeTruthy();
+  expect(screen.getByText(/100[.,]00 Dhs/)).toBeTruthy();
 });
 
 it('opens a notification target even after marking the row read', async () => {

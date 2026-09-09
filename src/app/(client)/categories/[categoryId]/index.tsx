@@ -2,18 +2,28 @@
  * CategoryDrillScreen — recursive level-2 / level-3 browse.
  *
  * Figma refs:
- *   Level-2 grid:  Search-Secondary-&-Third-categories_En-Stock / _Occasion
- *   Level-3 list:  Search-Body-parts-search_Lvl-2 / Lvl-3
+ *   Level-2 & Level-3 list: Search-Secondary-&-Third-categories_En-Stock / _Occasion,
+ *                           Search-Body-parts-search_Lvl-2 / Lvl-3
  *   Results entry: navigates to /(client)/categories/results
  *
- * Drill strategy:
- *   - Level 1 → this screen renders level-2 children as a grid (ItemCategoryComponent).
- *   - Level 2 → this screen renders level-3 children as a vertical list
- *               (ItemSubCategoryComponent with arrow → indicator in en_stock;
- *               an "add to list" CTA opening AddToListSheet in occasion).
- *   - Level 3 (leaf), en_stock → immediately redirects to the results screen.
- *   - Level 3 (leaf), occasion → no results screen (no generic-parts catalog);
- *     renders the leaf's parent drill instead of stranding the user.
+ * Drill strategy — every level renders its children as a single vertical
+ * list (ItemSubCategoryComponent), keyed on the CHILD's own level:
+ *   - child.level < 3 (level-2 under a level-1 parent) → arrow → row that
+ *     drills one level deeper.
+ *   - child.level === 3, en_stock → arrow → row; pressing the row (or the
+ *     arrow) goes straight to the priced results screen.
+ *   - child.level === 3, occasion → an "add to list" CTA opening
+ *     AddToListSheet; pressing the row BODY (not the CTA) instead navigates
+ *     to the results screen (the generic-parts "Brands" list for that leaf).
+ *   - Level 3 (leaf) reached directly via route param, en_stock → immediately
+ *     redirects to the results screen.
+ *   - Level 3 (leaf) reached directly via route param (DEEP LINK), occasion
+ *     → intentionally renders the leaf's PARENT drill instead of the results
+ *     screen: the leaf may have zero products, and an empty Brands list
+ *     would strand the user with no add-to-list CTA. This redirect applies
+ *     only to the direct deep-link load — tapping a level-3 occasion row
+ *     from within a drill still goes to the results/Brands list (see the
+ *     bullet above).
  *
  * Condition and the breadcrumb path (parentTitle) are carried via router params.
  */
@@ -111,12 +121,6 @@ const CategoryDrillScreen: React.FC = () => {
   const [children, setChildren] = useState<Category[]>([]);
   const [levelOneCategories, setLevelOneCategories] = useState<Category[]>([]);
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
-  // True only when a level-3 leaf's parent could not be resolved from the
-  // tree (stale/broken chain) — the leaf itself is then rendered as a single
-  // add-to-list row instead of the empty state. Decoupled from `current`'s
-  // own level so it can't be confused with the (unrelated) en_stock redirect
-  // path, which also briefly sets `current` to a level-3 leaf.
-  const [leafFallback, setLeafFallback] = useState(false);
   const [sheetItem, setSheetItem] = useState<{ categoryId: number; title: string; titleAr: string; image?: Category["image"] | null } | null>(null);
   const { items: draftItems } = useRequestDraft();
 
@@ -133,10 +137,12 @@ const CategoryDrillScreen: React.FC = () => {
     }
     setState("loading");
     try {
-    setLeafFallback(false);
     const response = await getCategoryTree();
     const flat = flattenCategories(response.data);
     let found = flat.find((c) => c.id === categoryId);
+    // True only when a level-3 leaf's parent could not be resolved from the
+    // tree (stale/broken chain) — the leaf itself becomes its own single
+    // add-to-list row (`kids = [found]` below) instead of the empty state.
     let isLeafFallback = false;
 
     if (found && found.level === 3) {
@@ -153,12 +159,15 @@ const CategoryDrillScreen: React.FC = () => {
         } as never);
         return;
       }
-      // Occasion mode has no results CTA for a bare leaf (BLOCKER FIX) — show
-      // the leaf's parent drill instead of stranding the user on a priced
-      // list with no way to add the generic part to their request. When the
-      // parent itself cannot be resolved from the tree (stale/broken chain),
-      // fall back to rendering the leaf as a single add-to-list row rather
-      // than the empty state.
+      // Intentional: a level-3 occasion leaf reached by DEEP LINK renders its
+      // PARENT drill instead of the results screen — an empty Brands list
+      // (the leaf may have zero products) would strand the user with no
+      // add-to-list CTA. Tapping a level-3 occasion row from within a drill
+      // still goes to the results/Brands list (handleRowPress below); this
+      // redirect applies only to the direct deep-link load. When the parent
+      // itself cannot be resolved from the tree (stale/broken chain), fall
+      // back to rendering the leaf as a single add-to-list row rather than
+      // the empty state.
       const parent = findParent(response.data, found.id);
       if (parent) {
         found = parent;
@@ -168,7 +177,6 @@ const CategoryDrillScreen: React.FC = () => {
     }
 
     setCurrent(found);
-    setLeafFallback(isLeafFallback);
     if (found) {
       const kids = isLeafFallback ? [found] : (found.children ?? flat.filter((c) => c.parentId === found.id));
       setChildren(kids);
@@ -214,6 +222,21 @@ const CategoryDrillScreen: React.FC = () => {
     }
   };
 
+  // Row-body press: same destination as handleChildPress, except a level-3
+  // leaf in occasion mode — its CTA opens the add-to-list sheet, but tapping
+  // the row itself instead reaches the generic-parts "Brands" results list
+  // for that leaf (Figma: row body → results, CTA → sheet).
+  const handleRowPress = (child: Category) => {
+    if (child.level === 3 && condition === "occasion") {
+      router.push({
+        pathname: "/(client)/categories/results",
+        params: { categoryId: String(child.id), condition },
+      } as never);
+      return;
+    }
+    handleChildPress(child);
+  };
+
   const handleOtherCategoryPress = (cat: Category) => {
     router.push({
       pathname: "/(client)/categories/[categoryId]",
@@ -227,26 +250,19 @@ const CategoryDrillScreen: React.FC = () => {
     router.push("/(client)/requests/CreateRequestScreen" as Href);
   };
 
-  // ── Render level-2 children as 2-column grid ──────────────────────────────
-  const renderGridItem = ({ item }: { item: Category }) => (
-    <View style={styles.gridCell}>
-      <ItemCategoryComponent
-        item={toCategoryProps(item)}
-        onPress={() => handleChildPress(item)}
-      />
-    </View>
-  );
-
-  // ── Render level-3 children as list rows with → arrow (en_stock) or an
-  //    "add to list" CTA (occasion) ─────────────────────────────────────────
+  // ── Render every child as a list row, keyed on the CHILD's own level ──────
+  //    level < 3            → arrow → row, drills one level deeper.
+  //    level === 3, en_stock → arrow → row, goes to results.
+  //    level === 3, occasion → "add to list" CTA (row body goes to results).
   const renderListItem = ({ item }: { item: Category }) => {
-    const isAdded = condition === "occasion" && draftItems.some((draft) => draft.categoryId === item.id);
+    const isOccasionLeaf = item.level === 3 && condition === "occasion";
+    const isAdded = isOccasionLeaf && draftItems.some((draft) => draft.categoryId === item.id);
     return (
       <ItemSubCategoryComponent
         item={toSubCategoryItem(item)}
-        actionButton={condition === "occasion"
+        actionButton={isOccasionLeaf
           ? (isAdded
-            ? { variant: "green", leftIcon: "check", title: t("Ajouté"), onPress: () => handleChildPress(item) }
+            ? { variant: "green", leftIcon: "check", sizeIcon: 14, title: t("Ajouté"), onPress: () => handleChildPress(item) }
             : { variant: "primary", title: t("Ajoutez à la liste"), onPress: () => handleChildPress(item) })
           : {
             variant: "secondary",
@@ -255,13 +271,13 @@ const CategoryDrillScreen: React.FC = () => {
             sizeIcon: 14,
             onPress: () => handleChildPress(item),
           }}
+        onPress={() => handleRowPress(item)}
         styleContainer={styles.listRow}
       />
     );
   };
 
-  const isLevelTwoDrill = current?.level === 1 && children.length > 0;
-  const isLevelThreeDrill = (current?.level === 2 || leafFallback) && children.length > 0;
+  const hasChildren = children.length > 0;
 
   if (state === "loading") {
     return <Screen whatsapp={false}><View flex alignItems="center"><ActivityIndicator color={Colors.primary} size="large" /></View></Screen>;
@@ -286,21 +302,8 @@ const CategoryDrillScreen: React.FC = () => {
           {screenTitle}
         </Text>
 
-        {/* ── Children grid (level-1 → show level-2 as grid) ── */}
-        {isLevelTwoDrill && (
-          <FlatList<Category>
-            data={children}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={renderGridItem}
-            numColumns={2}
-            columnWrapperStyle={styles.gridRow}
-            scrollEnabled={false}
-            style={styles.grid}
-          />
-        )}
-
-        {/* ── Children list (level-2 → show level-3 as list) ── */}
-        {isLevelThreeDrill && (
+        {/* ── Children list (both level-2 and level-3 render as a list) ── */}
+        {hasChildren && (
           <FlatList<Category>
             data={children}
             keyExtractor={(item) => String(item.id)}
@@ -312,7 +315,7 @@ const CategoryDrillScreen: React.FC = () => {
         )}
 
         {/* ── Empty state ───────────────────────────────────── */}
-        {!isLevelTwoDrill && !isLevelThreeDrill && (
+        {!hasChildren && (
           <EmptyListComponent title={t("Aucune catégorie disponible")} />
         )}
 
@@ -369,18 +372,7 @@ const styles = StyleSheet.create({
     color: Colors.brand,
     marginBottom: 16,
   },
-  // Grid (level-2 children)
-  grid: {
-    marginBottom: 24,
-  },
-  gridRow: {
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  gridCell: {
-    width: "48%",
-  },
-  // List (level-3 children)
+  // List (level-2 & level-3 children)
   list: {
     marginBottom: 24,
   },

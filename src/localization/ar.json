@@ -397,6 +397,8 @@
   "Ajout...": "جارٍ الإضافة...",
   "Ajouté au panier !": "تمت الإضافة إلى السلة!",
   "Ajouté à la liste !": "تمت الإضافة إلى القائمة!",
+  "Retiré de la liste": "تمت الإزالة من القائمة",
+  "Retirer de la liste": "إزالة من القائمة",
   "Voir le panier": "عرض السلة",
   "Qté": "الكمية",
   "Avis": "الآراء",
@@ -1332,6 +1334,7 @@
   ,"settings.wishlist.explore": "\u0627\u0633\u062a\u0643\u0634\u0641 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a"
   ,"settings.wishlist.loadError": "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0631\u063a\u0628\u0627\u062a"
   ,"settings.wishlist.removeError": "\u062a\u0639\u0630\u0631 \u0625\u0632\u0627\u0644\u0629 \u0647\u0630\u0627 \u0627\u0644\u0639\u0646\u0635\u0631"
+  ,"settings.wishlist.searchPlaceholder": "\u0628\u062d\u062b"
   ,"settings.orders.loadError": "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0637\u0644\u0628\u0627\u062a"
   ,"settings.orders.loadDetailError": "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0637\u0644\u0628"
   ,"settings.orders.invalid": "\u0631\u0627\u0628\u0637 \u0627\u0644\u0637\u0644\u0628 \u063a\u064a\u0631 \u0635\u0627\u0644\u062d"

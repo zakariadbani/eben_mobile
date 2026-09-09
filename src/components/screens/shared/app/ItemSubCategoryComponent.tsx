@@ -33,6 +33,9 @@ export interface SubCategoryItem {
   price?: number;
   articleNumber?: string;
   condition?: string;
+  /** Category sublabel shown above the title (results/basket rows). */
+  categoryName?: string;
+  categoryNameAr?: string;
 }
 
 /**
@@ -50,6 +53,7 @@ export interface ItemSubCategoryActionButton {
   title?: string;
   onPress?: () => void;
   style?: ViewStyle;
+  accessibilityLabel?: string;
 }
 
 export interface ItemSubCategoryComponentProps {
@@ -64,6 +68,8 @@ export interface ItemSubCategoryComponentProps {
   actionButton?: ItemSubCategoryActionButton;
   /** Secondary action button (e.g. trash delete). Omit to hide. */
   actionButtonTwo?: ItemSubCategoryActionButton;
+  /** Extra trailing element rendered after actionButtonTwo (e.g. a wishlist heart). */
+  trailing?: React.ReactNode;
   /** Container style override. */
   styleContainer?: ViewStyle;
   onPress?: () => void;
@@ -76,6 +82,7 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
   showState = false,
   actionButton,
   actionButtonTwo,
+  trailing,
   styleContainer,
   onPress,
 }) => {
@@ -96,6 +103,7 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={onPress ? 0.75 : 1}
+      accessibilityRole={onPress ? "button" : undefined}
       style={[styles.container, styleContainer]}
     >
       <View flexDirection="row" alignItems="center" gap={10} style={styles.inner}>
@@ -110,6 +118,16 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
 
         {/* Info column */}
         <View flex style={styles.infoColumn} gap={2}>
+          {item.articleNumber != null && (
+            <Text type="small" color={Colors.gray}>
+              {t("home.articleNumber", { value: item.articleNumber })}
+            </Text>
+          )}
+          {item.categoryName != null && (
+            <Text type="small" color={Colors.gray}>
+              {t("home.category", { value: isArabic ? item.categoryNameAr ?? item.categoryName : item.categoryName })}
+            </Text>
+          )}
           <Text type="label" semiBold style={styles.title} numberOfLines={2}>
             {displayTitle}
           </Text>
@@ -118,11 +136,6 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
               {t("requestList.condition", {
                 condition: t(item.condition),
               })}
-            </Text>
-          )}
-          {item.articleNumber != null && (
-            <Text type="small" color={Colors.gray}>
-              {t("home.articleNumber", { value: item.articleNumber })}
             </Text>
           )}
           {showQty && (
@@ -158,6 +171,7 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
               title={actionButton.title}
               onPress={actionButton.onPress}
               style={mergeStyles(styles.actionBtn, actionButton.style)}
+              accessibilityLabel={actionButton.accessibilityLabel}
               fit
             />
           )}
@@ -173,9 +187,11 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
               title={actionButtonTwo.title}
               onPress={actionButtonTwo.onPress}
               style={mergeStyles(styles.actionBtn, actionButtonTwo.style)}
+              accessibilityLabel={actionButtonTwo.accessibilityLabel}
               fit
             />
           )}
+          {trailing}
         </View>
       </View>
     </TouchableOpacity>

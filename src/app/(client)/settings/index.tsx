@@ -34,6 +34,8 @@ interface MenuHeader {
 interface MenuRow {
   type?: 'row';
   icon?: string;
+  iconType?: 'custom' | 'standard';
+  iconTypeName?: string;
   title: string;
   navigateTo?: string;
   isToggle?: boolean;
@@ -121,7 +123,9 @@ const ClientMenuScreen: React.FC = () => {
       navigateTo: '(client)/settings/archived-offers',
     },
     {
-      icon: 'wishlist',
+      icon: 'heart-outline',
+      iconType: 'standard',
+      iconTypeName: 'Ionicons',
       title: t('settings.wishlist'),
       navigateTo: '(client)/settings/wishlist',
     },
@@ -269,6 +273,8 @@ const ClientMenuScreen: React.FC = () => {
             <View key={index}>
               <ItemMenuComponent
                 icon={row.icon}
+                iconType={row.iconType}
+                iconTypeName={row.iconTypeName}
                 title={row.title}
                 onPress={row.onPress}
                 navigateTo={row.navigateTo}

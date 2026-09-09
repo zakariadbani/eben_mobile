@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   triangle: {
     position: "absolute",
     bottom: -10, // Adjust the position so the triangle is at the bottom center
-    right: "27%",
+    right: "47%", // point at the "liste" (requests) tab — the add-to-list target
     marginLeft: -10, // Adjust based on triangle size
     width: 0,
     height: 0,

@@ -15,8 +15,8 @@ import { useTranslation } from "react-i18next";
 
 import { getCategories, getCategoryTree, getProducts, getRequests } from "@/api";
 import CustomIcon from "@/components/common/CustomIcon";
-import Icon from "@/components/common/Icon";
 import Screen from "@/components/common/Screen";
+import WishlistHeart from "@/components/common/WishlistHeart";
 import { Text } from "@/components/common/Text";
 import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
 import RequestSummaryCard, { isActiveRequest } from "@/components/screens/client/requests/RequestSummaryCard";
@@ -161,7 +161,8 @@ const HomeScreen: React.FC = () => {
       accessibilityLabel={isArabic ? product.titleAr : product.title}
     >
       {!recent ? (
-        <TouchableOpacity
+        <WishlistHeart
+          active={wished}
           onPress={() => {
             if (role !== Role.CLIENT) {
               requireClient(`/(client)/products/${product.id}`);
@@ -169,17 +170,10 @@ const HomeScreen: React.FC = () => {
             }
             void toggle(product.id);
           }}
-          style={styles.heart}
-          accessibilityRole="button"
+          size={24}
           accessibilityLabel={t(wished ? "Retirer de la liste de souhaits" : "Ajouter à la liste de souhaits")}
-        >
-          <Icon
-            name={wished ? "heart" : "heart-o"}
-            type="FontAwesome"
-            size={24}
-            iconColor={wished ? Colors.primary : Colors.brand}
-          />
-        </TouchableOpacity>
+          style={styles.heart}
+        />
       ) : null}
       <Image
         source={product.images[0] ? { uri: product.images[0] } : fallbackProductImage}

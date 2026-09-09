@@ -26,11 +26,22 @@ import { useTranslation } from "react-i18next";
  *     isToggle
  *     onToggle={(v) => console.log(v)}
  *   />
+ *   <ItemMenuComponent
+ *     icon="heart-outline"
+ *     iconType="standard"
+ *     iconTypeName="Ionicons"
+ *     title="Ma liste de souhaits"
+ *     navigateTo="(client)/settings/wishlist"
+ *   />
  */
 
 export interface ItemMenuComponentProps {
-  /** Key in CustomIcon's image map. */
+  /** Key in CustomIcon's image map (iconType="custom"), or a vector icon name (iconType="standard"). */
   icon?: string;
+  /** 'custom' (default) — CustomIcon image map. 'standard' — vector icon via Icon, named by iconTypeName. */
+  iconType?: "custom" | "standard";
+  /** Vector icon set for iconType="standard". Defaults to "FontAwesome". */
+  iconTypeName?: string;
   title?: string;
   /** expo-router path; triggers navigation on press. */
   navigateTo?: string;
@@ -53,6 +64,8 @@ export interface ItemMenuComponentProps {
 
 const ItemMenuComponent: React.FC<ItemMenuComponentProps> = ({
   icon,
+  iconType = "custom",
+  iconTypeName = "FontAwesome",
   title,
   navigateTo,
   onPress,
@@ -89,7 +102,11 @@ const ItemMenuComponent: React.FC<ItemMenuComponentProps> = ({
         {/* Leading icon */}
         {icon ? (
           <View style={styles.iconWrapper}>
-            <CustomIcon name={icon as never} size={26} />
+            {iconType === "standard" ? (
+              <Icon name={icon} type={iconTypeName} size={22} iconColor={Colors.brand} />
+            ) : (
+              <CustomIcon name={icon as never} size={26} />
+            )}
           </View>
         ) : (
           <View style={styles.iconWrapper} />

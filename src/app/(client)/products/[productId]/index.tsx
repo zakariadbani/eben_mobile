@@ -22,7 +22,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -38,7 +37,9 @@ import { Text } from "@/components/common/Text";
 import Button from "@/components/common/Button";
 import CustomModal from "@/components/common/CustomModal";
 import Icon from "@/components/common/Icon";
+import ImageSlider from "@/components/common/ImageSlider";
 import QtyStepper from "@/components/common/QtyStepper";
+import WishlistHeart from "@/components/common/WishlistHeart";
 import AddToListSheet from "@/components/screens/client/requests/AddToListSheet";
 import Colors from "@/constants/Colors";
 import { clientAuthHref } from '@/constants/clientReturnTo';
@@ -305,22 +306,13 @@ const ProductDetailScreen: React.FC = () => {
         {/* ── Gallery ─────────────────────────────────────────── */}
         <View style={styles.gallery}>
           {product.images.length > 0 ? (
-            <>
-              <Image
-                source={{ uri: product.images[0] }}
-                style={styles.galleryImage}
-                resizeMode="contain"
-              />
-              <View style={styles.galleryCounter}>
-                <Text type="small" color={Colors.white} translate={false}>
-                  {`1/${product.images.length}`}
-                </Text>
-              </View>
-            </>
+            <ImageSlider images={product.images} resizeMode="contain" />
           ) : (
-            <Text type="small" color={Colors.gray}>
-              {t("requestFlow.noPhoto")}
-            </Text>
+            <View style={styles.galleryEmpty}>
+              <Text type="small" color={Colors.gray}>
+                {t("requestFlow.noPhoto")}
+              </Text>
+            </View>
           )}
         </View>
 
@@ -497,27 +489,30 @@ const ProductDetailScreen: React.FC = () => {
       ) : null}
       <View style={styles.stickyBar}>
         {/* Wishlist heart */}
-        <TouchableOpacity
-          onPress={handleWishlist}
-          style={styles.wishlistBtn}
-          activeOpacity={0.7}
-          disabled={wishlistLoading}
-          accessibilityLabel={isArabic ? "إضافة إلى المفضلة" : "Ajouter à la liste"}
-        >
-          {wishlistLoading ? (
-            <ActivityIndicator size="small" color={Colors.orange} />
-          ) : (
-            <Icon
-              name="heart"
+        <RNView style={styles.wishlistBtn}>
+          {/* ponytail: WishlistHeart stays mounted (opacity-hidden, not
+              unmounted) during the loading spinner swap — unmounting it here
+              would drop the Pressable node mid-flight and break a second
+              press on the same element. Its own Pressable also owns the tap
+              target directly: nesting it inside a TouchableOpacity would
+              steal the outer's responder claim (Pressable always claims
+              onStartShouldSetResponder). */}
+          <RNView style={styles.wishlistIconSlot}>
+            <WishlistHeart
+              active={wished}
+              onPress={handleWishlist}
               size={22}
-              iconColor={wished ? Colors.red : Colors.grayMidDark}
-              type="FontAwesome"
+              accessibilityLabel={isArabic ? "إضافة إلى المفضلة" : "Ajouter à la liste"}
+              style={wishlistLoading ? styles.wishlistHeartHidden : undefined}
             />
-          )}
+            {wishlistLoading && (
+              <ActivityIndicator size="small" color={Colors.orange} style={styles.wishlistSpinner} />
+            )}
+          </RNView>
           <Text type="small" color={wished ? Colors.red : Colors.grayMidDark} style={styles.wishlistLabel}>
             {t("Ma liste")}
           </Text>
-        </TouchableOpacity>
+        </RNView>
 
         {/* Qty + add button (occasion has no stepper here — quantity is set in the sheet) */}
         <View flexDirection="row" alignItems="center" gap={10} style={styles.basketRow}>
@@ -627,21 +622,11 @@ const styles = StyleSheet.create({
   gallery: {
     height: 220,
     backgroundColor: Colors.white,
+  },
+  galleryEmpty: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-  },
-  galleryImage: {
-    width: "78%",
-    height: "78%",
-  },
-  galleryCounter: {
-    position: "absolute",
-    right: 16,
-    bottom: 10,
-    borderRadius: 14,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: "rgba(0,0,0,0.55)",
   },
 
   // Content card
@@ -741,6 +726,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     gap: 2,
   },
+  wishlistIconSlot: { width: 22, height: 22, alignItems: "center", justifyContent: "center" },
+  wishlistHeartHidden: { opacity: 0 },
+  wishlistSpinner: { position: "absolute" },
   wishlistLabel: { marginTop: 2 },
   basketRow: { flex: 1 },
   addBtnWrapper: { flex: 1 },

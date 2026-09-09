@@ -5,9 +5,8 @@
  * Figma: "Profile / Ma liste de souhaits" screen.
  *
  * Exactly ONE of (categoryId, pneumaticId) must be non-null.
- * `categoryId` should target a leaf (level-3) category (A-5).
- * TODO A-15: confirm whether the user wishes a leaf category type, a specific offer,
- * or an in-stock listing.
+ * Parts items are keyed by `productId` (`categoryId` is still populated with
+ * the product's leaf level-3 category); tyre items are keyed by `pneumaticId`.
  */
 export interface WishlistItem {
   id: number;
@@ -31,4 +30,14 @@ export interface WishlistItem {
   price?: number;
   articleNumber?: string;
   condition?: string;
+  /** Product id — set for product-keyed items; null/absent for tyre items. */
+  productId?: number | null;
+  /** Product title (French) — set for product-keyed items; absent for tyre items. */
+  productTitle?: string;
+  /** Product title (Arabic) — set for product-keyed items; absent for tyre items. */
+  productTitleAr?: string;
+  /** Product image URL — set for product-keyed items; absent for tyre items. */
+  productImage?: string | null;
+  /** Discounted price — set when the product has an active promo; absent otherwise. */
+  promoPrice?: number | null;
 }

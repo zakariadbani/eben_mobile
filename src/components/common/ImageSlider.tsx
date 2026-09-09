@@ -5,9 +5,10 @@ import { Text } from "./Text";
 
 interface ImageSliderProps {
   images: string[]; // Array of image URLs
+  resizeMode?: "cover" | "contain";
 }
 
-const ImageSlider: React.FC<ImageSliderProps> = ({ images }) => {
+const ImageSlider: React.FC<ImageSliderProps> = ({ images, resizeMode = "cover" }) => {
   const { t } = useTranslation();
   const [pageWidth, setPageWidth] = useState(0);
   const handleLayout = ({ nativeEvent }: LayoutChangeEvent) => {
@@ -31,6 +32,7 @@ const ImageSlider: React.FC<ImageSliderProps> = ({ images }) => {
           <Image
             source={{ uri: image }}
             style={styles.image}
+            resizeMode={resizeMode}
             accessibilityLabel={`${t("requestFlow.images")} ${index + 1}/${images.length}`}
           />
           <View style={styles.counterContainer}>
@@ -58,7 +60,6 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover", // or 'contain' depending on your needs
   },
   counterContainer: {
     position: "absolute",
