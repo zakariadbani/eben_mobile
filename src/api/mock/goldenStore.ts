@@ -187,7 +187,6 @@ function submitOffer(requestId: number, payload: SubmitOfferPayload) {
   const request = requestById(requestId);
   if (!['pending', 'offers_received'].includes(request.status)) throw new Error('Request is not open');
   const itemIds = new Set((request.items ?? []).map(({ id }) => id));
-  const submittedIds = payload.lines.map(({ requestItemId }) => requestItemId);
   const pricedLines = payload.lines.map((line) => {
     const priceFerrailleur = roundMoney(line.priceFerrailleur);
     return {
@@ -199,7 +198,6 @@ function submitOffer(requestId: number, payload: SubmitOfferPayload) {
   });
   if (
     !payload.lines.length ||
-    new Set(submittedIds).size !== submittedIds.length ||
     payload.lines.some(({ requestItemId }) => !itemIds.has(requestItemId)) ||
     pricedLines.some(({ priceFerrailleur, priceClient, priceBc }) =>
       [priceFerrailleur, priceClient, priceBc].some((price) => !Number.isFinite(price) || price <= 0)

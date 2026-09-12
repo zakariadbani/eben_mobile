@@ -193,7 +193,7 @@ describe('mock golden path', () => {
     await expect(createRequest({ vehicleId: 1, items: [{ ...validItem, quantity: 1.5 }] })).rejects.toThrow('Invalid request payload');
   });
 
-  it('rejects duplicate, foreign, and invalid offer lines', async () => {
+  it('rejects foreign and invalid offer lines but accepts several lines for one item', async () => {
     const created = await createRequest({
       vehicleId: 1,
       items: [{ categoryId: 100, quantity: 1, condition: 'occasion' }],
@@ -202,7 +202,9 @@ describe('mock golden path', () => {
     const itemId = (await getRequest(created.data.id)).data.items![0]!.id;
     const line = { requestItemId: itemId, priceFerrailleur: 10, condition: 'occasion' as const, description: null, images: [] };
 
-    await expect(submitOffer(created.data.id, { lines: [line, line] })).rejects.toThrow('Invalid offer lines');
+    await expect(submitOffer(created.data.id, { lines: [line, { ...line, priceFerrailleur: 12 }] })).resolves.toEqual(
+      expect.objectContaining({ data: expect.objectContaining({ success: true }) }),
+    );
     await expect(submitOffer(created.data.id, { lines: [{ ...line, requestItemId: 999999 }] })).rejects.toThrow('Invalid offer lines');
     await expect(submitOffer(created.data.id, { lines: [{ ...line, priceFerrailleur: Number.NaN }] })).rejects.toThrow('Invalid offer lines');
     await expect(submitOffer(created.data.id, { lines: [{ ...line, priceFerrailleur: 0 }] })).rejects.toThrow('Invalid offer lines');

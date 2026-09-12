@@ -6,8 +6,9 @@
  * The route param `offerId` is actually the incoming **requestId** for the
  * "fill new offer" path.  The screen:
  *
- *   1. Loads the incoming request (images, items, vehicle note, timer).
- *   2. For each request item the prestataire enters:
+ *   1. Loads the incoming request (images, items, vehicle note, timer) and
+ *      shows the focused item (?itemId, else the first item) in the header.
+ *   2. For that ONE item the prestataire enters one or more offers, each with:
  *        - Photos (ImageInputList)
  *        - Condition (en_stock | occasion) picker
  *        - Prix/pièce (priceFerrailleur — their net price; server derives ×1.06 / ×0.94)
@@ -31,8 +32,8 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
-  View as RNView,
   StyleSheet,
   TextInput as RNTextInput,
 } from 'react-native';
@@ -46,6 +47,8 @@ import Button from '@/components/common/Button';
 import ConfirmModal from '@/components/common/ConfirmModal';
 import CustomHeader from '@/components/common/CustomHeader';
 import ImageInputList from '@/components/common/ImageInputList';
+import ImageSlider from '@/components/common/ImageSlider';
+import Icon from '@/components/common/Icon';
 import AudioPlayer from '@/components/common/AudioPlayer';
 import PickerInput from '@/components/common/PickerInput';
 import Colors from '@/constants/Colors';
@@ -69,6 +72,8 @@ import type { PrestataireOffer } from '@/interfaces/Offer';
 type ConditionOption = 'en_stock' | 'occasion';
 
 interface OfferLine {
+  /** Client-side identity — stable across add/remove so collapse state survives renumbering. */
+  key: number;
   requestItemId: number;
   priceFerrailleur: string; // raw string while editing; parsed on submit
   condition: ConditionOption;
@@ -134,6 +139,8 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [offerLines, setOfferLines] = useState<OfferLine[]>([]);
+  const [collapsedLineKeys, setCollapsedLineKeys] = useState<Record<number, boolean>>({});
+  const nextLineKeyRef = useRef(1);
   const [lineErrors, setLineErrors] = useState<OfferLineErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [uploadedPaths, setUploadedPaths] = useState<Record<string, string>>({});
@@ -164,16 +171,10 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   const hasValidFocusedItemId = focusedItemIdParam !== null && Number.isSafeInteger(focusedItemIdParam) && focusedItemIdParam > 0;
   const focusedItem = hasValidFocusedItemId ? items.find((it) => it.id === focusedItemIdParam) ?? null : null;
   const headerItem = focusedItem ?? items[0] ?? null;
-  const offerScrollRef = useRef<ScrollView>(null);
-  const hasScrolledToFocusedRef = useRef(false);
-
-  useEffect(() => { hasScrolledToFocusedRef.current = false; }, [focusedItem?.id]);
-
-  const handleFocusedLineLayout = (event: { nativeEvent: { layout: { y: number } } }) => {
-    if (hasScrolledToFocusedRef.current) return;
-    hasScrolledToFocusedRef.current = true;
-    offerScrollRef.current?.scrollTo?.({ y: Math.max(0, event.nativeEvent.layout.y - 16), animated: true });
-  };
+  const headerBrand = headerItem
+    ? (isArabic ? headerItem.brandNameAr ?? headerItem.brandName : headerItem.brandName)
+    : null;
+  const isExpired = countdownLabel === t('partner.offer.statusExpired');
 
   useEffect(() => {
     if (state === 'decline') setDeclineVisible(true);
@@ -195,6 +196,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
         const ownedOffer = offerRes.data;
         setExistingOffer(ownedOffer);
         setOfferLines([{
+          key: nextLineKeyRef.current++,
           requestItemId: ownedOffer.requestItemId,
           priceFerrailleur: String(ownedOffer.priceFerrailleur),
           condition: ownedOffer.condition,
@@ -213,17 +215,20 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
       const found = res.data.find((r) => r.id === requestId) ?? null;
       setRequest(found);
 
-      if (found?.items) {
-        setOfferLines(
-          found.items.map((item) => ({
-            requestItemId: item.id,
-            priceFerrailleur: '',
-            condition: item.condition,
-            description: '',
-            images: [],
-          })),
-        );
-      }
+      // The screen is about ONE part: the focused item (from ?itemId) or the
+      // first item. The partner may add several offers for that same item.
+      const target = (hasValidFocusedItemId
+        ? found?.items?.find((it) => it.id === focusedItemIdParam)
+        : undefined) ?? found?.items?.[0];
+      setCollapsedLineKeys({});
+      setOfferLines(target ? [{
+        key: nextLineKeyRef.current++,
+        requestItemId: target.id,
+        priceFerrailleur: '',
+        condition: target.condition,
+        description: '',
+        images: [],
+      }] : []);
     } catch {
       setLoadError(t('partner.fill.loadError'));
     } finally {
@@ -231,7 +236,9 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
     }
   }, [
     existingOfferIdNum,
+    focusedItemIdParam,
     hasValidExistingOfferId,
+    hasValidFocusedItemId,
     hasValidRequestId,
     isResendMode,
     requestId,
@@ -263,6 +270,45 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
       else next[index] = nextLineErrors;
       return next;
     });
+  };
+
+  const addLine = () => {
+    const template = offerLines[0];
+    if (!template) return;
+    setOfferLines((prev) => [...prev, {
+      key: nextLineKeyRef.current++,
+      requestItemId: template.requestItemId,
+      priceFerrailleur: '',
+      condition: template.condition,
+      description: '',
+      images: [],
+    }]);
+  };
+
+  const removeLine = (index: number) => {
+    const removed = offerLines[index];
+    if (!removed || offerLines.length <= 1) return;
+    setOfferLines((prev) => prev.filter((_, i) => i !== index));
+    setCollapsedLineKeys((prev) => {
+      const next = { ...prev };
+      delete next[removed.key];
+      return next;
+    });
+    // Errors are indexed by position (mirrors the API's lines.<index>.<field>),
+    // so drop the removed slot and shift the ones after it down by one.
+    setLineErrors((prev) => {
+      const next: OfferLineErrors = {};
+      for (const [rawIndex, errors] of Object.entries(prev)) {
+        const i = Number(rawIndex);
+        if (i < index) next[i] = errors;
+        else if (i > index) next[i - 1] = errors;
+      }
+      return next;
+    });
+  };
+
+  const toggleLineCollapsed = (key: number) => {
+    setCollapsedLineKeys((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   // ── Submit ─────────────────────────────────────────────────────────────────
@@ -443,7 +489,6 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
         keyboardVerticalOffset={80}
       >
         <ScrollView
-          ref={offerScrollRef}
           style={isResendMode ? styles.resendScroll : undefined}
           contentContainerStyle={[
             styles.scrollContent,
@@ -451,112 +496,133 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
           ]}
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Request images ── */}
-          {!isResendMode && (request?.images?.length ?? 0) > 0 && (
-            <View style={styles.heroImageRow} flexDirection="row">
-              {request?.images?.slice(0, 3).map((uri, i) => (
-                <Image key={`img-${i}`} source={{ uri }} style={styles.heroImageWrapper} resizeMode="cover" />
-              ))}
-            </View>
+          {/* ── Hero: full-width request image carousel (Figma "1/6" counter) ── */}
+          {!isResendMode && (
+            (request?.images?.length ?? 0) > 0 ? (
+              <View style={styles.heroContainer}>
+                <ImageSlider images={request?.images ?? []} />
+              </View>
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <Text color={Colors.grayMidDark}>requestFlow.noPhoto</Text>
+              </View>
+            )
           )}
 
-          {/* ── Vehicle / request info block ── */}
-          {!isResendMode && <View style={styles.infoBlock} gap={6}>
-            <Text type="small" semiBold color={Colors.brand}>
-              {`${t('partner.offerDetail.ref')} ${request?.reference}`}
-            </Text>
-            {headerItem ? (
-              <>
-                <Text type="textTwo" semiBold translate={false}>
-                  {isArabic ? headerItem.categoryTitleAr ?? headerItem.categoryTitle : headerItem.categoryTitle}
+          {/* ── Part info block (Figma: name, brand, Condition, Qty, vehicle chip, ref) ── */}
+          {!isResendMode && headerItem ? (
+            <View style={styles.infoBlock} gap={8}>
+              <Text type="text" semiBold color={Colors.brand} translate={false}>
+                {isArabic ? headerItem.categoryTitleAr ?? headerItem.categoryTitle : headerItem.categoryTitle}
+              </Text>
+              {headerBrand ? (
+                <Text type="small" color={Colors.grayMidDark} translate={false}>
+                  {t('requestList.brand', { value: headerBrand })}
                 </Text>
-                {(isArabic ? headerItem.brandNameAr ?? headerItem.brandName : headerItem.brandName) ? (
-                  <Text type="label" color={Colors.grayMidDark} translate={false}>
-                    {t('requestList.brand', { value: isArabic ? headerItem.brandNameAr ?? headerItem.brandName : headerItem.brandName })}
-                  </Text>
-                ) : null}
-                <View flexDirection="row" alignItems="center" gap={14}>
-                  <Text type="label" translate={false}>
-                    {`${t('partner.offerDetail.condition')} ${t(headerItem.condition === 'occasion' ? 'partner.fill.conditionOccasion' : 'partner.fill.conditionEnStock')}`}
-                  </Text>
-                  <Text type="label" translate={false}>{`${t('partner.offerDetail.qty')} ${headerItem.quantity}`}</Text>
-                </View>
-              </>
-            ) : null}
-            {request?.notes ? (
-              <View style={styles.noteBox} gap={4}>
-                <Text type="small" semiBold color={Colors.brand}>
-                  {t('partner.fill.clientGeneralNote')}
+              ) : null}
+              <View flexDirection="row" alignItems="center" gap={6}>
+                <Icon name="check-circle" type="Feather" size={20} iconColor={Colors.brand} />
+                <Text type="label" translate={false}>
+                  {`${t('partner.offerDetail.condition')} ${t(headerItem.condition === 'occasion' ? 'partner.fill.conditionOccasion' : 'partner.fill.conditionEnStock')}`}
                 </Text>
+              </View>
+              <Text type="label" translate={false}>{`${t('partner.offerDetail.qty')} ${headerItem.quantity}`}</Text>
+              {/* Request only carries vehicleId (no label) — same fallback copy as ship.tsx */}
+              <View style={styles.vehicleCard} flexDirection="row" alignItems="center" gap={12}>
+                <Icon name="car-side" type="MaterialCommunityIcons" size={31} iconColor={Colors.black} />
+                <Text type="label" flex>{t('partner.ship.vehicleFallback')}</Text>
+              </View>
+              <Text type="small" color={Colors.grayMidDark} translate={false}>
+                {`${t('partner.offerDetail.ref')} ${request?.reference ?? ''}`}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* ── Client note ── */}
+          {!isResendMode && request?.notes ? (
+            <View style={styles.noteBlock} gap={6}>
+              <Text type="small" semiBold color={Colors.brand}>
+                {t('partner.fill.clientGeneralNote')}
+              </Text>
+              <View style={styles.noteBox}>
                 <Text type="small" color={Colors.grayMidDark} translate={false}>
                   {request.notes}
                 </Text>
               </View>
-            ) : null}
-          </View>}
+            </View>
+          ) : null}
 
           {isResendMode ? <View style={styles.sheetHandle} /> : null}
 
-          {/* ── Section header: fill offer ── */}
-          <View style={styles.sectionHeader} flexDirection="row" alignItems="center" gap={12}>
+          {/* ── Section header: fill offer + countdown ── */}
+          <View
+            style={[styles.sectionHeader, isResendMode ? undefined : styles.bodyPadding]}
+            flexDirection="row"
+            alignItems="center"
+            justifyContent="space-between"
+            gap={12}
+          >
             <Text type="text" semiBold color={Colors.brand}>
               {isResendMode ? 'partner.fill.sectionResend' : 'partner.fill.sectionFill'}
             </Text>
-            {!isResendMode && (
-              <View style={[
-                styles.timerBadge,
-                countdownLabel === t('partner.offer.statusExpired')
-                  ? styles.timerBadgeExpired
-                  : styles.timerBadgeActive,
-              ]}>
-                <Text
-                  type="small"
-                  semiBold
-                  color={countdownLabel === t('partner.offer.statusExpired') ? Colors.grayMidDark : Colors.noticeUnread}
-                  translate={false}
-                >
+            {!isResendMode && countdownDisplay ? (
+              <View flexDirection="row" alignItems="center" gap={4}>
+                <Text type="label" semiBold color={isExpired ? Colors.grayMidDark : Colors.red} translate={false}>
                   {countdownDisplay}
                 </Text>
-                <Text
-                  type="small"
-                  color={countdownLabel === t('partner.offer.statusExpired') ? Colors.grayMidDark : Colors.noticeUnread}
-                >
-                  partner.fill.timerRestante
-                </Text>
+                {!isExpired ? (
+                  <Text type="label" semiBold color={Colors.red}>partner.fill.timerRestante</Text>
+                ) : null}
               </View>
-            )}
+            ) : null}
           </View>
 
           {/* ── Offer lines ── */}
+          <View style={isResendMode ? undefined : styles.bodyPadding}>
           {offerLines.map((line, index) => {
-            const item = items.find((it) => it.id === line.requestItemId);
-            const categoryLabel = item
-              ? isArabic
-                ? item.categoryTitleAr ?? item.categoryTitle ?? '—'
-                : item.categoryTitle ?? '—'
-              : '—';
-
             const condItem = conditionItems.find((c) => c.value === line.condition);
-            const isFocusedLine = !isResendMode && focusedItem != null && item?.id === focusedItem.id;
-            const brandLabel = item ? (isArabic ? item.brandNameAr ?? item.brandName : item.brandName) : null;
+            const isCollapsed = !isResendMode && collapsedLineKeys[line.key] === true;
+            const canRemove = !isResendMode && offerLines.length > 1;
 
             return (
-              <RNView
-                key={line.requestItemId}
-                testID={isFocusedLine ? `fill-line-${line.requestItemId}-focused` : undefined}
-                onLayout={isFocusedLine ? handleFocusedLineLayout : undefined}
-              >
-                <View style={[styles.offerCard, isResendMode ? styles.resendOfferCard : undefined, isFocusedLine ? styles.offerCardFocused : undefined]} gap={12}>
+                <View key={line.key} style={[styles.offerCard, isResendMode ? styles.resendOfferCard : undefined]} gap={12}>
                 {/* Card header */}
                 <View flexDirection="row" alignItems="center" justifyContent="space-between" gap={8}>
-                  <View style={styles.offerIndexBadge}>
-                    <Text type="small" semiBold color={Colors.brand} translate={false}>
-                      {t('partner.fill.offerNumber', { count: index + 1 })}
-                    </Text>
-                  </View>
+                  {isResendMode ? (
+                    <View style={styles.offerIndexBadge}>
+                      <Text type="small" semiBold color={Colors.brand} translate={false}>
+                        {t('partner.fill.offerNumber', { count: index + 1 })}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Pressable
+                      onPress={() => toggleLineCollapsed(line.key)}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: !isCollapsed }}
+                      accessibilityLabel={t('partner.fill.offerLabel', { count: index + 1 })}
+                      style={styles.offerToggle}
+                    >
+                      <View flexDirection="row" alignItems="center" gap={12}>
+                        <Icon name={isCollapsed ? 'plus' : 'minus'} type="Feather" size={22} iconColor={Colors.brand} />
+                        <Text type="text" semiBold color={Colors.brand} translate={false}>
+                          {t('partner.fill.offerLabel', { count: index + 1 })}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  )}
                   {isResendMode && (
                     <View style={styles.checkboxPlaceholder} />
                   )}
+                  {canRemove ? (
+                    <Pressable
+                      onPress={() => removeLine(index)}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('partner.fill.removeOffer', { count: index + 1 })}
+                      hitSlop={8}
+                    >
+                      <Icon name="trash-2" type="Feather" size={22} iconColor={Colors.brand} />
+                    </Pressable>
+                  ) : null}
                 </View>
 
                 {isResendMode && existingOffer && index === 0 && (
@@ -608,23 +674,8 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                     </View>
                 )}
 
-                {!isResendMode && (
+                {!isResendMode && !isCollapsed && (
                   <>
-                    <View style={styles.partNameRow} flexDirection="row" alignItems="center" gap={6}>
-                      <Text type="small" color={Colors.grayMidDark} translate={false}>
-                        {categoryLabel}
-                      </Text>
-                      {item?.quantity ? (
-                        <Text type="small" color={Colors.gray} translate={false}>
-                          {`× ${item.quantity}`}
-                        </Text>
-                      ) : null}
-                    </View>
-                    {brandLabel ? (
-                      <Text type="small" color={Colors.gray} translate={false}>
-                        {t('requestList.brand', { value: brandLabel })}
-                      </Text>
-                    ) : null}
                     <View gap={4}>
                       <Text type="small" color={Colors.grayMidDark}>partner.fill.addPhotos</Text>
                       <ImageInputList
@@ -698,14 +749,27 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                   </>
                 )}
                 </View>
-              </RNView>
-
             );
           })}
+
+          {!isResendMode && offerLines.length > 0 ? (
+            <Pressable
+              onPress={addLine}
+              accessibilityRole="button"
+              accessibilityLabel={t('partner.fill.addAnotherOffer')}
+              style={styles.addLineButton}
+            >
+              <View flexDirection="row" alignItems="center" gap={12}>
+                <Icon name="plus" type="Feather" size={20} iconColor={Colors.grayMidDark} />
+                <Text type="label" color={Colors.grayMidDark}>partner.fill.addAnotherOffer</Text>
+              </View>
+            </Pressable>
+          ) : null}
 
           {submitError ? (
             <Text type="small" color={Colors.red} center translate={false}>{submitError}</Text>
           ) : null}
+          </View>
 
           {/* Spacer at bottom so content clears fixed action bar */}
           <View style={styles.bottomSpacer} />
@@ -823,10 +887,12 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
+  // Hero slider is edge-to-edge, so horizontal padding lives on the inner blocks.
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
     paddingBottom: 24,
+  },
+  bodyPadding: {
+    paddingHorizontal: 16,
   },
   resendScroll: {
     backgroundColor: Colors.white,
@@ -835,7 +901,44 @@ const styles = StyleSheet.create({
     marginTop: -40,
   },
   resendScrollContent: {
+    paddingHorizontal: 16,
     paddingTop: 28,
+  },
+  heroContainer: {
+    height: 185,
+    overflow: 'hidden',
+  },
+  imagePlaceholder: {
+    height: 185,
+    backgroundColor: Colors.backgroundGray,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vehicleCard: {
+    marginTop: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderRadius: 6,
+    backgroundColor: Colors.white,
+    shadowColor: Colors.gray,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.14,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  noteBlock: {
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  offerToggle: {
+    flex: 1,
+    paddingVertical: 4,
+  },
+  addLineButton: {
+    paddingVertical: 12,
+    marginBottom: 8,
   },
   sheetHandle: {
     width: 120,
@@ -845,18 +948,10 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 24,
   },
-  heroImageRow: {
-    height: 180,
-    backgroundColor: Colors.backgroundGray,
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  heroImageWrapper: {
-    flex: 1,
-  },
   infoBlock: {
-    marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    marginBottom: 20,
   },
   resendImages: {
     flexDirection: 'row',
@@ -876,20 +971,6 @@ const styles = StyleSheet.create({
   sectionHeader: {
     marginBottom: 12,
   },
-  timerBadge: {
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    flexDirection: 'row',
-    gap: 4,
-    alignItems: 'center',
-  },
-  timerBadgeActive: {
-    backgroundColor: Colors.noticeRead,
-  },
-  timerBadgeExpired: {
-    backgroundColor: Colors.backgroundGray,
-  },
   offerCard: {
     backgroundColor: Colors.white,
     borderRadius: 10,
@@ -900,10 +981,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 4,
     elevation: 2,
-  },
-  offerCardFocused: {
-    borderWidth: 2,
-    borderColor: Colors.brand,
   },
   resendOfferCard: {
     borderRadius: 0,
@@ -925,11 +1002,6 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     borderWidth: 1,
     borderColor: Colors.borderLight,
-  },
-  partNameRow: {
-    paddingBottom: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.backgroundGray,
   },
   priceRow: {
     alignItems: 'center',

@@ -264,7 +264,7 @@ beforeEach(async () => {
   mockShipOffer.mockResolvedValue({ success: true, data: { offerId: 401, shipped: true } });
 });
 
-it("focuses the requested line and header when opened with itemId, and shows each line's brand", async () => {
+it("shows only the requested part in the header when opened with itemId, with a single offer line", async () => {
   const requestWithBrand = {
     ...incomingRequest,
     items: [
@@ -276,11 +276,12 @@ it("focuses the requested line and header when opened with itemId, and shows eac
   mockParams = { offerId: "33", itemId: "9" };
   const screen = render(<OfferFillScreen />);
 
-  expect(await screen.findAllByText("Disques")).toHaveLength(2);
-  expect(screen.getAllByText(i18n.t("requestList.brand", { value: "Brembo" }))).toHaveLength(2);
-  expect(screen.getByText(i18n.t("requestList.brand", { value: "RIDEX" }))).toBeTruthy();
-  expect(screen.getByTestId("fill-line-9-focused")).toBeTruthy();
-  expect(screen.queryByTestId("fill-line-8-focused")).toBeNull();
+  expect(await screen.findAllByText("Disques")).toHaveLength(1);
+  expect(screen.getAllByText(i18n.t("requestList.brand", { value: "Brembo" }))).toHaveLength(1);
+  expect(screen.queryByText("Plaquettes")).toBeNull();
+  expect(screen.queryByText(i18n.t("requestList.brand", { value: "RIDEX" }))).toBeNull();
+  expect(screen.getAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"))).toHaveLength(1);
+  expect(screen.getByText(i18n.t("partner.ship.vehicleFallback"))).toBeTruthy();
 });
 
 it("falls back to the default header when itemId does not match any request line", async () => {
@@ -295,10 +296,32 @@ it("falls back to the default header when itemId does not match any request line
   mockParams = { offerId: "33", itemId: "9999" };
   const screen = render(<OfferFillScreen />);
 
-  expect(await screen.findAllByText("Plaquettes")).toHaveLength(2);
-  expect(screen.getAllByText(i18n.t("requestList.brand", { value: "RIDEX" }))).toHaveLength(2);
-  expect(screen.queryByTestId("fill-line-8-focused")).toBeNull();
-  expect(screen.queryByTestId("fill-line-9-focused")).toBeNull();
+  expect(await screen.findAllByText("Plaquettes")).toHaveLength(1);
+  expect(screen.getAllByText(i18n.t("requestList.brand", { value: "RIDEX" }))).toHaveLength(1);
+  expect(screen.queryByText("Disques")).toBeNull();
+  expect(screen.getAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"))).toHaveLength(1);
+});
+
+it("renders the request images in the shared hero slider", async () => {
+  const screen = render(<OfferFillScreen />);
+
+  expect(await screen.findByTestId("image-slider")).toBeTruthy();
+  expect(screen.queryByText(i18n.t("requestFlow.noPhoto"))).toBeNull();
+});
+
+it("adds a second offer line for the same part and removes it again", async () => {
+  const screen = render(<OfferFillScreen />);
+  expect(await screen.findAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"))).toHaveLength(1);
+  expect(screen.queryByRole("button", { name: i18n.t("partner.fill.removeOffer", { count: 1 }) })).toBeNull();
+
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.addAnotherOffer") }));
+  expect(screen.getAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"))).toHaveLength(2);
+  expect(screen.getByText(i18n.t("partner.fill.offerLabel", { count: 2 }))).toBeTruthy();
+
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.removeOffer", { count: 2 }) }));
+  expect(screen.getAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"))).toHaveLength(1);
+  expect(screen.queryByRole("button", { name: i18n.t("partner.fill.removeOffer", { count: 1 }) })).toBeNull();
+  expect(screen.queryByText(i18n.t("partner.fill.offerLabel", { count: 2 }))).toBeNull();
 });
 
 it("labels the client's request note with the general note key", async () => {
@@ -310,7 +333,10 @@ it("labels the client's request note with the general note key", async () => {
 
 it("requires a positive raw price and at least one image for every offer line", async () => {
   const screen = render(<OfferFillScreen />);
-  const priceInputs = await screen.findAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"));
+  expect(await screen.findAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"))).toHaveLength(1);
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.addAnotherOffer") }));
+  const priceInputs = screen.getAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"));
+  expect(priceInputs).toHaveLength(2);
   expect(screen.getByText(i18n.t("partner.fill.title"))).toBeTruthy();
   expect(screen.queryByText(i18n.t("partner.fill.openDetailTitle"))).toBeNull();
   fireEvent.changeText(priceInputs[0], "250");
@@ -333,7 +359,9 @@ it("surfaces a generic upload failure immediately", async () => {
   mockNextImageUris = ["file:///a.jpg", "file:///b.jpg"];
   mockUploadLocalImages.mockRejectedValueOnce(new Error("upload failed"));
   const screen = render(<OfferFillScreen />);
-  const addButtons = await screen.findAllByRole("button", { name: i18n.t("requestFlow.addImage") });
+  await screen.findAllByRole("button", { name: i18n.t("requestFlow.addImage") });
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.addAnotherOffer") }));
+  const addButtons = screen.getAllByRole("button", { name: i18n.t("requestFlow.addImage") });
   fireEvent.press(addButtons[0]);
   fireEvent.press(addButtons[1]);
   const priceInputs = screen.getAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"));
@@ -355,7 +383,9 @@ it("uploads multi-line local images in order, submits raw prices only, and retri
     .mockRejectedValueOnce(new ApiClientError("Validation failed", 422, { "lines.0.priceFerrailleur": ["Prix refusé"] }))
     .mockResolvedValueOnce({ success: true, data: { success: true, offerId: 402 } });
   const screen = render(<OfferFillScreen />);
-  const addButtons = await screen.findAllByRole("button", { name: i18n.t("requestFlow.addImage") });
+  await screen.findAllByRole("button", { name: i18n.t("requestFlow.addImage") });
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.addAnotherOffer") }));
+  const addButtons = screen.getAllByRole("button", { name: i18n.t("requestFlow.addImage") });
   fireEvent.press(addButtons[0]);
   fireEvent.press(addButtons[1]);
   const priceInputs = screen.getAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"));
@@ -369,7 +399,7 @@ it("uploads multi-line local images in order, submits raw prices only, and retri
   expect(mockSubmitOffer).toHaveBeenCalledWith(33, {
     lines: [
       { requestItemId: 8, priceFerrailleur: 250, condition: "occasion", description: null, images: ["tmp/mobile/14/a.jpg"] },
-      { requestItemId: 9, priceFerrailleur: 300.5, condition: "en_stock", description: null, images: ["tmp/mobile/14/b.png"] },
+      { requestItemId: 8, priceFerrailleur: 300.5, condition: "occasion", description: null, images: ["tmp/mobile/14/b.png"] },
     ],
   });
   expect(mockSubmitOffer.mock.calls[0]?.[1]).not.toEqual(expect.objectContaining({ priceClient: expect.anything() }));
