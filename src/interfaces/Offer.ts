@@ -68,6 +68,8 @@ export interface ClientOfferItem extends ClientOffer {
   categoryTitleAr?: string;
   categoryImage?: string | null;
   ferrailleurName?: string;
+  brandName?: string | null;
+  brandNameAr?: string | null;
 }
 
 /**
@@ -93,6 +95,8 @@ export interface PrestataireOffer
   categoryTitleAr: string | null;
   categoryImage: string | null;
   ferrailleurName: string | null;
+  brandName: string | null;
+  brandNameAr: string | null;
   /** Canonical backend decision: an unshipped purchase order currently accepts shipment. */
   shippingEligible: boolean;
 }

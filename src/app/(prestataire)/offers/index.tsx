@@ -18,6 +18,7 @@ import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
 import ItemIncomingRequestCard from "@/components/screens/prestataire/ItemIncomingRequestCard";
 import ItemPartnerOfferCard from "@/components/screens/prestataire/ItemPartnerOfferCard";
+import { flattenIncoming } from "@/helpers/flattenIncoming";
 import Colors from "@/constants/Colors";
 import type { PrestataireOffer } from "@/interfaces/Offer";
 import type { Request } from "@/interfaces/Request";
@@ -115,15 +116,31 @@ export default function PrestataireOffersScreen(): React.ReactElement {
     return Array.from(labels, ([categoryId, label]) => ({ key: `category:${categoryId}`, label }));
   }, [incoming, isArabic]);
 
-  const visibleIncoming = useMemo(() => {
+  const visiblePairs = useMemo(() => {
     const categoryId = selectedFilter.startsWith("category:")
       ? Number(selectedFilter.slice("category:".length))
       : null;
+    const pairs = flattenIncoming(incoming);
     const filtered = categoryId !== null && Number.isInteger(categoryId)
-      ? incoming.filter((request) => request.items?.some((item) => item.categoryId === categoryId))
-      : incoming;
-    return [...filtered].sort((a, b) => sortAsc ? a.id - b.id : b.id - a.id);
+      ? pairs.filter(({ item }) => item.categoryId === categoryId)
+      : pairs;
+    return [...filtered].sort((a, b) => sortAsc ? a.request.id - b.request.id : b.request.id - a.request.id);
   }, [incoming, selectedFilter, sortAsc]);
+
+  const groupedIncoming = useMemo(() => {
+    const groups = new Map<number, { categoryId: number; label: string; pairs: typeof visiblePairs }>();
+    visiblePairs.forEach((pair) => {
+      const label = isArabic
+        ? pair.item.categoryTitleAr ?? pair.item.categoryTitle
+        : pair.item.categoryTitle;
+      const existing = groups.get(pair.item.categoryId);
+      if (existing) existing.pairs.push(pair);
+      else groups.set(pair.item.categoryId, { categoryId: pair.item.categoryId, label: label ?? t("partner.offers.unknownPart"), pairs: [pair] });
+    });
+    return Array.from(groups.values());
+  }, [visiblePairs, isArabic, t]);
+
+  const incomingPartsCount = useMemo(() => flattenIncoming(incoming).length, [incoming]);
 
   const renderHeader = (title: string, onBack: () => void) => (
     <View style={styles.header} flexDirection="row" alignItems="center">
@@ -159,7 +176,7 @@ export default function PrestataireOffersScreen(): React.ReactElement {
   const renderHub = () => {
     const menu = [
       { key: "accepted" as const, icon: "file-check-outline", count: accepted.length, label: t("partner.offers.acceptedTitle") },
-      { key: "incoming" as const, icon: "file-clock-outline", count: incoming.length, label: t("partner.offers.openTitle") },
+      { key: "incoming" as const, icon: "file-clock-outline", count: incomingPartsCount, label: t("partner.offers.openTitle") },
       { key: "sent" as const, icon: "file-send-outline", count: sent.length, label: t("partner.offers.sentTitle") },
     ];
     const stats = [
@@ -241,7 +258,14 @@ export default function PrestataireOffersScreen(): React.ReactElement {
             <TouchableOpacity style={styles.smallButton} onPress={() => void load()} accessibilityRole="button"><Text type="labelTwo" semiBold>{t("partner.offers.retry")}</Text></TouchableOpacity>
           </View>
         ) : view === "incoming" ? (
-          visibleIncoming.length > 0 ? visibleIncoming.map((item) => <ItemIncomingRequestCard key={item.id} item={item} />) : <Text center color={Colors.gray}>{t("partner.offers.empty.incoming")}</Text>
+          groupedIncoming.length > 0 ? groupedIncoming.map((group) => (
+            <View key={group.categoryId} style={styles.categoryGroup}>
+              <Text type="titleTwo" semiBold translate={false} style={isArabic ? styles.textRtl : undefined}>{group.label}</Text>
+              {group.pairs.map(({ request, item }) => (
+                <ItemIncomingRequestCard key={`${request.id}-${item.id}`} request={request} item={item} />
+              ))}
+            </View>
+          )) : <Text center color={Colors.gray}>{t("partner.offers.empty.incoming")}</Text>
         ) : visibleOffers.length > 0 ? (
           visibleOffers.map((item) => (
             <ItemPartnerOfferCard
@@ -327,6 +351,7 @@ const styles = StyleSheet.create({
   statCard: { width: "30.7%", minHeight: 100, padding: 8, borderRadius: 7, backgroundColor: Colors.white, shadowColor: Colors.gray, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.18, shadowRadius: 5, elevation: 3 },
   statLabel: { minHeight: 42, marginTop: 5 },
   listContent: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 110 },
+  categoryGroup: { marginBottom: 8 },
   listTools: { marginBottom: 18 },
   toolButton: { width: 43, height: 43, alignItems: "center", justifyContent: "center" },
   loader: { marginVertical: 80 },

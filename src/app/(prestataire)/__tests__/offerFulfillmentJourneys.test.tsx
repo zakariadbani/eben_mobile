@@ -229,6 +229,8 @@ const offer = {
   categoryTitleAr: "Plaquettes AR",
   categoryImage: null,
   ferrailleurName: "Garage",
+  brandName: null,
+  brandNameAr: null,
   shippingEligible: true,
 } satisfies PrestataireOffer;
 const shipment = {
@@ -260,6 +262,50 @@ beforeEach(async () => {
   mockDeclineRequest.mockResolvedValue({ success: true, data: { success: true, requestId: 33 } });
   mockResendOffer.mockResolvedValue({ success: true, data: { success: true, offerId: 401 } });
   mockShipOffer.mockResolvedValue({ success: true, data: { offerId: 401, shipped: true } });
+});
+
+it("focuses the requested line and header when opened with itemId, and shows each line's brand", async () => {
+  const requestWithBrand = {
+    ...incomingRequest,
+    items: [
+      { ...incomingRequest.items[0], brandId: 1, brandName: "RIDEX", brandNameAr: "ريدكس" },
+      { ...incomingRequest.items[1], brandId: 2, brandName: "Brembo", brandNameAr: "بريمبو" },
+    ],
+  };
+  mockGetIncoming.mockResolvedValue({ success: true, data: [requestWithBrand], pagination });
+  mockParams = { offerId: "33", itemId: "9" };
+  const screen = render(<OfferFillScreen />);
+
+  expect(await screen.findAllByText("Disques")).toHaveLength(2);
+  expect(screen.getAllByText(i18n.t("requestList.brand", { value: "Brembo" }))).toHaveLength(2);
+  expect(screen.getByText(i18n.t("requestList.brand", { value: "RIDEX" }))).toBeTruthy();
+  expect(screen.getByTestId("fill-line-9-focused")).toBeTruthy();
+  expect(screen.queryByTestId("fill-line-8-focused")).toBeNull();
+});
+
+it("falls back to the default header when itemId does not match any request line", async () => {
+  const requestWithBrand = {
+    ...incomingRequest,
+    items: [
+      { ...incomingRequest.items[0], brandId: 1, brandName: "RIDEX", brandNameAr: "ريدكس" },
+      { ...incomingRequest.items[1], brandId: 2, brandName: "Brembo", brandNameAr: "بريمبو" },
+    ],
+  };
+  mockGetIncoming.mockResolvedValue({ success: true, data: [requestWithBrand], pagination });
+  mockParams = { offerId: "33", itemId: "9999" };
+  const screen = render(<OfferFillScreen />);
+
+  expect(await screen.findAllByText("Plaquettes")).toHaveLength(2);
+  expect(screen.getAllByText(i18n.t("requestList.brand", { value: "RIDEX" }))).toHaveLength(2);
+  expect(screen.queryByTestId("fill-line-8-focused")).toBeNull();
+  expect(screen.queryByTestId("fill-line-9-focused")).toBeNull();
+});
+
+it("labels the client's request note with the general note key", async () => {
+  const screen = render(<OfferFillScreen />);
+
+  expect(await screen.findByText(i18n.t("partner.fill.clientGeneralNote"))).toBeTruthy();
+  expect(screen.getByText("Two requested parts")).toBeTruthy();
 });
 
 it("requires a positive raw price and at least one image for every offer line", async () => {
@@ -404,6 +450,20 @@ it("labels an offer with no seller photo instead of showing a different part", a
 
   expect(await screen.findByText(i18n.t("requestFlow.noPhoto"))).toBeTruthy();
   expect(screen.queryByTestId("image-slider")).toBeNull();
+});
+
+it("keeps every description line visible when a canonical category title is shown", async () => {
+  mockParams = { offerId: "401" };
+  mockGetOffer.mockResolvedValueOnce({
+    success: true,
+    data: { ...offer, description: "Ligne info\nLigne détail\nLigne remarque" },
+  });
+  const screen = render(<OfferDetailScreen />);
+
+  expect(await screen.findByText("Plaquettes")).toBeTruthy();
+  expect(screen.getByText("Ligne info")).toBeTruthy();
+  expect(screen.getByText(/Ligne détail/)).toBeTruthy();
+  expect(screen.getByText(/Ligne remarque/)).toBeTruthy();
 });
 
 it("offers the existing resend flow from a rejected offer detail", async () => {

@@ -146,6 +146,25 @@ describe('mock golden path', () => {
     })).rejects.toThrow('Invalid request payload');
   });
 
+  it('carries brand fields through to prestataire and client offers', async () => {
+    const created = await createRequest({
+      vehicleId: 1,
+      items: [{ categoryId: 100, quantity: 1, condition: 'occasion', brandId: 1 }],
+    });
+    await sendRequest(created.data.id);
+    const itemId = (await getRequest(created.data.id)).data.items![0]!.id;
+    await submitOffer(created.data.id, {
+      lines: [{ requestItemId: itemId, priceFerrailleur: 100, condition: 'occasion', description: null, images: [] }],
+    });
+
+    const partnerOffers = (await getPrestataireOffers('active')).data
+      .filter(({ requestId }) => requestId === created.data.id);
+    expect(partnerOffers[0]).toEqual(expect.objectContaining({ brandName: 'RIDEX', brandNameAr: 'ريدكس' }));
+
+    const clientOffers = await getOffers(created.data.id);
+    expect(clientOffers.data[0]).toEqual(expect.objectContaining({ brandName: 'RIDEX', brandNameAr: 'ريدكس' }));
+  });
+
   it('persists vehicle and address mutations through their route-aware endpoints', () => {
     const vehicle = handleGoldenRequest('POST', '/vehicles', { brandId: 1, modelId: 1, year: 2024 });
     expect(handleGoldenRequest('GET', '/vehicles')).toMatchObject({ data: expect.arrayContaining([expect.objectContaining({ id: (vehicle as { data: { id: number } }).data.id })]) });

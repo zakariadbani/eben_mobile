@@ -32,6 +32,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  View as RNView,
   StyleSheet,
   TextInput as RNTextInput,
 } from 'react-native';
@@ -99,11 +100,12 @@ function mapOfferLineErrors(errors: Record<string, string[]>): OfferLineErrors {
 
 export default function PrestataireOfferFillScreen(): React.ReactElement {
   const router = useRouter();
-  const { offerId, mode, existingOfferId, state } = useLocalSearchParams<{
+  const { offerId, mode, existingOfferId, state, itemId } = useLocalSearchParams<{
     offerId: string;
     mode?: string;
     existingOfferId?: string;
     state?: string;
+    itemId?: string;
   }>();
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
@@ -157,6 +159,21 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   // guard; this screen always had a blank timer for a missing deadline, so
   // override just the render text instead of changing the shared helper.
   const countdownDisplay = request?.expiresAt ? countdownLabel : '';
+  const items: RequestItem[] = request?.items ?? [];
+  const focusedItemIdParam = itemId ? Number(itemId) : null;
+  const hasValidFocusedItemId = focusedItemIdParam !== null && Number.isSafeInteger(focusedItemIdParam) && focusedItemIdParam > 0;
+  const focusedItem = hasValidFocusedItemId ? items.find((it) => it.id === focusedItemIdParam) ?? null : null;
+  const headerItem = focusedItem ?? items[0] ?? null;
+  const offerScrollRef = useRef<ScrollView>(null);
+  const hasScrolledToFocusedRef = useRef(false);
+
+  useEffect(() => { hasScrolledToFocusedRef.current = false; }, [focusedItem?.id]);
+
+  const handleFocusedLineLayout = (event: { nativeEvent: { layout: { y: number } } }) => {
+    if (hasScrolledToFocusedRef.current) return;
+    hasScrolledToFocusedRef.current = true;
+    offerScrollRef.current?.scrollTo?.({ y: Math.max(0, event.nativeEvent.layout.y - 16), animated: true });
+  };
 
   useEffect(() => {
     if (state === 'decline') setDeclineVisible(true);
@@ -414,8 +431,6 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
     );
   }
 
-  const items: RequestItem[] = request?.items ?? [];
-
   // ── Main render ────────────────────────────────────────────────────────────
 
   return (
@@ -428,6 +443,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
         keyboardVerticalOffset={80}
       >
         <ScrollView
+          ref={offerScrollRef}
           style={isResendMode ? styles.resendScroll : undefined}
           contentContainerStyle={[
             styles.scrollContent,
@@ -449,21 +465,29 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
             <Text type="small" semiBold color={Colors.brand}>
               {`${t('partner.offerDetail.ref')} ${request?.reference}`}
             </Text>
-            {items[0] ? (
+            {headerItem ? (
               <>
                 <Text type="textTwo" semiBold translate={false}>
-                  {isArabic ? items[0].categoryTitleAr ?? items[0].categoryTitle : items[0].categoryTitle}
+                  {isArabic ? headerItem.categoryTitleAr ?? headerItem.categoryTitle : headerItem.categoryTitle}
                 </Text>
+                {(isArabic ? headerItem.brandNameAr ?? headerItem.brandName : headerItem.brandName) ? (
+                  <Text type="label" color={Colors.grayMidDark} translate={false}>
+                    {t('requestList.brand', { value: isArabic ? headerItem.brandNameAr ?? headerItem.brandName : headerItem.brandName })}
+                  </Text>
+                ) : null}
                 <View flexDirection="row" alignItems="center" gap={14}>
                   <Text type="label" translate={false}>
-                    {`${t('partner.offerDetail.condition')} ${t(items[0].condition === 'occasion' ? 'partner.fill.conditionOccasion' : 'partner.fill.conditionEnStock')}`}
+                    {`${t('partner.offerDetail.condition')} ${t(headerItem.condition === 'occasion' ? 'partner.fill.conditionOccasion' : 'partner.fill.conditionEnStock')}`}
                   </Text>
-                  <Text type="label" translate={false}>{`${t('partner.offerDetail.qty')} ${items[0].quantity}`}</Text>
+                  <Text type="label" translate={false}>{`${t('partner.offerDetail.qty')} ${headerItem.quantity}`}</Text>
                 </View>
               </>
             ) : null}
             {request?.notes ? (
-              <View style={styles.noteBox}>
+              <View style={styles.noteBox} gap={4}>
+                <Text type="small" semiBold color={Colors.brand}>
+                  {t('partner.fill.clientGeneralNote')}
+                </Text>
                 <Text type="small" color={Colors.grayMidDark} translate={false}>
                   {request.notes}
                 </Text>
@@ -513,9 +537,16 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
               : '—';
 
             const condItem = conditionItems.find((c) => c.value === line.condition);
+            const isFocusedLine = !isResendMode && focusedItem != null && item?.id === focusedItem.id;
+            const brandLabel = item ? (isArabic ? item.brandNameAr ?? item.brandName : item.brandName) : null;
 
             return (
-              <View key={line.requestItemId} style={[styles.offerCard, isResendMode ? styles.resendOfferCard : undefined]} gap={12}>
+              <RNView
+                key={line.requestItemId}
+                testID={isFocusedLine ? `fill-line-${line.requestItemId}-focused` : undefined}
+                onLayout={isFocusedLine ? handleFocusedLineLayout : undefined}
+              >
+                <View style={[styles.offerCard, isResendMode ? styles.resendOfferCard : undefined, isFocusedLine ? styles.offerCardFocused : undefined]} gap={12}>
                 {/* Card header */}
                 <View flexDirection="row" alignItems="center" justifyContent="space-between" gap={8}>
                   <View style={styles.offerIndexBadge}>
@@ -589,6 +620,11 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                         </Text>
                       ) : null}
                     </View>
+                    {brandLabel ? (
+                      <Text type="small" color={Colors.gray} translate={false}>
+                        {t('requestList.brand', { value: brandLabel })}
+                      </Text>
+                    ) : null}
                     <View gap={4}>
                       <Text type="small" color={Colors.grayMidDark}>partner.fill.addPhotos</Text>
                       <ImageInputList
@@ -661,7 +697,8 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                     </View>
                   </>
                 )}
-              </View>
+                </View>
+              </RNView>
 
             );
           })}
@@ -863,6 +900,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 4,
     elevation: 2,
+  },
+  offerCardFocused: {
+    borderWidth: 2,
+    borderColor: Colors.brand,
   },
   resendOfferCard: {
     borderRadius: 0,

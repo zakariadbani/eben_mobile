@@ -14,13 +14,15 @@ import { useNotification } from "@/context/NotificationContext";
 import type { Category } from "@/interfaces/Category";
 import type { PartCondition } from "@/interfaces/Request";
 
-type AddToListSheetItem = Pick<DraftItem, "categoryId" | "title" | "titleAr"> & {
+type AddToListSheetItem = Pick<DraftItem, "categoryId" | "title" | "titleAr"> &
+  Partial<Pick<DraftItem, "brandId" | "brandName" | "brandNameAr">> & {
   image?: Category["image"] | null;
 };
 
 interface AddToListSheetProps {
   item: AddToListSheetItem | null;
   onClose: () => void;
+  fixedCondition?: PartCondition;
 }
 
 const CONDITION_ITEMS = [
@@ -30,12 +32,12 @@ const CONDITION_ITEMS = [
 
 /**
  * AddToListSheet — bottom sheet for adding a generic (occasion) part, keyed
- * by its level-3 category, to the locally-persisted request draft. Opens for
+ * by its level-3 category and optional brand, to the locally-persisted request draft. Opens for
  * guests too (login is only required at send, see CreateRequestScreen).
  *
  * Figma: "Search / part details_Add to list".
  */
-const AddToListSheet: React.FC<AddToListSheetProps> = ({ item, onClose }) => {
+const AddToListSheet: React.FC<AddToListSheetProps> = ({ item, onClose, fixedCondition }) => {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === "ar";
   const { loading, items, setItems } = useRequestDraft();
@@ -45,13 +47,13 @@ const AddToListSheet: React.FC<AddToListSheetProps> = ({ item, onClose }) => {
 
   useEffect(() => {
     if (!item) return;
-    const existing = items.find((draft) => draftKey(draft) === draftKey({ categoryId: item.categoryId, brandId: null }));
+    const existing = items.find((draft) => draftKey(draft) === draftKey({ categoryId: item.categoryId, brandId: item.brandId ?? null }));
     setQuantity(existing?.quantity ?? 1);
     setCondition(existing?.condition ?? "occasion");
-    // Reseed only when a *different* leaf opens, not on every draft mutation
+    // Reseed when a leaf/brand opens or hydration finishes, not on every draft mutation
     // while this sheet stays open — avoids clobbering an in-progress edit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item?.categoryId]);
+  }, [item?.categoryId, item?.brandId, loading]);
 
   const displayTitle = item ? (isArabic ? item.titleAr : item.title) : "";
   const displayImage = resolveImageSource(item?.image ?? undefined);
@@ -64,18 +66,18 @@ const AddToListSheet: React.FC<AddToListSheetProps> = ({ item, onClose }) => {
   const selectedConditionItem = conditionItems[selectedConditionIndex];
 
   const handleAdd = () => {
-    if (!item) return;
+    if (!item || loading) return;
     setItems((current) => {
-      const existingIndex = current.findIndex((draft) => draftKey(draft) === draftKey({ categoryId: item.categoryId, brandId: null }));
+      const existingIndex = current.findIndex((draft) => draftKey(draft) === draftKey({ categoryId: item.categoryId, brandId: item.brandId ?? null }));
       const nextItem: DraftItem = {
         categoryId: item.categoryId,
         title: item.title,
         titleAr: item.titleAr,
         quantity,
-        condition,
-        brandId: null,
-        brandName: null,
-        brandNameAr: null,
+        condition: fixedCondition ?? condition,
+        brandId: item.brandId ?? null,
+        brandName: item.brandName ?? null,
+        brandNameAr: item.brandNameAr ?? null,
       };
       if (existingIndex === -1) return [...current, nextItem];
       const next = [...current];
@@ -106,27 +108,36 @@ const AddToListSheet: React.FC<AddToListSheetProps> = ({ item, onClose }) => {
           ) : (
             <View style={[styles.thumbnail, styles.thumbnailPlaceholder]} />
           )}
-          <Text semiBold translate={false} flex>{displayTitle}</Text>
+          <View flex gap={4}>
+            <Text type="textTwo" semiBold translate={false}>{displayTitle}</Text>
+            {item?.brandName ? (
+              <Text type="small" color={Colors.gray} translate={false}>
+                {t("requestList.brand", { value: isArabic ? item.brandNameAr || item.brandName : item.brandName })}
+              </Text>
+            ) : null}
+          </View>
         </View>
-        <View alignItems="flex-start">
+        <View alignItems={isArabic ? "flex-end" : "flex-start"}>
           <Text type="textTwo" semiBold style={styles.label}>{t("Quantité")}</Text>
           <QtyStepper value={quantity} onChange={setQuantity} />
         </View>
-        <View>
-          <Text type="textTwo" semiBold style={styles.label}>{t("Condition")}</Text>
-          <PickerInput
-            items={conditionItems}
-            selectedItem={selectedConditionItem}
-            onSelectItem={(picked) => {
-              const match = CONDITION_ITEMS.find((entry) => entry.id === picked.id);
-              if (match) setCondition(match.condition);
-            }}
-            placeholder={t("Condition")}
-            fillColor={Colors.white}
-            borderColor={Colors.borderLight}
-            showChevron
-          />
-        </View>
+        {fixedCondition === undefined ? (
+          <View>
+            <Text type="textTwo" semiBold style={styles.label}>{t("Condition")}</Text>
+            <PickerInput
+              items={conditionItems}
+              selectedItem={selectedConditionItem}
+              onSelectItem={(picked) => {
+                const match = CONDITION_ITEMS.find((entry) => entry.id === picked.id);
+                if (match) setCondition(match.condition);
+              }}
+              placeholder={t("Condition")}
+              fillColor={Colors.white}
+              borderColor={Colors.borderLight}
+              showChevron
+            />
+          </View>
+        ) : null}
       </View>
     </ConfirmModal>
   );

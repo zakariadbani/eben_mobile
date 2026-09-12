@@ -32,7 +32,6 @@ import type { PartCondition, RequestSummary } from "@/interfaces/Request";
 import type { Vehicle } from "@/interfaces/Vehicle";
 
 type LoadState = "loading" | "ready" | "error";
-type Step = 0 | 1 | 2;
 
 function positiveId(value: string | undefined): number | null {
   if (!value || !/^\d+$/.test(value)) return null;
@@ -75,13 +74,6 @@ export default function CreateRequestScreen() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [vehicleId, setVehicleId] = useState<number | null>(null);
   const [requests, setRequests] = useState<RequestSummary[]>([]);
-  const [step, setStep] = useState<Step>(0);
-  const [adding, setAdding] = useState(false);
-  const [selectedL1, setSelectedL1] = useState<Category | null>(null);
-  const [selectedL2, setSelectedL2] = useState<Category | null>(null);
-  const [condition, setCondition] = useState<PartCondition>(
-    params.condition === "en_stock" ? "en_stock" : "occasion",
-  );
   const [note, setNote] = useState("");
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [uploadedPaths, setUploadedPaths] = useState<string[] | null>(null);
@@ -158,42 +150,12 @@ export default function CreateRequestScreen() {
     }
   }, [isGuest]);
 
-  // Tabs keep this screen mounted between visits — reset the drill overlay
-  // when the tab loses focus so returning via the header back arrow doesn't
-  // resurface it. Also silently refreshes the requests list on refocus
-  // (e.g. after a request was created elsewhere), skipped until the first
-  // load has completed.
+  // Refresh active requests when returning to the list tab.
   useFocusEffect(useCallback(() => {
     if (loadedRef.current) void refreshRequests();
-    return () => setAdding(false);
   }, [refreshRequests]));
 
-  const level1 = useMemo(() => categories.filter((category) => category.level === 1), [categories]);
-  const level2 = useMemo(() => (selectedL1?.children ?? []).filter((category) => category.level === 2), [selectedL1]);
-  const level3 = useMemo(() => (selectedL2?.children ?? []).filter((category) => category.level === 3), [selectedL2]);
   const categoryLookup = useMemo(() => buildCategoryLookup(categories), [categories]);
-
-  const addPart = (leaf: Category) => {
-    if (leaf.level !== 3 || allLeaves(categories).every((category) => category.id !== leaf.id)) {
-      setError(t("requestFlow.invalidCategory"));
-      return;
-    }
-    const newItem: DraftItem = {
-      categoryId: leaf.id,
-      title: leaf.title,
-      titleAr: leaf.titleAr,
-      quantity: 1,
-      condition,
-      brandId: null,
-      brandName: null,
-      brandNameAr: null,
-    };
-    setDraftItems((current) => current.some((item) => draftKey(item) === draftKey(newItem))
-      ? current
-      : [...current, newItem]);
-    setStep(1);
-    setAdding(false);
-  };
 
   const addImage = (uri: string) => {
     setImageUris((current) => current.includes(uri) ? current : [...current, uri]);
@@ -264,8 +226,6 @@ export default function CreateRequestScreen() {
   }
 
   const emptyGarage = !isGuest && vehicles.length === 0;
-  const choices = step === 0 ? level1 : step === 1 ? level2 : level3;
-  const showDrill = adding;
   const totalQuantity = draftItems.reduce((sum, item) => sum + item.quantity, 0);
   const activeRequests = !isGuest && requests.length > 0 ? (
     <View gap={10}>
@@ -294,55 +254,7 @@ export default function CreateRequestScreen() {
             it instead — avoids rendering the message twice on screen. */}
         {error && !verifying ? <Text accessibilityRole="alert" color={Colors.error} style={styles.error} translate={false}>{error}</Text> : null}
 
-        {showDrill ? (
-          <>
-            {step > 0 || adding ? (
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel={t("requestFlow.back")}
-                onPress={() => (step === 0 ? setAdding(false) : setStep(step === 2 ? 1 : 0))}
-                style={styles.backLink}
-              >
-                <Text type="small" color={Colors.gray}>requestFlow.back</Text>
-              </TouchableOpacity>
-            ) : null}
-
-            {/* Only applies to parts added via this screen's own drill from now on —
-                it no longer rewrites the condition of items already in the draft
-                (e.g. added earlier from the catalog's "add to list" sheet). */}
-            <View flexDirection="row" gap={8} style={styles.conditionRow}>
-              <Button title="requestFlow.used" flex variant={condition === "occasion" ? "primary" : "white"} onPress={() => setCondition("occasion")} />
-              <Button title="requestFlow.new" flex variant={condition === "en_stock" ? "primary" : "white"} onPress={() => setCondition("en_stock")} />
-            </View>
-
-            <Text type="subTitle" semiBold style={styles.sectionTitle}>
-              {step === 0 ? t("requestFlow.chooseCategory") : step === 1 ? t("requestFlow.chooseSubcategory") : t("requestFlow.choosePart")}
-            </Text>
-            <View gap={10}>
-              {choices.map((category) => {
-                const title = isArabic ? category.titleAr : category.title;
-                const isLeaf = category.level === 3;
-                return (
-                  <TouchableOpacity
-                    key={category.id}
-                    accessibilityRole="button"
-                    accessibilityLabel={isLeaf ? t("requestFlow.addPart", { name: title }) : title}
-                    style={styles.card}
-                    onPress={() => {
-                      if (category.level === 1) { setSelectedL1(category); setSelectedL2(null); setStep(1); }
-                      else if (category.level === 2) { setSelectedL2(category); setStep(2); }
-                      else addPart(category);
-                    }}
-                  >
-                    <Text semiBold translate={false}>{title}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </>
-        ) : null}
-
-        {draftItems.length === 0 && !showDrill ? (
+        {draftItems.length === 0 ? (
           <View style={styles.details} gap={16}>
             <Text type="titleSection" color={Colors.brand} style={styles.sectionHeading}>Ajouter des détails</Text>
             <EmptyListComponent
@@ -355,9 +267,9 @@ export default function CreateRequestScreen() {
           </View>
         ) : null}
 
-        {draftItems.length > 0 && !showDrill ? (
+        {draftItems.length > 0 ? (
           <View style={styles.details} gap={16}>
-            <View gap={10}>
+            <View gap={12}>
               {draftItems.map((item) => {
                 const info = categoryLookup.get(item.categoryId);
                 const categoryTitle = (isArabic ? info?.categoryTitleAr : info?.categoryTitle) ?? "";
@@ -365,46 +277,52 @@ export default function CreateRequestScreen() {
                 const imageBroken = brokenImages.has(item.categoryId);
                 const brandLabel = isArabic ? (item.brandNameAr || item.brandName) : item.brandName;
                 return (
-                  <View key={draftKey(item)} flexDirection="row" gap={10} style={styles.itemCard}>
-                    {thumbnail && !imageBroken ? (
-                      <Image
-                        source={thumbnail}
-                        style={styles.thumbnail}
-                        resizeMode="contain"
-                        onError={() => setBrokenImages((prev) => new Set(prev).add(item.categoryId))}
-                      />
-                    ) : (
-                      <View style={[styles.thumbnail, styles.thumbnailPlaceholder]} />
-                    )}
-                    <View flex gap={4}>
-                      {categoryTitle ? (
-                        <Text type="small" color={Colors.gray} translate={false}>
-                          {t("requestList.category", { value: categoryTitle })}
-                        </Text>
-                      ) : null}
-                      <Text semiBold translate={false}>{isArabic ? item.titleAr : item.title}</Text>
-                      {brandLabel ? (
-                        <Text type="small" color={Colors.gray} translate={false}>
-                          {t("requestList.brand", { value: brandLabel })}
-                        </Text>
-                      ) : null}
-                      <Text type="small" color={Colors.gray} translate={false}>
+                  <View key={draftKey(item)} gap={10} style={styles.itemCard}>
+                    <View flexDirection="row" alignItems="center" gap={12}>
+                      {thumbnail && !imageBroken ? (
+                        <Image
+                          source={thumbnail}
+                          style={styles.thumbnail}
+                          resizeMode="contain"
+                          onError={() => setBrokenImages((prev) => new Set(prev).add(item.categoryId))}
+                        />
+                      ) : (
+                        <View style={[styles.thumbnail, styles.thumbnailPlaceholder]} />
+                      )}
+                      <View flex gap={4} style={styles.itemDetails}>
+                        {categoryTitle ? (
+                          <Text type="small" color={Colors.gray} translate={false}>
+                            {t("requestList.category", { value: categoryTitle })}
+                          </Text>
+                        ) : null}
+                        <Text type="labelTwo" semiBold translate={false}>{isArabic ? item.titleAr : item.title}</Text>
+                        {brandLabel ? (
+                          <Text type="small" color={Colors.gray} translate={false}>
+                            {t("requestList.brand", { value: brandLabel })}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                    <View flexDirection="row" alignItems="center" gap={12}>
+                      <Text flex type="small" color={Colors.grayMidDark} translate={false}>
                         {t("requestList.condition", { condition: t(`requestFlow.condition.${item.condition}`) })}
                       </Text>
-                    </View>
-                    <View alignItems="center" gap={8}>
-                      <QtyStepper
-                        value={item.quantity}
-                        onChange={(next) => setDraftItems((current) => current.map((entry) => draftKey(entry) === draftKey(item) ? { ...entry, quantity: next } : entry))}
-                      />
-                      <TouchableOpacity
-                        accessibilityRole="button"
-                        accessibilityLabel={t("requestFlow.removePart")}
-                        style={styles.trashBtn}
-                        onPress={() => setDraftItems((current) => current.filter((entry) => draftKey(entry) !== draftKey(item)))}
-                      >
-                        <CustomIcon name="trash" size={20} />
-                      </TouchableOpacity>
+                      <View flexDirection="row" alignItems="center" gap={8}>
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          accessibilityLabel={t("requestFlow.removePart")}
+                          style={styles.trashBtn}
+                          hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                          onPress={() => setDraftItems((current) => current.filter((entry) => draftKey(entry) !== draftKey(item)))}
+                        >
+                          <CustomIcon name="trash" size={18} tintColor={Colors.grayDark} />
+                        </TouchableOpacity>
+                        <QtyStepper
+                          compact
+                          value={item.quantity}
+                          onChange={(next) => setDraftItems((current) => current.map((entry) => draftKey(entry) === draftKey(item) ? { ...entry, quantity: next } : entry))}
+                        />
+                      </View>
                     </View>
                   </View>
                 );
@@ -421,8 +339,6 @@ export default function CreateRequestScreen() {
                 Les demandes de prix sont ouvertes de 8h à 18h, toute demande envoyée après 18h sera satisfaite à 10h le jour ouvrable suivant.
               </Text>
             </View>
-
-            <Button title="Ajouter une pièce" variant="white" onPress={() => { setStep(0); setAdding(true); }} />
 
             <View gap={12}>
               <Text type="titleSection" color={Colors.brand} style={styles.sectionHeading}>Ajouter des détails</Text>
@@ -487,17 +403,14 @@ const styles = StyleSheet.create({
   centered: { justifyContent: "center", alignItems: "center" },
   vehicleLabel: { marginTop: 8 },
   error: { marginTop: 12 },
-  backLink: { alignSelf: "flex-start", marginTop: 8 },
-  conditionRow: { marginTop: 16 },
-  sectionTitle: { marginTop: 20, marginBottom: 12 },
   sectionHeading: { fontSize: 25, lineHeight: 32 },
-  card: { padding: 14, borderRadius: 8, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.borderLight },
   details: { marginTop: 24 },
   emptyState: { flex: 0, paddingVertical: 0, paddingHorizontal: 0 },
-  itemCard: { padding: 12, borderRadius: 8, backgroundColor: Colors.white, shadowColor: Colors.borderLight, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 3, elevation: 2 },
-  thumbnail: { width: 64, height: 64, borderRadius: 6 },
+  itemCard: { padding: 12, minHeight: 100, borderRadius: 10, backgroundColor: Colors.white, shadowColor: Colors.grayDark, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.12, shadowRadius: 6, elevation: 3 },
+  itemDetails: { minWidth: 0 },
+  thumbnail: { width: 54, height: 64 },
   thumbnailPlaceholder: { backgroundColor: Colors.backgroundGray },
-  trashBtn: { width: 36, height: 36, borderRadius: 6, backgroundColor: Colors.pink, alignItems: "center", justifyContent: "center" },
+  trashBtn: { width: 32, height: 32, borderRadius: 6, backgroundColor: Colors.pink, alignItems: "center", justifyContent: "center" },
   notice: { paddingHorizontal: 6, marginTop: 4 },
   // Figma "List / full": borderless light-gray textarea.
   noteInput: { backgroundColor: Colors.backgroundGray, borderColor: Colors.backgroundGray, borderRadius: 8, paddingHorizontal: 12 },

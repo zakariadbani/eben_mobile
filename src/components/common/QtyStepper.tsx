@@ -14,6 +14,7 @@ interface QtyStepperProps {
   value: number;
   min?: number;
   max?: number;
+  compact?: boolean;
   onChange: (next: number) => void;
 }
 
@@ -21,6 +22,7 @@ const QtyStepper: React.FC<QtyStepperProps> = ({
   value,
   min = 1,
   max = 99,
+  compact = false,
   onChange,
 }) => {
   const { t } = useTranslation();
@@ -31,7 +33,7 @@ const QtyStepper: React.FC<QtyStepperProps> = ({
     <View flexDirection="row" alignItems="center" gap={0} style={styles.qtyStepper}>
       <TouchableOpacity
         onPress={decrement}
-        style={[styles.qtyBtn, value <= min && styles.qtyBtnDisabled]}
+        style={[styles.qtyBtn, compact && styles.compactCell, value <= min && styles.qtyBtnDisabled]}
         activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel={t("Diminuer la quantité")}
@@ -39,14 +41,14 @@ const QtyStepper: React.FC<QtyStepperProps> = ({
       >
         <Text type="text" bold style={styles.qtyBtnText}>−</Text>
       </TouchableOpacity>
-      <View style={styles.qtyValueBox}>
-        <Text type="default" bold style={styles.qtyValue} translate={false}>
+      <View style={[styles.qtyValueBox, compact && styles.compactCell]}>
+        <Text type="default" bold style={[styles.qtyValue, compact && styles.compactValue]} translate={false}>
           {String(value)}
         </Text>
       </View>
       <TouchableOpacity
         onPress={increment}
-        style={[styles.qtyBtn, value >= max && styles.qtyBtnDisabled]}
+        style={[styles.qtyBtn, compact && styles.compactCell, value >= max && styles.qtyBtnDisabled]}
         activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel={t("Augmenter la quantité")}
@@ -72,6 +74,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: Colors.backgroundGray,
   },
+  compactCell: { width: 28, height: 30 },
+  compactValue: { fontSize: 14 },
   qtyBtnDisabled: { opacity: 0.4 },
   qtyBtnText: { color: Colors.brand, lineHeight: 20 },
   qtyValueBox: {

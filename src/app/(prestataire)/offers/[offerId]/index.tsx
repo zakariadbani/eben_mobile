@@ -214,9 +214,11 @@ export default function PrestataireOfferDetailScreen(): React.ReactElement {
   const countdownBase = offer.validatedAt ?? offer.createdAt;
   const countdown = inlineStatus.showCountdown ? getCountdown(countdownBase, 24) : null;
   const descriptionLines = offer.description?.split("\n") ?? [];
-  const partName = descriptionLines[0] ?? `Ref. ${offer.reference}`;
-  const partDescription = descriptionLines[1];
-  const remarks = descriptionLines.slice(2).join("\n") || offer.description;
+  const canonicalTitle = isArabic ? offer.categoryTitleAr ?? offer.categoryTitle : offer.categoryTitle;
+  const partName = canonicalTitle ?? descriptionLines[0] ?? `Ref. ${offer.reference}`;
+  const descStart = canonicalTitle ? 0 : 1;
+  const partDescription = descriptionLines[descStart];
+  const remarks = descriptionLines.slice(descStart + 1).join("\n") || offer.description;
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -283,6 +285,11 @@ export default function PrestataireOfferDetailScreen(): React.ReactElement {
           {partDescription ? (
             <Text type="small" color={Colors.grayMidDark} translate={false} style={styles.latinCopy}>
               {partDescription}
+            </Text>
+          ) : null}
+          {(isArabic ? offer.brandNameAr ?? offer.brandName : offer.brandName) ? (
+            <Text type="small" color={Colors.grayMidDark} translate={false} style={styles.latinCopy}>
+              {t('requestList.brand', { value: isArabic ? offer.brandNameAr ?? offer.brandName : offer.brandName })}
             </Text>
           ) : null}
 

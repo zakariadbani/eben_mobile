@@ -22,11 +22,12 @@ import ItemCategoryComponent from "@/components/screens/shared/app/ItemCategoryC
 import ItemSubCategoryComponent from "@/components/screens/shared/app/ItemSubCategoryComponent";
 import SliderBlockComponent from "@/components/screens/shared/app/SliderBlockComponent";
 import PubPlacerDemandeBlockComponent from "@/components/screens/shared/app/PubPlacerDemandeBlockComponent";
+import AddToListSheet from "@/components/screens/client/requests/AddToListSheet";
 import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
 import Colors from "@/constants/Colors";
 import { categoryById } from "@/helpers/categoryLookup";
 import { getCategoryTree, getCategoryBrands } from "@/api";
-import { useRequestDraft, draftKey, type DraftItem } from "@/context/RequestDraftContext";
+import { useRequestDraft, draftKey } from "@/context/RequestDraftContext";
 import { useNotification } from "@/context/NotificationContext";
 import type { Category, CategoryProps, PartBrand } from "@/interfaces/Category";
 
@@ -55,6 +56,7 @@ const CategoryBrandsScreen: React.FC = () => {
   const categoryId = /^\d+$/.test(params.categoryId) ? Number(params.categoryId) : Number.NaN;
   const validCategoryId = Number.isSafeInteger(categoryId) && categoryId > 0;
 
+  const [sheetItem, setSheetItem] = useState<React.ComponentProps<typeof AddToListSheet>["item"]>(null);
   const [leaf, setLeaf] = useState<Category | undefined>(undefined);
   const [levelOneCategories, setLevelOneCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<PartBrand[]>([]);
@@ -88,22 +90,17 @@ const CategoryBrandsScreen: React.FC = () => {
 
   const screenTitle = leaf ? (isArabic ? leaf.titleAr : leaf.title) : "";
 
-  const handleAdd = (brand: PartBrand | null) => {
+  const openListSheet = (brand: PartBrand | null) => {
     if (!leaf) return;
-    const newItem: DraftItem = {
+    setSheetItem({
       categoryId: leaf.id,
       title: leaf.title,
       titleAr: leaf.titleAr,
-      quantity: 1,
-      condition: "occasion",
+      image: leaf.image,
       brandId: brand?.id ?? null,
       brandName: brand?.name ?? null,
       brandNameAr: brand?.nameAr ?? null,
-    };
-    setDraftItems((current) => current.some((item) => draftKey(item) === draftKey(newItem))
-      ? current
-      : [...current, newItem]);
-    showNotification(t("Ajouté à la liste !"));
+    });
   };
 
   const handleRemove = (brand: PartBrand | null) => {
@@ -146,8 +143,8 @@ const CategoryBrandsScreen: React.FC = () => {
           categoryNameAr: leaf.titleAr,
         }}
         actionButton={isAdded
-          ? { variant: "green", title: t("Ajouté"), rightIcon: "liste_plus", iconType: "custom", sizeIcon: 18 }
-          : { variant: "primary", title: t("Liste"), rightIcon: "liste", iconType: "custom", sizeIcon: 18, onPress: () => handleAdd(brand) }}
+          ? { variant: "green", title: t("Ajouté"), rightIcon: "liste_plus", iconType: "custom", sizeIcon: 18, onPress: () => openListSheet(brand) }
+          : { variant: "primary", title: t("Liste"), rightIcon: "liste", iconType: "custom", sizeIcon: 18, onPress: () => openListSheet(brand) }}
         cornerAction={isAdded
           ? {
               leftIcon: "trash-2",
@@ -235,6 +232,7 @@ const CategoryBrandsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </View>
+      <AddToListSheet item={sheetItem} fixedCondition="occasion" onClose={() => setSheetItem(null)} />
     </Screen>
   );
 };

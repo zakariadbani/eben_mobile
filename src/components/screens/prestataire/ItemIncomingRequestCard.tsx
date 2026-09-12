@@ -7,10 +7,11 @@ import Icon from "@/components/common/Icon";
 import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
 import Colors from "@/constants/Colors";
-import type { Request } from "@/interfaces/Request";
+import type { Request, RequestItem } from "@/interfaces/Request";
 
 export interface ItemIncomingRequestCardProps {
-  item: Request;
+  request: Request;
+  item: RequestItem;
   onPress?: () => void;
   styleContainer?: ViewStyle;
 }
@@ -26,19 +27,20 @@ function formatExpiry(expiresAt: string | null): { label: string; color: string 
   return { label: `${hours}h ${String(remaining).padStart(2, "0")}min`, color };
 }
 
-export default function ItemIncomingRequestCard({ item, onPress, styleContainer }: ItemIncomingRequestCardProps): React.ReactElement {
+export default function ItemIncomingRequestCard({ request, item, onPress, styleContainer }: ItemIncomingRequestCardProps): React.ReactElement {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === "ar";
   const router = useRouter();
-  const firstItem = item.items?.[0];
   const title = isArabic
-    ? firstItem?.categoryTitleAr ?? firstItem?.categoryTitle ?? t("partner.offers.unknownPart")
-    : firstItem?.categoryTitle ?? t("partner.offers.unknownPart");
-  const expiry = formatExpiry(item.expiresAt);
-  const imageSource = typeof firstItem?.categoryImage === "string"
-    ? { uri: firstItem.categoryImage }
-    : firstItem?.categoryImage || require("@/assets/img/freins.png");
-  const handlePress = () => onPress ? onPress() : router.push(`/(prestataire)/offers/${item.id}/fill`);
+    ? item.categoryTitleAr ?? item.categoryTitle ?? t("partner.offers.unknownPart")
+    : item.categoryTitle ?? t("partner.offers.unknownPart");
+  const brandLabel = isArabic ? item.brandNameAr ?? item.brandName : item.brandName;
+  const conditionKey = item.condition === "occasion" ? "partner.fill.conditionOccasion" : "partner.fill.conditionEnStock";
+  const expiry = formatExpiry(request.expiresAt);
+  const imageSource = typeof item.categoryImage === "string"
+    ? { uri: item.categoryImage }
+    : item.categoryImage || require("@/assets/img/freins.png");
+  const handlePress = () => onPress ? onPress() : router.push(`/(prestataire)/offers/${request.id}/fill?itemId=${item.id}`);
 
   return (
     <TouchableOpacity style={[styles.card, isArabic && styles.cardRtl, styleContainer]} activeOpacity={0.78} onPress={handlePress}>
@@ -48,8 +50,16 @@ export default function ItemIncomingRequestCard({ item, onPress, styleContainer 
         resizeMode="contain"
       />
       <View flex style={styles.content}>
-        <Text type="label" color={Colors.gray} translate={false} style={isArabic ? styles.textRtl : undefined}>{`${t("partner.offers.card.ref")} ${item.reference}`}</Text>
+        <Text type="label" color={Colors.gray} translate={false} style={isArabic ? styles.textRtl : undefined}>{`${t("partner.offers.card.ref")} ${request.reference}`}</Text>
         <Text type="labelTwo" semiBold numberOfLines={2} translate={false} style={isArabic ? styles.textRtl : undefined}>{title}</Text>
+        {brandLabel ? (
+          <Text type="label" color={Colors.gray} translate={false} style={isArabic ? styles.textRtl : undefined}>
+            {t("requestList.brand", { value: brandLabel })}
+          </Text>
+        ) : null}
+        <Text type="label" color={Colors.gray} translate={false} style={isArabic ? styles.textRtl : undefined}>
+          {`${t("partner.offerDetail.qty")} ${item.quantity} · ${t(conditionKey)}`}
+        </Text>
         <View flexDirection="row" alignItems="center" gap={7} style={[styles.expiry, isArabic && styles.rowRtl]}>
           <Icon name="clock" type="Feather" size={20} iconColor={expiry.color} />
           <Text type="labelTwo" semiBold color={expiry.color} translate={false} style={isArabic ? styles.textRtl : undefined}>

@@ -763,6 +763,7 @@
   "partner.fill.pricePlaceholder": ".....",
   "partner.fill.commentLabel": "اترك تعليقاً",
   "partner.fill.commentPlaceholder": "......",
+  "partner.fill.clientGeneralNote": "ملاحظة عامة حول الطلب",
   "partner.fill.remarksLabel": "ملاحظات على القطعة",
   "partner.fill.priceRecapLabel": "السعر",
   "partner.fill.ctaSend": "إرسال العرض",

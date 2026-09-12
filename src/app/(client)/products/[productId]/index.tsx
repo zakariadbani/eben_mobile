@@ -256,10 +256,11 @@ const ProductDetailScreen: React.FC = () => {
   }, [router]);
 
   // ── Render helpers ────────────────────────────────────────────────────────────
+  // The client tab bar handles the bottom safe area for this route.
 
   if (loadState === "loading") {
     return (
-      <Screen whatsapp={false}>
+      <Screen whatsapp={false} edges={[]}>
         <View flex style={styles.centered}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
@@ -269,7 +270,7 @@ const ProductDetailScreen: React.FC = () => {
 
   if (loadState === "error" || !product) {
     return (
-      <Screen padding whatsapp={false}>
+      <Screen padding whatsapp={false} edges={[]}>
         <View flex style={styles.centered}>
           <Text type="default" color={Colors.gray} accessibilityRole="alert">
             {t("auth.error.generic")}
@@ -297,7 +298,7 @@ const ProductDetailScreen: React.FC = () => {
   const wished = isWishlisted(product.id);
 
   return (
-    <Screen whatsapp={false}>
+    <Screen whatsapp={false} edges={[]}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -475,9 +476,6 @@ const ProductDetailScreen: React.FC = () => {
               </ExpandableSection>
             </>
           )}
-
-          {/* ── Bottom spacer for sticky footer clearance ──────── */}
-          <RNView style={styles.bottomSpacer} />
         </View>
       </ScrollView>
 
@@ -633,6 +631,7 @@ const styles = StyleSheet.create({
   contentCard: {
     paddingHorizontal: 16,
     paddingTop: 14,
+    paddingBottom: 16,
     backgroundColor: Colors.backgroundLight,
   },
 
@@ -705,9 +704,6 @@ const styles = StyleSheet.create({
 
   // Occasion extra info
   flex1: { flex: 1 },
-
-  // Bottom spacer
-  bottomSpacer: { height: 100 },
 
   // Sticky bar
   stickyBar: {

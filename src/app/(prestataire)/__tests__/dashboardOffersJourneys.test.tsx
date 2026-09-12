@@ -160,6 +160,102 @@ const requests = [
   },
 ];
 
+const requestA = {
+  id: 511,
+  reference: "REQ-511",
+  userId: 7,
+  vehicleId: 8,
+  addressId: null,
+  notes: null,
+  status: "pending" as const,
+  aiValidationTag: null,
+  aiValidationReason: null,
+  offersCount: 0,
+  expiresAt: "2099-01-01T12:00:00.000Z",
+  createdAt: "2026-08-03T10:00:00.000Z",
+  updatedAt: "2026-08-03T10:00:00.000Z",
+  items: [
+    {
+      id: 811,
+      requestId: 511,
+      categoryId: 33,
+      quantity: 1,
+      condition: "occasion" as const,
+      notes: null,
+      createdAt: "2026-08-03T10:00:00.000Z",
+      updatedAt: "2026-08-03T10:00:00.000Z",
+      categoryTitle: "Disque live",
+      categoryTitleAr: "Disque live AR",
+      categoryImage: "https://cdn.example/disque.jpg",
+      brandId: 1,
+      brandName: "RIDEX live",
+      brandNameAr: "ريدكس live",
+      brandLogo: null,
+    },
+    {
+      id: 812,
+      requestId: 511,
+      categoryId: 33,
+      quantity: 1,
+      condition: "occasion" as const,
+      notes: null,
+      createdAt: "2026-08-03T10:00:00.000Z",
+      updatedAt: "2026-08-03T10:00:00.000Z",
+      categoryTitle: "Disque live",
+      categoryTitleAr: "Disque live AR",
+      categoryImage: "https://cdn.example/disque.jpg",
+      brandId: 2,
+      brandName: "Brembo live",
+      brandNameAr: "بريمبو live",
+      brandLogo: null,
+    },
+  ],
+};
+
+const requestB = {
+  id: 512,
+  reference: "REQ-512",
+  userId: 7,
+  vehicleId: 8,
+  addressId: null,
+  notes: null,
+  status: "pending" as const,
+  aiValidationTag: null,
+  aiValidationReason: null,
+  offersCount: 0,
+  expiresAt: "2099-01-01T12:00:00.000Z",
+  createdAt: "2026-08-04T10:00:00.000Z",
+  updatedAt: "2026-08-04T10:00:00.000Z",
+  items: [
+    {
+      id: 822,
+      requestId: 512,
+      categoryId: 36,
+      quantity: 1,
+      condition: "en_stock" as const,
+      notes: null,
+      createdAt: "2026-08-04T10:00:00.000Z",
+      updatedAt: "2026-08-04T10:00:00.000Z",
+      categoryTitle: "Amortisseur live",
+      categoryTitleAr: "Amortisseur live AR",
+      categoryImage: "https://cdn.example/amortisseur.jpg",
+    },
+    {
+      id: 821,
+      requestId: 512,
+      categoryId: 31,
+      quantity: 1,
+      condition: "occasion" as const,
+      notes: null,
+      createdAt: "2026-08-04T10:00:00.000Z",
+      updatedAt: "2026-08-04T10:00:00.000Z",
+      categoryTitle: "Plaquettes live",
+      categoryTitleAr: "Plaquettes live AR",
+      categoryImage: "https://cdn.example/plaquettes.jpg",
+    },
+  ],
+};
+
 const sentOffer = {
   id: 901,
   reference: "OFF-901",
@@ -181,6 +277,8 @@ const sentOffer = {
   categoryTitleAr: "Plaquettes offer live AR",
   categoryImage: "https://cdn.example/offer-category.jpg",
   ferrailleurName: "Ferrailleur live",
+  brandName: null,
+  brandNameAr: null,
 };
 
 const activeOffer = { ...sentOffer, id: 902, reference: "OFF-902", status: "validated" as const, categoryTitle: "Active offer live" };
@@ -348,7 +446,7 @@ it("searches the fetched incoming list locally, retries, refreshes, and opens th
   expect(mockGetIncoming).toHaveBeenCalledTimes(2);
 
   fireEvent.press(screen.getByText(i18n.t("partner.offers.card.details")));
-  expect(mockPush).toHaveBeenCalledWith("/(prestataire)/offers/502/fill");
+  expect(mockPush).toHaveBeenCalledWith("/(prestataire)/offers/502/fill?itemId=802");
 
   fireEvent.changeText(screen.getByPlaceholderText(i18n.t("partner.search.placeholder")), "missing");
   expect(screen.getByText(i18n.t("partner.search.noResults"))).toBeTruthy();
@@ -360,10 +458,50 @@ it("searches the fetched incoming list locally, retries, refreshes, and opens th
   await waitFor(() => expect(mockGetIncoming).toHaveBeenCalledTimes(3));
 });
 
+it("renders one incoming card per item with its brand and filters by brand text on Recherche", async () => {
+  mockGetIncoming.mockResolvedValue({ success: true, data: [requestA], pagination });
+  const screen = render(<PrestataireSearchScreen />);
+
+  expect(await screen.findByText(i18n.t("requestList.brand", { value: "RIDEX live" }))).toBeTruthy();
+  expect(screen.getByText(i18n.t("requestList.brand", { value: "Brembo live" }))).toBeTruthy();
+  expect(screen.getAllByText("Disque live")).toHaveLength(2);
+
+  fireEvent.changeText(screen.getByPlaceholderText(i18n.t("partner.search.placeholder")), "Brembo live");
+  expect(screen.queryByText(i18n.t("requestList.brand", { value: "RIDEX live" }))).toBeNull();
+  expect(screen.getByText(i18n.t("requestList.brand", { value: "Brembo live" }))).toBeTruthy();
+});
+
+it("groups incoming cards under category headings and keeps the category filter scoped to matching items only", async () => {
+  mockGetIncoming.mockResolvedValue({ success: true, data: [...requests, requestB], pagination });
+  mockParams = { view: "incoming" };
+  const screen = render(<PrestataireOffersScreen />);
+
+  expect(await screen.findAllByText("Plaquettes live")).toHaveLength(3);
+
+  fireEvent.press(screen.UNSAFE_getAllByProps({ accessibilityRole: "button" }).find(
+    (node) => node.props.accessibilityLabel === i18n.t("partner.offers.filter.title"),
+  )!);
+  fireEvent.press(screen.getAllByText("Plaquettes live").at(-1)!);
+  fireEvent.press(screen.getByText(i18n.t("partner.offers.filter.apply")));
+
+  expect(screen.getAllByText("Plaquettes live")).toHaveLength(3);
+  expect(screen.queryByText("Transmission live")).toBeNull();
+  expect(screen.queryByText("Amortisseur live")).toBeNull();
+});
+
+it("shows one open-offer row per incoming item with its brand on the dashboard", async () => {
+  mockGetIncoming.mockResolvedValue({ success: true, data: [requestA], pagination });
+  const screen = render(<Dashboard />);
+
+  expect(await screen.findAllByText("Disque live")).toHaveLength(2);
+  expect(screen.getByText(i18n.t("requestList.brand", { value: "RIDEX live" }))).toBeTruthy();
+  expect(screen.getByText(i18n.t("requestList.brand", { value: "Brembo live" }))).toBeTruthy();
+});
+
 it("filters fetched incoming requests locally and offer cards open returned offer ids", async () => {
   mockParams = { view: "incoming" };
   const incomingScreen = render(<PrestataireOffersScreen />);
-  await incomingScreen.findByText("Plaquettes live");
+  await incomingScreen.findAllByText("Plaquettes live");
 
   fireEvent.press(incomingScreen.UNSAFE_getAllByProps({ accessibilityRole: "button" }).find(
     (node) => node.props.accessibilityLabel === i18n.t("partner.offers.filter.title"),
@@ -371,7 +509,7 @@ it("filters fetched incoming requests locally and offer cards open returned offe
   fireEvent.press(incomingScreen.getAllByText("Transmission live").at(-1)!);
   fireEvent.press(incomingScreen.getByText(i18n.t("partner.offers.filter.apply")));
   expect(incomingScreen.queryByText("Plaquettes live")).toBeNull();
-  expect(incomingScreen.getByText("Transmission live")).toBeTruthy();
+  expect(incomingScreen.getAllByText("Transmission live")).toHaveLength(2);
   expect(mockGetIncoming).toHaveBeenCalledTimes(1);
   incomingScreen.unmount();
 
@@ -387,7 +525,8 @@ it("passes bundled category images through and mirrors Prestataire cards in Arab
   const localImage = 42 as unknown as string;
   const incoming = render(
     <ItemIncomingRequestCard
-      item={{ ...requests[0]!, items: [{ ...requests[0]!.items[0]!, categoryImage: localImage }] }}
+      request={requests[0]!}
+      item={{ ...requests[0]!.items[0]!, categoryImage: localImage }}
     />,
   );
 
@@ -417,16 +556,16 @@ it("filters incoming requests by category id instead of localized title text", a
   });
   mockParams = { view: "incoming" };
   const screen = render(<PrestataireOffersScreen />);
-  await screen.findByText("Pièces d'arrêt");
+  await screen.findAllByText("Pièces d'arrêt");
 
   fireEvent.press(screen.getByLabelText(i18n.t("partner.offers.filter.title")));
   const gearboxLabels = screen.getAllByText("Boîte live");
-  expect(gearboxLabels).toHaveLength(2);
-  fireEvent.press(gearboxLabels[1]);
+  expect(gearboxLabels).toHaveLength(3);
+  fireEvent.press(gearboxLabels.at(-1)!);
   fireEvent.press(screen.getByText(i18n.t("partner.offers.filter.apply")));
 
   expect(screen.queryByText("Pièces d'arrêt")).toBeNull();
-  expect(screen.getByText("Boîte live")).toBeTruthy();
+  expect(screen.getAllByText("Boîte live")).toHaveLength(2);
 });
 it.each(["accepted", "sent"] as const)("maps progress, rejected, and paid filters to fetched offers in the %s view", async (view) => {
   mockParams = { view };

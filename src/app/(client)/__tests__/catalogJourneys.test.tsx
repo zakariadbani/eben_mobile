@@ -1,5 +1,5 @@
 import React from "react";
-import { ActivityIndicator } from "react-native";
+import { ActivityIndicator, Modal } from "react-native";
 import { act, fireEvent, render as rtlRender, waitFor } from "@testing-library/react-native";
 import {
   addToBasket,
@@ -788,21 +788,44 @@ it("renders level-2 children as list rows instead of a grid, and drills deeper o
   });
 });
 
-it("turns a brand row into a demande draft line and back via Liste/trash", async () => {
+it.each(["fr", "ar"])("turns a brand row into a demande draft line and back via Liste/trash in %s", async (language) => {
+  await i18n.changeLanguage(language);
   mockParams = { categoryId: "12" };
   const screen = render(<CategoryBrandsScreen />);
-  await screen.findByText("RIDEX");
+  await screen.findByText(i18n.language === "ar" ? "ريدكس" : "RIDEX");
 
   fireEvent.press(await findActionButton(screen, i18n.t("Liste")));
+  expect(screen.queryByText(i18n.t("Condition"))).toBeNull();
+  expect(mockShowNotification).not.toHaveBeenCalled();
+  expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+  fireEvent.press(screen.getByLabelText(i18n.t("Augmenter la quantité")));
+  const popup = screen.UNSAFE_getAllByType(Modal).find((modal) => modal.props.visible);
+  expect(popup).toBeDefined();
+  fireEvent(popup!, "requestClose");
+  await waitFor(() => expect(screen.queryByText(i18n.t("Quantité"))).toBeNull());
+  expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+  fireEvent.press(await findActionButton(screen, i18n.t("Liste")));
+  expect(await screen.findByText("1")).toBeTruthy();
+  fireEvent.press(screen.getByLabelText(i18n.t("Augmenter la quantité")));
+  fireEvent.press(await findActionButton(screen, i18n.t("Ajouter à la liste")));
 
   expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Ajouté à la liste !"));
   expect(await findActionButton(screen, i18n.t("Ajouté"))).toBeTruthy();
   // Draft line is keyed by the leaf category (the demande carries no SKU) —
-  // quantity 1, occasion condition, title = the LEAF name, plus the chosen
+  // quantity 2, occasion condition, title = the LEAF name, plus the chosen
   // brand id/name.
   await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith(
     "requestDraft",
-    JSON.stringify([{ categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 1, condition: "occasion", brandId: 1, brandName: "RIDEX", brandNameAr: "ريدكس" }]),
+    JSON.stringify([{ categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 2, condition: "occasion", brandId: 1, brandName: "RIDEX", brandNameAr: "ريدكس" }]),
+  ));
+
+  fireEvent.press(getActionButton(screen, i18n.t("Ajouté")));
+  expect(await screen.findByText("2")).toBeTruthy();
+  fireEvent.press(screen.getByLabelText(i18n.t("Augmenter la quantité")));
+  fireEvent.press(getActionButton(screen, i18n.t("Ajouter à la liste")));
+  await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenLastCalledWith(
+    "requestDraft",
+    JSON.stringify([{ categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 3, condition: "occasion", brandId: 1, brandName: "RIDEX", brandNameAr: "ريدكس" }]),
   ));
 
   const trash = getActionButton(screen, i18n.t("Retirer de la liste"));
@@ -819,7 +842,7 @@ it("turns a brand row into a demande draft line and back via Liste/trash", async
 it("appends exactly one draft line when Liste is pressed twice in the same frame", async () => {
   mockParams = { categoryId: "12" };
   const screen = render(<CategoryBrandsScreen />);
-  await screen.findByText("RIDEX");
+  await screen.findByText(i18n.language === "ar" ? "ريدكس" : "RIDEX");
 
   const listButton = await findActionButton(screen, i18n.t("Liste"));
   act(() => {
@@ -827,6 +850,11 @@ it("appends exactly one draft line when Liste is pressed twice in the same frame
     fireEvent.press(listButton);
   });
 
+  const confirmButton = await findActionButton(screen, i18n.t("Ajouter à la liste"));
+  act(() => {
+    fireEvent.press(confirmButton);
+    fireEvent.press(confirmButton);
+  });
   await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalled());
   const setItemMock = AsyncStorage.setItem as jest.Mock;
   const lastPersisted = JSON.parse(setItemMock.mock.calls[setItemMock.mock.calls.length - 1][1] as string);
@@ -838,20 +866,24 @@ it("appends exactly one draft line when Liste is pressed twice in the same frame
 it("adds two brands of the same leaf as two draft lines and removes only one via trash", async () => {
   mockParams = { categoryId: "12" };
   const screen = render(<CategoryBrandsScreen />);
-  await screen.findByText("RIDEX");
+  await screen.findByText(i18n.language === "ar" ? "ريدكس" : "RIDEX");
   await screen.findByText("Bosch");
 
   fireEvent.press(await findActionButton(screen, i18n.t("Liste")));
+  fireEvent.press(screen.getByLabelText(i18n.t("Augmenter la quantité")));
+  fireEvent.press(await findActionButton(screen, i18n.t("Ajouter à la liste")));
   await waitFor(() => expect(screen.getAllByRole("button", { name: i18n.t("Liste") })).toHaveLength(1));
   fireEvent.press(getActionButton(screen, i18n.t("Liste")));
+  fireEvent.press(await findActionButton(screen, i18n.t("Ajouter à la liste")));
 
   const setItemMock = AsyncStorage.setItem as jest.Mock;
   await waitFor(() => {
     const lastPersisted = JSON.parse(setItemMock.mock.calls[setItemMock.mock.calls.length - 1][1] as string);
     expect(lastPersisted).toHaveLength(2);
   });
-  const bothAdded = JSON.parse(setItemMock.mock.calls[setItemMock.mock.calls.length - 1][1] as string) as { brandId: number | null }[];
+  const bothAdded = JSON.parse(setItemMock.mock.calls[setItemMock.mock.calls.length - 1][1] as string) as { brandId: number | null; quantity: number }[];
   expect(bothAdded.map((entry) => entry.brandId).sort()).toEqual([1, 2]);
+  expect(bothAdded.map((entry) => entry.quantity)).toEqual([2, 1]);
 
   const trashButtons = screen.getAllByRole("button", { name: i18n.t("Retirer de la liste") });
   expect(trashButtons).toHaveLength(2);
@@ -871,6 +903,7 @@ it("renders a single brandless add-to-list row when the leaf has no linked brand
   const listButton = await findActionButton(screen, i18n.t("Liste"));
   expect(screen.getAllByRole("button", { name: i18n.t("Liste") })).toHaveLength(1);
   fireEvent.press(listButton);
+  fireEvent.press(await findActionButton(screen, i18n.t("Ajouter à la liste")));
 
   await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith(
     "requestDraft",
@@ -898,9 +931,10 @@ it("lets a signed-in client add a brand without a login redirect", async () => {
   mockedUseSession.mockReturnValue({ role: Role.CLIENT } as ReturnType<typeof useSession>);
   mockParams = { categoryId: "12" };
   const screen = render(<CategoryBrandsScreen />);
-  await screen.findByText("RIDEX");
+  await screen.findByText(i18n.language === "ar" ? "ريدكس" : "RIDEX");
 
   fireEvent.press(await findActionButton(screen, i18n.t("Liste")));
+  fireEvent.press(await findActionButton(screen, i18n.t("Ajouter à la liste")));
 
   expect(mockShowNotification).toHaveBeenCalledWith(i18n.t("Ajouté à la liste !"));
   expect(await findActionButton(screen, i18n.t("Ajouté"))).toBeTruthy();

@@ -75,6 +75,11 @@ export default function OffersListScreen() {
                 <View style={[styles.offerRow, isArabic && styles.offerRowRtl]}>
                   <View flex gap={4}>
                     {title ? <Text semiBold translate={false}>{title}</Text> : null}
+                    {(isArabic ? item.brandNameAr ?? item.brandName : item.brandName) ? (
+                      <Text type="small" color={Colors.gray} translate={false}>
+                        {t("requestList.brand", { value: isArabic ? item.brandNameAr ?? item.brandName : item.brandName })}
+                      </Text>
+                    ) : null}
                     <Text type="small" color={Colors.gray} translate={false}>{t("requestFlow.reference", { value: item.reference })}</Text>
                     <Text type="small" color={Colors.gray}>requestFlow.clientPrice</Text>
                     <Text type="subTitle" bold translate={false}>{`${item.priceClient.toLocaleString(locale)} Dhs`}</Text>

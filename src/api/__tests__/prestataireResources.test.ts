@@ -113,6 +113,8 @@ const offer: PrestataireOffer = {
   categoryTitleAr: null,
   categoryImage: null,
   ferrailleurName: null,
+  brandName: null,
+  brandNameAr: null,
   shippingEligible: false,
 };
 

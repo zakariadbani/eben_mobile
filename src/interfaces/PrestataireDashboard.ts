@@ -33,6 +33,8 @@ export interface PrestataireDashboardSeries {
 /** Small summary row for a recent offer shown in the dashboard feed. */
 export interface RecentOfferSummary {
   offerId: number;
+  /** Item id within the request — used to deep-link the fill screen to this exact line. */
+  itemId?: number | null;
   offerReference: string;
   requestReference: string;
   /** The ferrailleur's own price (priceFerrailleur). */
@@ -47,6 +49,8 @@ export interface RecentOfferSummary {
   expiresAt: string | null;
   /** Category image URL returned by Laravel. */
   categoryImage: string | null;
+  brandName?: string | null;
+  brandNameAr?: string | null;
 }
 
 /**

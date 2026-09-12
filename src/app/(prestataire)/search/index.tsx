@@ -15,6 +15,7 @@ import Screen from "@/components/common/Screen";
 import { Text } from "@/components/common/Text";
 import View from "@/components/common/View";
 import ItemIncomingRequestCard from "@/components/screens/prestataire/ItemIncomingRequestCard";
+import { flattenIncoming } from "@/helpers/flattenIncoming";
 import Colors from "@/constants/Colors";
 import type { Request } from "@/interfaces/Request";
 
@@ -51,14 +52,13 @@ export default function PrestataireSearchScreen(): React.ReactElement {
   }, [load]);
 
   const results = useMemo(() => {
+    const pairs = flattenIncoming(requests);
     const normalized = query.trim().toLocaleLowerCase(i18n.language);
-    if (!normalized) return requests;
-    return requests.filter((request) => {
-      const categories = (request.items ?? []).flatMap((item) => [item.categoryTitle, item.categoryTitleAr]);
-      return [request.reference, request.notes, ...categories]
+    if (!normalized) return pairs;
+    return pairs.filter(({ request, item }) =>
+      [request.reference, request.notes, item.categoryTitle, item.categoryTitleAr, item.brandName, item.brandNameAr]
         .filter((value): value is string => Boolean(value))
-        .some((value) => value.toLocaleLowerCase(i18n.language).includes(normalized));
-    });
+        .some((value) => value.toLocaleLowerCase(i18n.language).includes(normalized)));
   }, [i18n.language, query, requests]);
 
   const emptyTitle = query.trim()
@@ -105,8 +105,8 @@ export default function PrestataireSearchScreen(): React.ReactElement {
           data={results}
           refreshing={refreshing}
           onRefresh={onRefresh}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={({ item }) => <ItemIncomingRequestCard item={item} />}
+          keyExtractor={(pair) => `${pair.request.id}-${pair.item.id}`}
+          renderItem={({ item: pair }) => <ItemIncomingRequestCard request={pair.request} item={pair.item} />}
           contentContainerStyle={[styles.list, results.length === 0 ? styles.emptyList : null]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}

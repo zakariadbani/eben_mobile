@@ -36,6 +36,7 @@ const PartnerOfferRow: React.FC<PartnerOfferRowProps> = ({ item, variant = "open
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === "ar";
   const title = isArabic ? (item.categoryTitleAr ?? item.categoryTitle ?? "—") : (item.categoryTitle ?? "—");
+  const brandLabel = isArabic ? (item.brandNameAr ?? item.brandName) : item.brandName;
   const appearance = statusAppearance[item.status] ?? statusAppearance.pending;
   const countdownColor = item.expiresAt && new Date(item.expiresAt).getTime() - Date.now() > 60 * 60_000 ? "#F59E0B" : Colors.red;
   const [remaining, setRemaining] = useState(item.expiresAt ? remainingLabel(item.expiresAt, isArabic) : "");
@@ -68,6 +69,11 @@ const PartnerOfferRow: React.FC<PartnerOfferRowProps> = ({ item, variant = "open
         <Text type="defaultTwo" semiBold translate={false} numberOfLines={2} style={styles.title}>
           {title}
         </Text>
+        {brandLabel ? (
+          <Text type="labelTwo" color={Colors.gray} translate={false} numberOfLines={1}>
+            {t("requestList.brand", { value: brandLabel })}
+          </Text>
+        ) : null}
         {variant === "open" ? (
           <View flexDirection="row" alignItems="center" gap={7} style={styles.status}>
             <Icon name="clock" type="Feather" size={21} iconColor={countdownColor} />

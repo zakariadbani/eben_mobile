@@ -520,6 +520,7 @@
   "partner.fill.pricePlaceholder": ".....",
   "partner.fill.commentLabel": "Laissez un commentaire",
   "partner.fill.commentPlaceholder": "......",
+  "partner.fill.clientGeneralNote": "Note générale sur la demande",
   "partner.fill.remarksLabel": "Remarques sur la pièce",
   "partner.fill.priceRecapLabel": "Prix",
   "partner.fill.ctaSend": "Envoyer l'offre",

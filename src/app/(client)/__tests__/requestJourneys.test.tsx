@@ -235,18 +235,13 @@ beforeEach(async () => {
 it("uploads local attachments and creates a draft with selected server vehicle and leaf IDs", async () => {
   (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([
     { categoryId: 13, title: "Disques", titleAr: "أقراص", quantity: 1, condition: "occasion" },
+    { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 2, condition: "occasion" },
   ]));
   const screen = render(<CreateRequestScreen />);
 
   await screen.findByText("Disques");
-  fireEvent.press(screen.getByRole("button", { name: "Ajouter une pièce" }));
-  fireEvent.press(await screen.findByRole("button", { name: "Freins" }));
-  fireEvent.press(screen.getByRole("button", { name: "Freins avant" }));
-  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.addPart", { name: "Plaquettes" }) }));
   fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.addImage") }));
   await screen.findByLabelText("file:///part.jpg");
-  expect(screen.getAllByLabelText(i18n.t("Diminuer la quantité"))[1].props.accessibilityState.disabled).toBe(true);
-  fireEvent.press(screen.getAllByLabelText(i18n.t("Augmenter la quantité"))[1]);
   fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.verify") }));
 
   const send = await screen.findByRole("button", { name: i18n.t("requestFlow.send") });
@@ -401,7 +396,8 @@ it("keeps listing the draft and offers the add-car CTA when the garage is empty"
   expect(mockCreateRequest).not.toHaveBeenCalled();
 });
 
-it("renders the Figma list/full layout for a saved draft", async () => {
+it.each(["fr", "ar"])("renders the Figma list/full layout for a saved draft in %s", async (language) => {
+  await i18n.changeLanguage(language);
   const draftItem1 = { categoryId: 12, title: "Plaquettes", titleAr: "وسادات", quantity: 3, condition: "occasion" as const };
   const draftItem2 = { categoryId: 13, title: "Disques", titleAr: "أقراص", quantity: 1, condition: "occasion" as const, brandId: null, brandName: null, brandNameAr: null };
   (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify([draftItem1, draftItem2]));
@@ -417,7 +413,7 @@ it("renders the Figma list/full layout for a saved draft", async () => {
 
   expect(await screen.findByText(i18n.t("requestFlow.totalPieces", { count: 4 }))).toBeTruthy();
   expect(screen.queryByText(i18n.t("requestFlow.chooseCategory"))).toBeNull();
-  expect(screen.getAllByText(i18n.t("requestList.category", { value: "Freins" })).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(i18n.t("requestList.category", { value: language === "ar" ? "فرامل" : "Freins" })).length).toBeGreaterThan(0);
   expect(screen.getByText(i18n.t(
     "Les demandes de prix sont ouvertes de 8h à 18h, toute demande envoyée après 18h sera satisfaite à 10h le jour ouvrable suivant.",
   ))).toBeTruthy();
@@ -426,15 +422,14 @@ it("renders the Figma list/full layout for a saved draft", async () => {
   expect(screen.getByText(i18n.t("home.checkPrices"))).toBeTruthy();
   expect(screen.getByText(i18n.t("home.details"))).toBeTruthy();
 
-  fireEvent.press(screen.getByRole("button", { name: i18n.t("Ajouter une pièce") }));
-  expect(await screen.findByText(i18n.t("requestFlow.chooseCategory"))).toBeTruthy();
-  expect(screen.queryByText(i18n.t("requestFlow.totalPieces", { count: 4 }))).toBeNull();
-  expect(screen.queryByText(i18n.t("Ajouter des détails"))).toBeNull();
-  expect(screen.queryByText(i18n.t("Vos requêtes actives"))).toBeNull();
-
-  fireEvent.press(screen.getByLabelText(i18n.t("requestFlow.back")));
+  expect(screen.queryByRole("button", { name: i18n.t("Ajouter une pièce") })).toBeNull();
+  const increaseButtons = screen.getAllByLabelText(i18n.t("Augmenter la quantité"));
+  const decreaseButtons = screen.getAllByLabelText(i18n.t("Diminuer la quantité"));
+  expect(decreaseButtons[1].props.accessibilityState.disabled).toBe(true);
+  fireEvent.press(increaseButtons[0]);
+  expect(await screen.findByText(i18n.t("requestFlow.totalPieces", { count: 5 }))).toBeTruthy();
+  fireEvent.press(decreaseButtons[0]);
   expect(await screen.findByText(i18n.t("requestFlow.totalPieces", { count: 4 }))).toBeTruthy();
-  expect(screen.queryByText(i18n.t("requestFlow.chooseCategory"))).toBeNull();
 
   fireEvent.press(screen.getAllByLabelText(i18n.t("requestFlow.removePart"))[0]);
   await waitFor(() => expect(AsyncStorage.setItem).toHaveBeenCalledWith("requestDraft", JSON.stringify([draftItem2])));

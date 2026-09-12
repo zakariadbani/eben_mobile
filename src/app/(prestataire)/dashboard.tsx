@@ -19,6 +19,7 @@ import PartnerRevenueHeroCard from "@/components/screens/prestataire/dashboard/P
 import PartnerStatCard from "@/components/screens/prestataire/dashboard/PartnerStatCard";
 import PartnerOfferRow from "@/components/screens/prestataire/dashboard/PartnerOfferRow";
 import { getPrestataireIncomingRequests, getPrestataireStats, getPrestataireOffers } from "@/api/resources/prestataire";
+import { flattenIncoming } from "@/helpers/flattenIncoming";
 import type { PrestataireDashboardStats } from "@/interfaces/PrestataireDashboard";
 import type { PrestataireOffer } from "@/interfaces/Offer";
 import type { Request } from "@/interfaces/Request";
@@ -128,25 +129,27 @@ const Dashboard: React.FC = () => {
     categoryTitle: offer.categoryTitle,
     categoryTitleAr: offer.categoryTitleAr,
     categoryImage: offer.categoryImage,
+    brandName: offer.brandName ?? null,
+    brandNameAr: offer.brandNameAr ?? null,
     createdAt: offer.createdAt,
     expiresAt: null,
   });
-  const incomingRows = incomingRequests.slice(0, 3).map((request) => {
-    const item = request.items?.[0];
-    return {
-      offerId: request.id,
-      offerReference: request.reference,
-      requestReference: request.reference,
-      priceFerrailleur: 0,
-      quantity: item?.quantity ?? 0,
-      status: "pending" as const,
-      categoryTitle: item?.categoryTitle ?? null,
-      categoryTitleAr: item?.categoryTitleAr ?? null,
-      categoryImage: item?.categoryImage ?? null,
-      createdAt: request.createdAt,
-      expiresAt: request.expiresAt,
-    };
-  });
+  const incomingRows = flattenIncoming(incomingRequests).slice(0, 3).map(({ request, item }) => ({
+    offerId: request.id,
+    itemId: item.id,
+    offerReference: request.reference,
+    requestReference: request.reference,
+    priceFerrailleur: 0,
+    quantity: item.quantity,
+    status: "pending" as const,
+    categoryTitle: item.categoryTitle ?? null,
+    categoryTitleAr: item.categoryTitleAr ?? null,
+    categoryImage: item.categoryImage ?? null,
+    brandName: item.brandName ?? null,
+    brandNameAr: item.brandNameAr ?? null,
+    createdAt: request.createdAt,
+    expiresAt: request.expiresAt,
+  }));
   const sentOfferRows = sentOffers.slice(0, 3).map(offerRow);
   const activeOfferRows = activeOffers.slice(0, 3).map(offerRow);
   const goToOffers = () => router.push("/(prestataire)/offers" as Href);
@@ -175,7 +178,7 @@ const Dashboard: React.FC = () => {
 
       <View style={styles.section}>
         <SectionHeader title="partner.dashboard.openOffers" onPress={goToOffers} />
-        {offerFeed(incomingRows.map((offer) => (<PartnerOfferRow key={offer.offerId} item={offer} onPress={() => router.push(`/(prestataire)/offers/${offer.offerId}/fill` as Href)} />)))}
+        {offerFeed(incomingRows.map((offer) => (<PartnerOfferRow key={`${offer.offerId}-${offer.itemId}`} item={offer} onPress={() => router.push(`/(prestataire)/offers/${offer.offerId}/fill?itemId=${offer.itemId}` as Href)} />)))}
         <View flexDirection="row" alignItems="flex-start" gap={10} style={styles.windowNotice}>
           <Icon name="info" type="Feather" size={20} iconColor={Colors.gray} />
           <Text type="label" color={Colors.innerText} flex>{"partner.dashboard.offerWindowNote"}</Text>

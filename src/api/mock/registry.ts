@@ -36,9 +36,11 @@ import {
   mockPrestataireDashboardStats,
   mockPrestataireProfile,
   mockPrestataireCompany,
+  mockPrestataireIncomingRequests,
   mockPrestataireOffersHistory,
   mockPrestataireNotifications,
 } from './mockPrestataire';
+import { mockRequests } from './mockRequests';
 import type { PrestataireDashboardStats } from '@/interfaces/PrestataireDashboard';
 import type { PrestataireProfile } from '@/interfaces/User';
 import type { PrestataireCompany } from '@/interfaces/PrestataireCompany';
@@ -84,6 +86,24 @@ function paginated<T>(data: T[], page = 1, perPage = DEFAULT_PAGE_SIZE): Paginat
 
 function single<T>(data: T): ApiResponse<T> {
   return { success: true, data };
+}
+
+function enrichHistoryOffer(offer: Offer) {
+  const requestItem = mockPrestataireIncomingRequests
+    .find(({ id }) => id === offer.requestId)
+    ?.items?.find(({ id }) => id === offer.requestItemId)
+    ?? mockRequests
+      .find(({ id }) => id === offer.requestId)
+      ?.items?.find(({ id }) => id === offer.requestItemId);
+  if (!requestItem) return offer;
+  return {
+    ...offer,
+    categoryTitle: requestItem.categoryTitle ?? null,
+    categoryTitleAr: requestItem.categoryTitleAr ?? null,
+    categoryImage: requestItem.categoryImage ?? null,
+    brandName: requestItem.brandName ?? null,
+    brandNameAr: requestItem.brandNameAr ?? null,
+  };
 }
 
 export const mockRegistry: Record<string, MockHandler> = {
@@ -279,7 +299,7 @@ export const mockRegistry: Record<string, MockHandler> = {
 
   // Offers history (all statuses, all time)
   'GET:/prestataire/offers/history': () =>
-    paginated<Offer>(mockPrestataireOffersHistory),
+    paginated(mockPrestataireOffersHistory.map(enrichHistoryOffer)),
 
   // Prestataire notifications
   'GET:/prestataire/notifications': () =>

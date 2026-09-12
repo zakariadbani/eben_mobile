@@ -110,6 +110,8 @@ const toClientOffer = (offer: Offer): ClientOfferItem => {
     categoryTitle: requestItem?.categoryTitle,
     categoryTitleAr: requestItem?.categoryTitleAr,
     categoryImage: requestItem?.categoryImage ?? null,
+    brandName: requestItem?.brandName ?? null,
+    brandNameAr: requestItem?.brandNameAr ?? null,
   } as ClientOfferItem;
 };
 const toPrestataireOffer = (offer: Offer): PrestataireOffer => {
@@ -130,6 +132,8 @@ const toPrestataireOffer = (offer: Offer): PrestataireOffer => {
     categoryTitleAr: requestItem?.categoryTitleAr ?? null,
     categoryImage: requestItem?.categoryImage ?? null,
     ferrailleurName: null,
+    brandName: requestItem?.brandName ?? null,
+    brandNameAr: requestItem?.brandNameAr ?? null,
     shippingEligible: offer.status === 'selected' && !state.shipments.some(({ offerId }) => offerId === offer.id),
   } as PrestataireOffer;
 };

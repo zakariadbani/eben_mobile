@@ -155,6 +155,7 @@ export default function OfferDetailScreen() {
   const isAvailable = offer.availability === "available";
   const requestClosed = request?.status === "ordered" || request?.status === "expired" || request?.status === "cancelled";
   const canAccept = isAvailable && offer.status === "validated" && !requestClosed;
+  const isArabic = i18n.language === "ar";
   const locale = i18n.language === "ar" ? "ar-MA" : "fr-MA";
   const vehicleLabel = vehicle ? [vehicle.brandName, vehicle.modelName, vehicle.year].filter(Boolean).join(" ") : "";
   return (
@@ -164,6 +165,11 @@ export default function OfferDetailScreen() {
         <Text type="small" color={Colors.gray} style={styles.reference} translate={false}>
           {t("requestFlow.reference", { value: offer.reference })}
         </Text>
+        {(isArabic ? offer.brandNameAr ?? offer.brandName : offer.brandName) ? (
+          <Text type="small" color={Colors.gray} translate={false}>
+            {t("requestList.brand", { value: isArabic ? offer.brandNameAr ?? offer.brandName : offer.brandName })}
+          </Text>
+        ) : null}
         <Text color={isAvailable ? Colors.greenDark : Colors.error}>
           {isAvailable ? "requestFlow.available" : "requestFlow.unavailable"}
         </Text>
