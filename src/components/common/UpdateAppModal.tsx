@@ -14,7 +14,7 @@ interface UpdateAppModalProps {
 
 const UpdateAppModal: React.FC<UpdateAppModalProps> = ({ visible, onUpdate, onSkip }) => {
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onSkip}>
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onSkip} statusBarTranslucent>
       <View style={styles.overlay}>
         <View style={styles.card}>
           <View style={styles.iconCircle}>

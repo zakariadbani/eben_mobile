@@ -14,16 +14,14 @@
  *   Info card      — inline-editable rows (AR frame):
  *                      name  → "Modifier" opens first/last name inputs, "Confirmer ✓" saves
  *                      email → "Modifier" opens email + current password, "Confirmer ✓" saves
- *                      phone / password → read-only (FR frame): no mobile phone-change continuation
- *                      for Prestataire, no password field on PUT /prestataire/profile
- *   Support CTA    — grey "Contactez le support pour modifier" (FR frame) → support alert
+ *                      phone → current-password gate, then role-owned OTP continuation
+ *                      password → current/new/confirmation through the dedicated endpoint
  *   WhatsApp FAB   — inherited from Screen
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Platform,
   StyleSheet,
@@ -31,6 +29,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 
 import View from '@/components/common/View';
@@ -41,7 +40,7 @@ import CustomIcon from '@/components/common/CustomIcon';
 import Button from '@/components/common/Button';
 import { Screen } from '@/components/common/Screen';
 
-import { getPrestataireProfile, updatePrestataireProfile } from '@/api';
+import { changePrestatairePassword, getPrestataireProfile, updatePrestataireProfile } from '@/api';
 import type { UpdatePrestataireProfilePayload } from '@/api/resources/prestataire';
 import { uploadLocalImages } from '@/api/resources/uploads';
 import { ApiClientError } from '@/api/types';
@@ -49,8 +48,9 @@ import { useSession } from '@/context/AuthContext';
 import { usePartnerBadges } from '@/hooks/usePartnerBadges';
 import type { PrestataireProfile } from '@/interfaces/User';
 import Colors from '@/constants/Colors';
+import { normalizeMoroccanPhone } from '@/helpers/phoneHelper';
 
-type EditableField = 'name' | 'email';
+type EditableField = 'name' | 'email' | 'phone' | 'password';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -110,7 +110,7 @@ interface InlineInputProps {
   readonly onChangeText: (value: string) => void;
   readonly placeholder: string;
   readonly secure?: boolean;
-  readonly keyboardType?: 'default' | 'email-address';
+  readonly keyboardType?: 'default' | 'email-address' | 'phone-pad';
   readonly isArabic: boolean;
 }
 
@@ -138,8 +138,9 @@ function InlineInput({ iconName, value, onChangeText, placeholder, secure = fals
 
 export default function EditProfileScreen(): React.ReactElement {
   const { t, i18n } = useTranslation();
+  const router = useRouter();
   const isArabic = i18n.language === 'ar';
-  const { refreshSessionProfile } = useSession();
+  const { refreshSessionProfile, startPhoneChangeVerification } = useSession();
   const { hasUnreadNotifications } = usePartnerBadges();
 
   const [profile, setProfile] = useState<PrestataireProfile | null>(null);
@@ -152,7 +153,10 @@ export default function EditProfileScreen(): React.ReactElement {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [fieldSaving, setFieldSaving] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
 
@@ -203,24 +207,20 @@ export default function EditProfileScreen(): React.ReactElement {
     }
   };
 
-  const showSupport = () => {
-    Alert.alert(
-      t('partner.editProfile.supportTitle'),
-      t('partner.editProfile.supportBody'),
-      [{ text: t('Fermer'), style: 'cancel' }],
-    );
-  };
-
   const startEditing = (field: EditableField) => {
     if (!profile) return;
     setFieldError(null);
     setCurrentPassword('');
+    setNewPassword('');
+    setPasswordConfirmation('');
     if (field === 'name') {
       const [first = '', ...rest] = profile.name.trim().split(/\s+/);
       setFirstName(profile.firstName ?? first);
       setLastName(profile.lastName ?? rest.join(' '));
-    } else {
+    } else if (field === 'email') {
       setEmail(profile.email ?? '');
+    } else if (field === 'phone') {
+      setPhone(profile.phone);
     }
     setEditing(field);
   };
@@ -279,6 +279,86 @@ export default function EditProfileScreen(): React.ReactElement {
       return;
     }
     void submit({ email: next, currentPassword });
+  };
+
+  const confirmPhone = async () => {
+    if (!profile) return;
+    const next = normalizeMoroccanPhone(phone);
+    if (!/^\+2126\d{8}$/.test(next)) {
+      setFieldError(t('partner.editProfile.phoneInvalid'));
+      return;
+    }
+    if (next === profile.phone) {
+      setEditing(null);
+      return;
+    }
+    if (!currentPassword) {
+      setFieldError(t('partner.editProfile.phoneCurrentPasswordRequired'));
+      return;
+    }
+    setFieldSaving(true);
+    setFieldError(null);
+    try {
+      const response = await updatePrestataireProfile({ phone: next, currentPassword });
+      setProfile(response.data);
+      try {
+        await startPhoneChangeVerification(response.data);
+      } finally {
+        router.replace('/(prestataire)/profile/verify-phone');
+      }
+    } catch (caught) {
+      const errors = caught instanceof ApiClientError ? caught.errors : {};
+      setFieldError(
+        errors.currentPassword
+          ? t('partner.editProfile.currentPasswordInvalid')
+          : errors.phone
+            ? t('partner.editProfile.phoneInvalid')
+            : t('partner.editProfile.saveError'),
+      );
+    } finally {
+      setFieldSaving(false);
+    }
+  };
+
+  const confirmPassword = async () => {
+    if (!currentPassword) {
+      setFieldError(t('partner.editProfile.passwordCurrentRequired'));
+      return;
+    }
+    if (newPassword.length < 8) {
+      setFieldError(t('partner.editProfile.newPasswordInvalid'));
+      return;
+    }
+    if (newPassword !== passwordConfirmation) {
+      setFieldError(t('partner.editProfile.passwordMismatch'));
+      return;
+    }
+    setFieldSaving(true);
+    setFieldError(null);
+    try {
+      await changePrestatairePassword({
+        currentPassword,
+        password: newPassword,
+        passwordConfirmation,
+      });
+      setEditing(null);
+      setCurrentPassword('');
+      setNewPassword('');
+      setPasswordConfirmation('');
+    } catch (caught) {
+      const errors = caught instanceof ApiClientError ? caught.errors : {};
+      setFieldError(
+        errors.currentPassword
+          ? t('partner.editProfile.currentPasswordInvalid')
+          : errors.passwordConfirmation
+            ? t('partner.editProfile.passwordMismatch')
+            : errors.password
+              ? t('partner.editProfile.newPasswordInvalid')
+              : t('partner.editProfile.saveError'),
+      );
+    } finally {
+      setFieldSaving(false);
+    }
   };
 
   const pageHeader = (
@@ -396,9 +476,42 @@ export default function EditProfileScreen(): React.ReactElement {
           </View>
         ) : null}
 
-        {/* Phone and password change only through support (FR frame): read-only rows. */}
-        <InfoRow iconName="phone" value={profile.phone} />
-        <InfoRow iconName="lock" value={t('partner.editProfile.maskedPassword')} />
+        <InfoRow
+          iconName="phone"
+          value={profile.phone}
+          action={{
+            label: editing === 'phone' ? confirmLabel : modifyLabel,
+            confirming: editing === 'phone',
+            busy: editing === 'phone' && fieldSaving,
+            onPress: () => (editing === 'phone' ? void confirmPhone() : startEditing('phone')),
+            accessibilityLabel: `${editing === 'phone' ? confirmLabel : modifyLabel} ${t('auth.fields.phone')}`,
+          }}
+        />
+        {editing === 'phone' ? (
+          <View style={styles.inlineBlock} gap={10}>
+            <InlineInput iconName="phone" value={phone} onChangeText={setPhone} placeholder={t('auth.fields.phone')} keyboardType="phone-pad" isArabic={isArabic} />
+            <InlineInput iconName="lock" value={currentPassword} onChangeText={setCurrentPassword} placeholder={t('partner.editProfile.currentPassword')} secure isArabic={isArabic} />
+          </View>
+        ) : null}
+
+        <InfoRow
+          iconName="lock"
+          value={t('partner.editProfile.maskedPassword')}
+          action={{
+            label: editing === 'password' ? confirmLabel : modifyLabel,
+            confirming: editing === 'password',
+            busy: editing === 'password' && fieldSaving,
+            onPress: () => (editing === 'password' ? void confirmPassword() : startEditing('password')),
+            accessibilityLabel: `${editing === 'password' ? confirmLabel : modifyLabel} ${t('auth.fields.password')}`,
+          }}
+        />
+        {editing === 'password' ? (
+          <View style={styles.inlineBlock} gap={10}>
+            <InlineInput iconName="lock" value={currentPassword} onChangeText={setCurrentPassword} placeholder={t('partner.editProfile.currentPassword')} secure isArabic={isArabic} />
+            <InlineInput iconName="lock" value={newPassword} onChangeText={setNewPassword} placeholder={t('partner.editProfile.newPassword')} secure isArabic={isArabic} />
+            <InlineInput iconName="lock" value={passwordConfirmation} onChangeText={setPasswordConfirmation} placeholder={t('partner.editProfile.passwordConfirmation')} secure isArabic={isArabic} />
+          </View>
+        ) : null}
 
         {fieldError ? (
           <Text accessibilityRole="alert" type="small" color={Colors.error} style={styles.fieldError}>
@@ -413,18 +526,6 @@ export default function EditProfileScreen(): React.ReactElement {
         </Text>
       ) : null}
 
-      {/* Figma FR: grey support button under the card. */}
-      <TouchableOpacity
-        style={styles.supportCta}
-        onPress={showSupport}
-        activeOpacity={0.8}
-        accessibilityRole="button"
-        accessibilityLabel={t('partner.editProfile.supportCta')}
-      >
-        <Text type="textTwo" semiBold color={Colors.brand} translate={false} center>
-          {t('partner.editProfile.supportCta')}
-        </Text>
-      </TouchableOpacity>
     </Screen>
   );
 }
@@ -523,16 +624,5 @@ const styles = StyleSheet.create({
   },
   retryBtn: {
     marginTop: 16,
-  },
-  // Figma FR: light blue-grey (#EFF2F6) 40 dp button.
-  supportCta: {
-    minHeight: 44,
-    marginHorizontal: 16,
-    marginBottom: 24,
-    paddingHorizontal: 16,
-    borderRadius: 4,
-    backgroundColor: Colors.backgroundGray,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

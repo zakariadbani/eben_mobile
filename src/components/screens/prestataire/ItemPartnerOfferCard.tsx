@@ -53,6 +53,9 @@ export function timePrefix(createdAt: string, isArabic = false): string {
  *   expired                    → "Offre manquée"
  */
 function statusAppearance(item: PartnerOfferCardItem, listMode: ListMode, isShipped: boolean): StatusAppearance {
+  if (item.paymentStatus === "pending" || item.paymentStatus === "failed") {
+    return { labelKey: "partner.status.payment.unpaid", color: Colors.red, icon: { name: "alert-circle", type: "Feather" } };
+  }
   if (isShipped) {
     return { labelKey: "partner.sent.shipped", color: statusColor("shipped"), icon: statusIcon("shipped") };
   }

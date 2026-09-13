@@ -49,6 +49,7 @@ import { Role, useSession } from "@/context/AuthContext";
 import { useWishlist } from "@/context/WishlistContext";
 import type { Product } from "@/interfaces/Product";
 import type { Basket } from "@/interfaces/Basket";
+import { formatDhs, moneyLocale } from "@/helpers/money";
 
 // ── Star rating row ───────────────────────────────────────────────────────────
 
@@ -293,8 +294,14 @@ const ProductDetailScreen: React.FC = () => {
   const displayWarranty = isArabic ? product.warrantyAr : product.warranty;
   const displayCategoryName = isArabic ? product.categoryNameAr : product.categoryName;
 
-  const hasPromo = product.promoPrice !== undefined && product.promoPrice !== null && product.promoPrice > 0;
+  const hasPromo = product.promoPrice !== undefined
+    && product.promoPrice !== null
+    && product.promoPrice > 0
+    && product.promoPrice < product.price;
   const activePrice = hasPromo ? product.promoPrice! : product.price;
+  const discountPercent = hasPromo
+    ? Math.round((1 - product.promoPrice! / product.price) * 100)
+    : 0;
   const wished = isWishlisted(product.id);
 
   return (
@@ -368,7 +375,7 @@ const ProductDetailScreen: React.FC = () => {
                   style={styles.originalPrice}
                   translate={false}
                 >
-                  {`${product.price.toLocaleString("fr-MA")} Dhs TTC`}
+                  {t("home.price", { price: formatDhs(product.price, moneyLocale(i18n.language)) })}
                 </Text>
               )}
               <View flexDirection="row" alignItems="center" gap={8}>
@@ -378,12 +385,12 @@ const ProductDetailScreen: React.FC = () => {
                   style={[styles.activePrice, hasPromo && styles.activePricePromo]}
                   translate={false}
                 >
-                  {`${activePrice.toLocaleString("fr-MA")} Dhs TTC`}
+                  {t("home.price", { price: formatDhs(activePrice, moneyLocale(i18n.language)) })}
                 </Text>
                 {hasPromo && (
                   <View style={styles.promoBadge}>
                     <Text type="small" color={Colors.white} translate={false}>
-                      {t("Promo")}
+                      {`-${discountPercent}%`}
                     </Text>
                   </View>
                 )}
@@ -500,7 +507,7 @@ const ProductDetailScreen: React.FC = () => {
               active={wished}
               onPress={handleWishlist}
               size={22}
-              accessibilityLabel={isArabic ? "إضافة إلى المفضلة" : "Ajouter à la liste"}
+              accessibilityLabel={t(wished ? "Retirer de la liste de souhaits" : "Ajouter à la liste de souhaits")}
               style={wishlistLoading ? styles.wishlistHeartHidden : undefined}
             />
             {wishlistLoading && (
@@ -534,7 +541,7 @@ const ProductDetailScreen: React.FC = () => {
         onClose={() => setShowPurchaseModal(false)}
         title={t("Ajouter au panier")}
         primaryButton={{
-          title: addToBasketLoading ? t("Ajout...") : t("Confirm"),
+          title: addToBasketLoading ? t("Ajout...") : t("Acheter"),
           onPress: () => void handleAddToBasket(),
           variant: "primary",
         }}
@@ -548,9 +555,23 @@ const ProductDetailScreen: React.FC = () => {
           <View style={styles.sheetHandle} />
           <Text type="defaultTwo" semiBold center translate={false}>{displayTitle}</Text>
           {!isOccasion ? (
-            <Text type="subTitleTwo" semiBold style={styles.purchasePrice} translate={false}>
-              {`${activePrice.toLocaleString("fr-MA")} Dhs TTC`}
-            </Text>
+            <View alignItems="center" gap={6}>
+              {hasPromo ? (
+                <Text type="labelTwo" style={styles.purchaseOldPrice} translate={false}>
+                  {t("home.price", { price: formatDhs(product.price, moneyLocale(i18n.language)) })}
+                </Text>
+              ) : null}
+              <View flexDirection="row" alignItems="center" gap={8}>
+                <Text type="subTitleTwo" semiBold style={styles.purchasePrice} translate={false}>
+                  {t("home.price", { price: formatDhs(activePrice, moneyLocale(i18n.language)) })}
+                </Text>
+                {hasPromo ? (
+                  <Text type="labelTwo" semiBold style={styles.purchaseDiscount} translate={false}>
+                    {`-${discountPercent}%`}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
           ) : null}
           <Text type="textTwo" semiBold style={styles.quantityLabel}>{t("Quantité")}</Text>
           <QtyStepper value={qty} onChange={setQty} />
@@ -589,10 +610,7 @@ const ProductDetailScreen: React.FC = () => {
               {basketAfterAdd ? (
                 <Text testID="product-basket-total" type="small" color={Colors.gray} translate={false}>
                   {t("commerce.success.total", {
-                    value: basketAfterAdd.total.toLocaleString("fr-MA", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    }),
+                    price: formatDhs(basketAfterAdd.total, moneyLocale(i18n.language)),
                   })}
                 </Text>
               ) : null}
@@ -737,6 +755,8 @@ const styles = StyleSheet.create({
   purchaseSheet: { width: "100%", alignItems: "center", gap: 16, paddingBottom: 12 },
   sheetHandle: { width: 120, height: 5, borderRadius: 3, backgroundColor: Colors.grayDark },
   purchasePrice: { color: Colors.brand, backgroundColor: Colors.primary, paddingHorizontal: 12, paddingVertical: 8 },
+  purchaseOldPrice: { color: Colors.gray, textDecorationLine: "line-through" },
+  purchaseDiscount: { color: Colors.brand, backgroundColor: Colors.orange, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4 },
   quantityLabel: { color: Colors.brand, alignSelf: "flex-start" },
 });
 

@@ -81,6 +81,26 @@ export default function PrestataireSearchScreen(): React.ReactElement {
         .some((value) => value.toLocaleLowerCase(i18n.language).includes(normalized)));
   }, [i18n.language, query, requests]);
 
+  const groupedResults = useMemo(() => {
+    const groups = new Map<number, { label: string; pairs: typeof results }>();
+    results.forEach((pair) => {
+      const family = pair.item.categoryFamily;
+      const id = family?.id ?? pair.item.categoryId;
+      const label = family
+        ? (isArabic ? family.titleAr || family.title : family.title)
+        : ((isArabic ? pair.item.categoryTitleAr : pair.item.categoryTitle) ?? t('partner.offers.unknownPart'));
+      const group = groups.get(id);
+      if (group) group.pairs.push(pair);
+      else groups.set(id, { label, pairs: [pair] });
+    });
+    return Array.from(groups, ([id, group]) => group.pairs.map((pair, index) => ({
+      key: `${pair.request.id}-${pair.item.id}`,
+      pair,
+      familyId: id,
+      familyLabel: index === 0 ? group.label : null,
+    }))).flat();
+  }, [isArabic, results, t]);
+
   const emptyTitle = query.trim()
     ? t("partner.search.noResults")
     : t("partner.search.empty");
@@ -129,11 +149,18 @@ export default function PrestataireSearchScreen(): React.ReactElement {
         </View>
       ) : (
         <FlatList
-          data={results}
+          data={groupedResults}
           refreshing={refreshing}
           onRefresh={onRefresh}
-          keyExtractor={(pair) => `${pair.request.id}-${pair.item.id}`}
-          renderItem={({ item: pair }) => <ItemIncomingRequestCard request={pair.request} item={pair.item} />}
+          keyExtractor={(entry) => entry.key}
+          renderItem={({ item: entry }) => (
+            <View>
+              {entry.familyLabel ? (
+                <Text type="titleTwo" semiBold translate={false} style={styles.familyTitle}>{entry.familyLabel}</Text>
+              ) : null}
+              <ItemIncomingRequestCard request={entry.pair.request} item={entry.pair.item} />
+            </View>
+          )}
           contentContainerStyle={[styles.list, results.length === 0 ? styles.emptyList : null]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -177,5 +204,6 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 110 },
   emptyList: { flexGrow: 1, justifyContent: "center", paddingBottom: 160 },
   resultsLabel: { marginBottom: 10 },
+  familyTitle: { marginTop: 10, marginBottom: 8 },
   retryButton: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 4, backgroundColor: Colors.primary },
 });

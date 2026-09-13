@@ -61,14 +61,7 @@ const ProgressStepperComponent: React.FC<ProgressStepperComponentProps> = ({
                   !isCompleted && !isActive && styles.circlePending,
                 ]}
               >
-                {isCompleted ? (
-                  <Icon
-                    name="check"
-                    size={14}
-                    iconColor={Colors.white}
-                    type="Feather"
-                  />
-                ) : isActive ? (
+                {isCompleted || isActive ? (
                   <Icon
                     name="check"
                     size={14}
@@ -94,8 +87,8 @@ const ProgressStepperComponent: React.FC<ProgressStepperComponentProps> = ({
             </NativeView>
 
             {/* Connector line (not after last step) — Figma draws one
-                continuous black line regardless of step state. */}
-            {!isLast && <View style={styles.connector} />}
+                continuous black line from circle to circle. */}
+            {!isLast && <View style={[styles.connector, isArabic ? styles.connectorRtl : styles.connectorLtr]} />}
           </View>
         );
       })}
@@ -115,10 +108,12 @@ const styles = StyleSheet.create({
   },
   stepWrapper: {
     alignItems: "center",
+    position: "relative",
   },
   stepNode: {
     alignItems: "center",
-    width: 72,
+    width: "100%",
+    zIndex: 1,
   },
   circle: {
     width: 26,
@@ -129,27 +124,32 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     marginBottom: 4,
   },
+  // Figma (List-Commandez 63-16648): done and current steps are yellow with a black check.
   circleCompleted: {
-    backgroundColor: Colors.greenDark,
-    borderColor: Colors.greenDark,
+    backgroundColor: Colors.primary,
+    borderColor: Colors.brand,
   },
   circleActive: {
     backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    borderColor: Colors.brand,
   },
   circlePending: {
     backgroundColor: Colors.white,
     borderColor: Colors.brand,
   },
+  // Runs from this circle's right edge to the next circle's left edge (both
+  // circles sit at the centre of equal-width step columns).
   connector: {
-    flex: 1,
+    position: "absolute",
+    top: 12,
+    width: "100%",
     height: 2,
-    marginBottom: 19, // offset to align with the 26px circle centres
-    marginHorizontal: 2,
     backgroundColor: Colors.brand,
   },
+  connectorLtr: { left: "50%", marginLeft: 13 },
+  connectorRtl: { right: "50%", marginRight: 13 },
   stepLabel: {
-    maxWidth: 72,
+    maxWidth: 84,
   },
   labelCompleted: {
     color: Colors.greenDark,

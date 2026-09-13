@@ -150,6 +150,9 @@ function order(status: PurchaseOrderStatus = "sent", id = 31, createdAt = "2026-
       updatedAt: "2026-08-02T10:00:00.000Z",
       categoryTitle: "Freins",
       categoryTitleAr: "الفرامل",
+      images: ["https://cdn.example/order-line.jpg"],
+      vehicle: { brandName: "BMW", modelName: "X5 (E53)", motorisation: "4.8 Essence", year: 2004 },
+      paymentStatus: "completed",
       purchaseOrder: purchaseOrder(status),
     }],
   };
@@ -178,6 +181,8 @@ const linkedOffer = {
   ferrailleurName: "Garage",
   brandName: null,
   brandNameAr: null,
+  vehicle: { brandName: "BMW", modelName: "X5 (E53)", motorisation: "4.8 Essence", year: 2004 },
+  paymentStatus: "completed",
   shippingEligible: true,
 } satisfies PrestataireOffer;
 
@@ -327,16 +332,17 @@ it("shows the Figma shipped block with tracking and keeps order notes separate",
   expect(view.queryByText(i18n.t("partner.orders.parts"))).toBeNull();
 });
 
-it("enriches the detail with the linked offer photos, condition, remarks, and audio", async () => {
+it("uses order-line photos and vehicle while enriching remarks and audio from the linked offer", async () => {
   mockParams = { orderId: "31" };
   mockGetOrder.mockResolvedValue(response(order("shipped")));
   mockGetOffer.mockResolvedValue({ success: true, data: linkedOffer });
   const view = render(<OrderDetailScreen />);
 
   expect(await view.findByTestId("image-slider")).toBeTruthy();
-  expect(mockGetOffer).toHaveBeenCalledWith(401);
+  await waitFor(() => expect(mockGetOffer).toHaveBeenCalledWith(401));
   expect(view.getByText("Ref: ORD-31")).toBeTruthy();
-  expect(view.getByText("Remarque offre")).toBeTruthy();
+  expect(await view.findByText("Remarque offre")).toBeTruthy();
+  expect(view.getByText("BMW X5 (E53) 4.8 Essence 2004")).toBeTruthy();
   expect(view.getByTestId("audio-player")).toBeTruthy();
   expect(view.getByText(`${i18n.t("partner.offerDetail.condition")} ${i18n.t("partner.fill.conditionOccasion")}`)).toBeTruthy();
 });

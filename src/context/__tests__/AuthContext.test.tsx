@@ -229,6 +229,29 @@ describe('AuthContext', () => {
     expect(result.current.session?.user.phone).toBe('+212600000109');
   });
 
+  it('persists the same phone-change continuation for a Prestataire session', async () => {
+    mockedAuth.login.mockResolvedValueOnce(success(authSession('ferrailleur')));
+    const changedIdentity = {
+      name: 'Test User',
+      email: null,
+      phone: '+212600000109',
+      avatar: null,
+    };
+    const { result } = renderSession();
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.login('+212600000101', 'local-password', Role.PRESTATAIRE);
+    });
+    await act(async () => {
+      await result.current.startPhoneChangeVerification(changedIdentity);
+    });
+
+    expect(mockedAuth.sendOtp).toHaveBeenCalledWith({ phone: '+212600000109', purpose: 'register' });
+    expect(result.current.pendingPhoneChangeVerificationPhone).toBe('+212600000109');
+    expect(result.current.role).toBe(Role.PRESTATAIRE);
+  });
+
   it('rejects and best-effort revokes a server role that mismatches the selected entry', async () => {
     const { result } = renderSession();
     await waitFor(() => expect(result.current.isLoading).toBe(false));

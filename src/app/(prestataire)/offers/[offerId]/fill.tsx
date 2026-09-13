@@ -31,7 +31,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -53,8 +52,10 @@ import ImageInputList from '@/components/common/ImageInputList';
 import ImageSlider from '@/components/common/ImageSlider';
 import Icon from '@/components/common/Icon';
 import AudioPlayer from '@/components/common/AudioPlayer';
+import AudioRecorderInput from '@/components/common/AudioRecorderInput';
 import PickerInput from '@/components/common/PickerInput';
 import Colors from '@/constants/Colors';
+import { vehicleSummaryLabel } from '@/helpers/vehicleSummary';
 
 import {
   submitOffer,
@@ -64,7 +65,7 @@ import {
   getPrestataireOffer,
   type SubmitOfferLinePayload,
 } from '@/api/resources/prestataire';
-import { uploadLocalImages } from '@/api/resources/uploads';
+import { uploadLocalAudio, uploadLocalImages } from '@/api/resources/uploads';
 import { ApiClientError } from '@/api/types';
 import { useCountdown } from '@/helpers/countdown';
 import { remainingColor, remainingLabel } from '@/components/screens/prestataire/dashboard/remaining';
@@ -83,9 +84,10 @@ interface OfferLine {
   condition: ConditionOption;
   description: string;
   images: string[];
+  audio: string | null;
 }
 
-type OfferLineField = 'priceFerrailleur' | 'condition' | 'description' | 'images';
+type OfferLineField = 'priceFerrailleur' | 'condition' | 'description' | 'images' | 'audio';
 type OfferLineErrors = Record<number, Partial<Record<OfferLineField, string>>>;
 
 const isLocalImage = (uri: string): boolean => /^(file|content):\/\//i.test(uri);
@@ -100,7 +102,7 @@ const isLineReady = (line: OfferLine): boolean => {
 function mapOfferLineErrors(errors: Record<string, string[]>): OfferLineErrors {
   const mapped: OfferLineErrors = {};
   for (const [field, messages] of Object.entries(errors)) {
-    const match = field.match(/^lines\.(\d+)\.(priceFerrailleur|condition|description|images)(?:\.\d+)?$/);
+    const match = field.match(/^lines\.(\d+)\.(priceFerrailleur|condition|description|images|audio)(?:\.\d+)?$/);
     const message = messages[0];
     if (!match || !message) continue;
     const index = Number(match[1]);
@@ -155,6 +157,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   const [lineErrors, setLineErrors] = useState<OfferLineErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [uploadedPaths, setUploadedPaths] = useState<Record<string, string>>({});
+  const [uploadedAudioPaths, setUploadedAudioPaths] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitDone, setSubmitDone] = useState(false);
   const [completedOfferId, setCompletedOfferId] = useState<number | null>(null);
@@ -229,6 +232,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
           condition: ownedOffer.condition,
           description: ownedOffer.description ?? '',
           images: ownedOffer.images,
+          audio: null,
         }]);
         return;
       }
@@ -255,6 +259,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
         condition: target.condition,
         description: '',
         images: [],
+        audio: null,
       }] : []);
     } catch {
       setLoadError(t('partner.fill.loadError'));
@@ -323,6 +328,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
       condition: template.condition,
       description: '',
       images: [],
+      audio: null,
     }]);
     // Focus the new offer: previous lines fold, the added one opens.
     setCollapsedLineKeys(Object.fromEntries(offerLines.map((line) => [line.key, true])));
@@ -396,12 +402,26 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
       if (localUris.some((uri) => !nextUploadedPaths[uri])) throw new Error('Incomplete image upload');
       setUploadedPaths(nextUploadedPaths);
 
+      const localAudioUris = offerLines
+        .map((line) => line.audio)
+        .filter((uri): uri is string => uri !== null);
+      const pendingAudioUris = localAudioUris.filter((uri) => uploadedAudioPaths[uri] === undefined);
+      const newAudioPaths = pendingAudioUris.length > 0 ? await uploadLocalAudio(pendingAudioUris) : [];
+      const nextUploadedAudioPaths = { ...uploadedAudioPaths };
+      pendingAudioUris.forEach((uri, index) => {
+        const path = newAudioPaths[index];
+        if (path) nextUploadedAudioPaths[uri] = path;
+      });
+      if (localAudioUris.some((uri) => !nextUploadedAudioPaths[uri])) throw new Error('Incomplete audio upload');
+      setUploadedAudioPaths(nextUploadedAudioPaths);
+
       const lines: SubmitOfferLinePayload[] = offerLines.map((line) => ({
         requestItemId: line.requestItemId,
         priceFerrailleur: Number(line.priceFerrailleur),
         condition: line.condition,
         description: line.description.trim() || null,
         images: line.images.map((uri) => nextUploadedPaths[uri]!),
+        ...(line.audio ? { audio: nextUploadedAudioPaths[line.audio]! } : {}),
       }));
       const result = await submitOffer(requestId, { lines });
       if (!result.data.success || !Number.isSafeInteger(result.data.offerId) || result.data.offerId <= 0) {
@@ -573,10 +593,11 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                 </Text>
               </View>
               <Text type="label" translate={false}>{`${t('partner.offerDetail.qty')} ${headerItem.quantity}`}</Text>
-              {/* Request only carries vehicleId (no label) — same fallback copy as ship.tsx */}
               <View style={styles.vehicleCard} flexDirection="row" alignItems="center" gap={12}>
                 <Icon name="car-outline" type="MaterialCommunityIcons" size={31} iconColor={Colors.black} />
-                <Text type="label" flex>{t('partner.ship.vehicleFallback')}</Text>
+                <Text type="label" flex translate={false}>
+                  {vehicleSummaryLabel(request?.vehicle) ?? t('partner.ship.vehicleFallback')}
+                </Text>
               </View>
               <Text type="small" color={Colors.grayMidDark} translate={false}>
                 {`${t('partner.offerDetail.ref')} ${request?.reference ?? ''}`}
@@ -784,6 +805,10 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                         <Text type="small" color={Colors.red} translate={false}>{lineErrors[index].description}</Text>
                       ) : null}
                     </View>
+                    <AudioRecorderInput
+                      value={line.audio}
+                      onChange={(audio) => updateLine(index, { audio })}
+                    />
                   </>
                 )}
                 </View>
@@ -898,13 +923,12 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
     <Screen statusBarStyle="dark-content" whatsapp={false} scrollable={false} edges={['bottom']}>
       <CustomHeader title="partner.fill.openDetailTitle" />
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={80}
-      >
+      {/* Screen already avoids the keyboard: a second KeyboardAvoidingView here
+          (offset 80) left the action bar ~90 dp above the tab bar once the
+          keyboard closed. */}
+      <View style={styles.flex}>
         {content}
-      </KeyboardAvoidingView>
+      </View>
 
       {/* ── Decline bottom sheet ── */}
       <ConfirmModal

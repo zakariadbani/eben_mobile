@@ -14,18 +14,21 @@
  *   Group 3 — Préférences: Notifications push (toggle), Ne pas faire de suivi (toggle), Langue
  *   Group 4 — À propos: Contactez-nous, À propos d'EBEN
  *   Group 5 — Mentions légales: Termes et conditions, Politique de confidentialité, Politique de vente
- *   Footer  — pink power-off button (logout), copyright line, version
+ *   Footer  — pink power-off button (logout, confirmed in the same bottom sheet as
+ *             the client Profil), copyright line, version
  *
  * Preference toggles are stored on-device only (no preferences endpoint yet).
  */
 
 import React, { useCallback, useState } from 'react';
-import { Alert, Image, ScrollView, StatusBar, StyleSheet, TouchableOpacity } from 'react-native';
+import { Image, ScrollView, StatusBar, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Href, useFocusEffect, useRouter } from 'expo-router';
 
 import View from '@/components/common/View';
+import ConfirmModal from '@/components/common/ConfirmModal';
+import { Text } from '@/components/common/Text';
 import Icon from '@/components/common/Icon';
 import Footer from '@/components/common/Footer';
 import HeaderBell from '@/components/common/navigation/HeaderBell';
@@ -55,6 +58,8 @@ export default function PrestataireProfileScreen(): React.ReactElement {
   const { hasUnreadNotifications } = usePartnerBadges();
 
   const [profile, setProfile] = useState<PrestataireProfile | null>(null);
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [[pushLoading, pushStored], setPushStored] = useStorageState<boolean>(PARTNER_PUSH_PREFERENCE_KEY);
   const [[trackLoading, doNotTrackStored], setDoNotTrackStored] = useStorageState<boolean>(PARTNER_DO_NOT_TRACK_KEY);
   // Figma defaults: push ON, do-not-track OFF.
@@ -75,15 +80,16 @@ export default function PrestataireProfileScreen(): React.ReactElement {
   const go = (path: string) => router.push(path as Href);
   const openLegal = (section: LegalSection) => router.push({ pathname: '/(prestataire)/profile/legal', params: { section } } as Href);
 
-  const handleLogout = () => {
-    Alert.alert(
-      t('partner.profile.logoutTitle'),
-      t('partner.profile.logoutBody'),
-      [
-        { text: t('Annuler'), style: 'cancel' },
-        { text: t('Déconnexion'), style: 'destructive', onPress: () => logOut() },
-      ],
-    );
+  // Destructive and one tap away: always confirm first (same sheet and copy as the client Profil).
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logOut();
+      setLogoutConfirmVisible(false);
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   const displayName = profile?.name ?? username ?? t('partner.profile.partnerFallback');
@@ -198,7 +204,7 @@ export default function PrestataireProfileScreen(): React.ReactElement {
         <View style={styles.logoutSection} alignItems="center">
           <TouchableOpacity
             style={styles.logoutBtn}
-            onPress={handleLogout}
+            onPress={() => setLogoutConfirmVisible(true)}
             activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityLabel={t('partner.profile.logoutTitle')}
@@ -209,6 +215,22 @@ export default function PrestataireProfileScreen(): React.ReactElement {
 
         <Footer />
       </ScrollView>
+
+      <ConfirmModal
+        visible={logoutConfirmVisible}
+        onClose={() => setLogoutConfirmVisible(false)}
+        secondaryButton={{ title: t('Annuler'), variant: 'gray', onPress: () => setLogoutConfirmVisible(false) }}
+        primaryButton={{
+          title: t('settings.logout'),
+          variant: 'pink',
+          disabled: loggingOut,
+          onPress: () => { void handleLogout(); },
+        }}
+      >
+        <View style={styles.logoutConfirm}>
+          <Text type="headerTitle">{t('settings.logoutConfirm')}</Text>
+        </View>
+      </ConfirmModal>
     </SafeAreaView>
   );
 }
@@ -233,6 +255,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 24 },
   firstGroup: { paddingTop: 24 },
   logoutSection: { marginTop: 40, marginBottom: 56 },
+  logoutConfirm: { paddingTop: 20, paddingBottom: 40 },
   logoutBtn: {
     width: 64,
     height: 64,

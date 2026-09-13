@@ -10,11 +10,25 @@ import ClientRegisterScreen from '../ClientRegisterScreen';
 import ClientAuthenticationOptionsScreen from '../ClientAuthenticationOptionsScreen';
 import RegistrationVerificationScreen from '../register/verification';
 import RegistrationSuccessScreen from '../register/success';
+import ClientLoadingScreen from '../loading';
+import {
+  armWelcomeSplash,
+  claimWelcomeSplashRedirect,
+  disarmWelcomeSplash,
+  isWelcomeSplashArmed,
+} from '@/helpers/welcomeSplash';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn().mockResolvedValue(null),
   setItem: jest.fn().mockResolvedValue(undefined),
 }));
+
+// ClientAuthenticationOptionsScreen reads useSafeAreaInsets() without a
+// <SafeAreaProvider> in this render tree: the library's jest mock returns
+// zeroed insets instead of throwing "No safe area value available".
+jest.mock('react-native-safe-area-context', () =>
+  require('react-native-safe-area-context/jest/mock').default,
+);
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
@@ -24,10 +38,16 @@ const mockVerifyRegistration = jest.fn();
 const mockResendRegistrationOtp = jest.fn();
 let mockParams: Record<string, string | undefined> = {};
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockReplace, push: mockPush }),
-  useLocalSearchParams: () => mockParams,
-}));
+jest.mock('expo-router', () => {
+  const React = require('react');
+  const Stack = ({ children }: { children?: React.ReactNode }) => React.createElement(React.Fragment, null, children);
+  Stack.Screen = function MockStackScreen() { return null; };
+  return {
+    Stack,
+    useRouter: () => ({ replace: mockReplace, push: mockPush }),
+    useLocalSearchParams: () => mockParams,
+  };
+});
 jest.mock('@/context/AuthContext', () => ({
   AuthRoleMismatchError: class AuthRoleMismatchError extends Error {},
   Role: { CLIENT: 'client', PRESTATAIRE: 'prestataire' },
@@ -61,6 +81,7 @@ const mockedUseSession = useSession as jest.MockedFunction<typeof useSession>;
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  disarmWelcomeSplash();
   mockParams = { phone: '+212600000101' };
   await i18n.changeLanguage('fr');
   mockLogin.mockResolvedValue(Role.CLIENT);
@@ -102,12 +123,46 @@ it('awaits Client login and navigates only after success', async () => {
 
   await waitFor(() => expect(mockLogin).toHaveBeenCalledWith('+212600000101', 'password123', Role.CLIENT));
   expect(mockReplace).not.toHaveBeenCalled();
+  // Armed before login() resolves: the root guard sees the session first.
+  expect(isWelcomeSplashArmed()).toBe(true);
   await waitFor(() => expect(
     screen.getByRole('button', { name: i18n.t('auth.login.submitting') }).props.accessibilityState,
   ).toMatchObject({ busy: true, disabled: true }));
 
   await act(async () => resolveLogin(Role.CLIENT));
-  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/(client)'));
+  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith({
+    pathname: '/(auth)/loading',
+    params: { returnTo: '/(client)' },
+  }));
+});
+
+it('leaves the splash redirect to the root guard when it already issued it', async () => {
+  let resolveLogin: (role: Role) => void = () => undefined;
+  mockLogin.mockReturnValueOnce(new Promise((resolve) => { resolveLogin = resolve; }));
+  mockParams = { returnTo: '/(client)/cart' };
+  const screen = render(<ClientLoginScreen />);
+
+  fireEvent.changeText(screen.getByPlaceholderText(i18n.t('auth.fields.phonePlaceholder')), '0600000101');
+  fireEvent.changeText(screen.getByPlaceholderText('......'), 'password123');
+  fireEvent.press(screen.getByRole('button', { name: i18n.t('auth.login.submit') }));
+  await waitFor(() => expect(mockLogin).toHaveBeenCalled());
+
+  // The session appeared: the root layout guard claims the splash redirect first.
+  expect(claimWelcomeSplashRedirect()).toEqual({
+    pathname: '/(auth)/loading',
+    params: { returnTo: '/(client)/cart' },
+  });
+  await act(async () => resolveLogin(Role.CLIENT));
+
+  expect(mockReplace).not.toHaveBeenCalled();
+  expect(isWelcomeSplashArmed()).toBe(true);
+});
+
+it('clears the splash hand-off when the splash mounts', () => {
+  armWelcomeSplash(Role.CLIENT, '/(client)');
+  mockParams = { phase: '3' };
+  render(<ClientLoadingScreen />);
+  expect(isWelcomeSplashArmed()).toBe(false);
 });
 
 it('returns a signed-in Client to the protected product they requested', async () => {
@@ -118,7 +173,10 @@ it('returns a signed-in Client to the protected product they requested', async (
   fireEvent.changeText(screen.getByPlaceholderText('......'), 'password123');
   fireEvent.press(screen.getByRole('button', { name: i18n.t('auth.login.submit') }));
 
-  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/(client)/products/1001'));
+  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith({
+    pathname: '/(auth)/loading',
+    params: { returnTo: '/(client)/products/1001' },
+  }));
 });
 
 it('rejects external return targets after Client login', async () => {
@@ -129,7 +187,48 @@ it('rejects external return targets after Client login', async () => {
   fireEvent.changeText(screen.getByPlaceholderText('......'), 'password123');
   fireEvent.press(screen.getByRole('button', { name: i18n.t('auth.login.submit') }));
 
-  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/(client)'));
+  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith({
+    pathname: '/(auth)/loading',
+    params: { returnTo: '/(client)' },
+  }));
+});
+
+it.each(['fr', 'ar'])('greets the signed-in Client by first name on the post-login splash in %s', async (language) => {
+  await i18n.changeLanguage(language);
+  mockParams = { phase: '3', returnTo: '/(client)/products/1001' };
+  mockedUseSession.mockReturnValue({
+    ...mockedUseSession(),
+    session: { token: 'token' },
+    role: Role.CLIENT,
+    username: 'Zak Amrani',
+  } as unknown as ReturnType<typeof useSession>);
+
+  const screen = render(<ClientLoadingScreen />);
+
+  expect(screen.getByText(i18n.t('Bienvenue {{name}}', { name: 'Zak' }))).toBeTruthy();
+  expect(screen.getByLabelText('EBEN')).toBeTruthy();
+  expect(mockReplace).not.toHaveBeenCalled();
+});
+
+it('opens the protected Client destination once the splash animation ends', () => {
+  jest.useFakeTimers();
+  try {
+    mockParams = { returnTo: '/(client)/products/1001' };
+    mockedUseSession.mockReturnValue({
+      ...mockedUseSession(),
+      session: { token: 'token' },
+      role: Role.CLIENT,
+      username: 'Zak',
+    } as unknown as ReturnType<typeof useSession>);
+
+    render(<ClientLoadingScreen />);
+    expect(mockReplace).not.toHaveBeenCalled();
+    act(() => { jest.advanceTimersByTime(3000); });
+
+    expect(mockReplace).toHaveBeenCalledWith('/(client)/products/1001');
+  } finally {
+    jest.useRealTimers();
+  }
 });
 
 it('preserves a protected destination when a guest chooses sign up', () => {
@@ -207,6 +306,8 @@ it('shows a localized login error and does not navigate', async () => {
 
   expect(await screen.findByText(i18n.t('auth.login.error'))).toBeTruthy();
   expect(mockReplace).not.toHaveBeenCalled();
+  // A failed sign-in never leaves a splash hand-off behind.
+  expect(isWelcomeSplashArmed()).toBe(false);
 });
 
 it('shows a distinct throttle message for a 429 login response', async () => {

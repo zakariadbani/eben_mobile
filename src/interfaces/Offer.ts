@@ -17,6 +17,10 @@
  * ws.ts `dataOffer` fields: id, ref, comment, price, audio, images[].
  */
 
+/**
+ * Client-visible statuses: `validated` = available to add to the basket;
+ * `selected` = this offer is already in the owning client's basket.
+ */
 export type OfferStatus = 'pending' | 'validated' | 'rejected' | 'selected' | 'expired';
 export type OfferAvailability = 'available' | 'not_available';
 
@@ -64,12 +68,17 @@ export interface Offer {
 export type ClientOffer = Omit<Offer, 'priceFerrailleur' | 'priceBc'>;
 
 export interface ClientOfferItem extends ClientOffer {
+  /** Canonical values from the linked request item. */
+  condition: import('./Request').PartCondition;
+  quantity: number;
   categoryTitle?: string;
   categoryTitleAr?: string;
   categoryImage?: string | null;
+  categoryFamily?: import('./Category').CategoryFamily | null;
   ferrailleurName?: string;
-  brandName?: string | null;
-  brandNameAr?: string | null;
+  brandName: string | null;
+  brandNameAr: string | null;
+  vehicle: import('./Vehicle').VehicleSummary | null;
 }
 
 /**
@@ -97,6 +106,8 @@ export interface PrestataireOffer
   ferrailleurName: string | null;
   brandName: string | null;
   brandNameAr: string | null;
+  vehicle: import('./Vehicle').VehicleSummary | null;
+  paymentStatus: import('./Order').PaymentStatus | null;
   /** Canonical backend decision: an unshipped purchase order currently accepts shipment. */
   shippingEligible: boolean;
 }

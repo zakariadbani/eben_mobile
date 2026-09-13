@@ -20,9 +20,11 @@ import View from '@/components/common/View';
 import { Text } from '@/components/common/Text';
 import Button from '@/components/common/Button';
 import CustomIcon from '@/components/common/CustomIcon';
+import Icon from '@/components/common/Icon';
 import Colors from '@/constants/Colors';
 import { getOrder } from '@/api/resources/orders';
 import type { Order } from '@/interfaces/Order';
+import { formatDhs, moneyLocale } from '@/helpers/money';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -39,12 +41,6 @@ function formatDate(iso: string | undefined, locale: string): string {
   });
 }
 
-function formatPrice(value: number, locale: string): string {
-  return value.toLocaleString(locale, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -54,6 +50,7 @@ export default function OrderSuccessScreen() {
   const router = useRouter();
   const { t, i18n } = useTranslation();
   const locale = i18n.language === 'ar' ? 'ar-MA' : 'fr-MA';
+  const money = (value: number) => formatDhs(value, moneyLocale(i18n.language));
   const params = useLocalSearchParams<{ orderId?: string }>();
   const rawOrderId = params.orderId ?? '';
   const parsedOrderId = /^\d+$/.test(rawOrderId) ? Number(rawOrderId) : Number.NaN;
@@ -88,9 +85,12 @@ export default function OrderSuccessScreen() {
     router.replace('/(client)/' as Href);
   }, [router]);
 
-  const handleViewOrders = useCallback(() => {
-    router.replace('/(client)/settings/orders' as Href);
-  }, [router]);
+  const handleViewOrder = useCallback(() => {
+    router.replace({
+      pathname: '/(client)/settings/orders/[orderId]',
+      params: { orderId: String(parsedOrderId) },
+    });
+  }, [parsedOrderId, router]);
 
   if (loading) {
     return (
@@ -118,14 +118,13 @@ export default function OrderSuccessScreen() {
     total,
     createdAt,
     shippingFee,
+    premiumFee,
     subtotal,
     discountAmount,
     taxAmount,
     items = [],
   } = order;
-  const paymentLabel = order.paymentMethod === 'cod'
-    ? t('commerce.success.payment.cod')
-    : order.paymentMethod;
+  const paymentLabel = t(`settings.orders.paymentMethod.${order.paymentMethod}`);
 
   return (
     <Screen whatsapp={false}>
@@ -133,14 +132,19 @@ export default function OrderSuccessScreen() {
 
         {/* ── "Afficher Ma Commande" link ───────────────────────────── */}
         <TouchableOpacity
-          onPress={handleViewOrders}
+          onPress={handleViewOrder}
           activeOpacity={0.7}
           style={styles.viewOrderRow}
           accessibilityRole="button"
           accessibilityLabel={t('commerce.success.viewOrders')}
         >
           <View flexDirection="row" alignItems="center" gap={6}>
-            <CustomIcon name="arrow_left" size={18} tintColor={Colors.brand} />
+            <Icon
+              name={i18n.language === 'ar' ? 'arrow-right' : 'arrow-left'}
+              type="Feather"
+              size={22}
+              iconColor={Colors.brand}
+            />
             <Text type="default" bold style={styles.viewOrderLink}>
               {t('commerce.success.viewOrders')}
             </Text>
@@ -170,7 +174,7 @@ export default function OrderSuccessScreen() {
           </Text>
 
           <Text type="default" translate={false} color={Colors.orange}>
-            {t('commerce.success.total', { value: formatPrice(total, locale) })}
+            {t('commerce.success.total', { price: money(total) })}
           </Text>
 
           {/* Label black, value orange — Figma spec */}
@@ -206,14 +210,14 @@ export default function OrderSuccessScreen() {
               <Text type="label" bold>
                 {t('commerce.success.item', {
                   count: item.quantity,
-                  title: i18n.language === 'ar'
-                    ? item.categoryTitleAr ?? item.categoryTitle ?? ''
-                    : item.categoryTitle ?? '',
+                  title: (i18n.language === 'ar'
+                    ? item.categoryTitleAr ?? item.categoryTitle
+                    : item.categoryTitle) ?? t('checkout.itemFallback', { id: item.categoryId }),
                 })}
               </Text>
               <View flexDirection="row" alignItems="center" gap={6}>
                 <Text type="label" translate={false} color={Colors.brand}>
-                  {`${formatPrice(item.totalPrice, locale)} Dhs`}
+                  {money(item.totalPrice)}
                 </Text>
                 <Text type="small" color={Colors.grayMidDark}>
                   {t('commerce.success.taxIncluded')}
@@ -235,7 +239,7 @@ export default function OrderSuccessScreen() {
               <View flexDirection="row" style={styles.spaceBetween}>
                 <Text type="label">{t('commerce.success.shipping')}</Text>
                 <Text type="label" translate={false}>
-                  {shippingFee === 0 ? '—' : `${formatPrice(shippingFee, locale)} Dhs`}
+                  {shippingFee === 0 ? '—' : money(shippingFee)}
                 </Text>
               </View>
             )}
@@ -244,20 +248,26 @@ export default function OrderSuccessScreen() {
               <View flexDirection="row" style={styles.spaceBetween}>
                 <Text type="label">{t('commerce.success.subtotal')}</Text>
                 <Text type="label" bold translate={false}>
-                  {`${formatPrice(subtotal, locale)} Dhs`}
+                  {money(subtotal)}
                 </Text>
+              </View>
+            )}
+            {premiumFee > 0 && (
+              <View flexDirection="row" style={styles.spaceBetween}>
+                <Text type="label">{t('commerce.cart.premium')}</Text>
+                <Text testID="success-premium" type="label" translate={false}>{money(premiumFee)}</Text>
               </View>
             )}
             {discountAmount > 0 && (
               <View flexDirection="row" style={styles.spaceBetween}>
                 <Text type="label">{t('commerce.success.discount')}</Text>
-                <Text testID="success-discount" type="label" translate={false}>{`−${formatPrice(discountAmount, locale)} Dhs`}</Text>
+                <Text testID="success-discount" type="label" translate={false}>{`−${money(discountAmount)}`}</Text>
               </View>
             )}
             {taxAmount !== null && (
               <View flexDirection="row" style={styles.spaceBetween}>
                 <Text type="label">{t('commerce.success.tax')}</Text>
-                <Text testID="success-tax" type="label" translate={false}>{`${formatPrice(taxAmount, locale)} Dhs`}</Text>
+                <Text testID="success-tax" type="label" translate={false}>{money(taxAmount)}</Text>
               </View>
             )}
           </View>

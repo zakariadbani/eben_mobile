@@ -13,12 +13,11 @@
  *   Period tabs     — 1 jour | 7 jours | 1 mois | 6 mois | 1 ans | MAX (equal grey pills, active yellow)
  *   Chart           — smooth yellow curve + gradient area, Y ticks, X bucket labels (react-native-svg)
  *
- * Data: getPrestataireDashboardSeries(period). The "top sold products" block of the AR frame
- * needs a backend field that does not exist yet.
+ * Data: getPrestataireDashboardSeries(period), including its server-ranked top products.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import View from '@/components/common/View';
@@ -225,6 +224,34 @@ export default function OverviewScreen(): React.ReactElement {
             ? <View style={styles.chartPlaceholder} />
             : <OverviewChart points={chartPoints} rtl={isArabic} integerTicks={!currentMetric.monetary} />}
         </View>
+
+        {(dashboardSeries?.topProducts.length ?? 0) > 0 ? (
+          <View style={styles.topProducts}>
+            <Text type="titleTwo" semiBold color={Colors.brand} style={styles.topProductsTitle}>
+              {t('partner.overview.topProducts')}
+            </Text>
+            {dashboardSeries?.topProducts.map((product, index) => (
+              <View key={`${product.title}-${index}`} style={styles.topProductRow} flexDirection="row" alignItems="center" gap={14}>
+                <Text type="titleTwo" semiBold translate={false} style={styles.rank}>{`${index + 1})`}</Text>
+                {product.image ? (
+                  <Image source={{ uri: product.image }} style={styles.productImage} resizeMode="contain" />
+                ) : (
+                  <View style={styles.productImage} alignItems="center" justifyContent="center">
+                    <Icon name="package" type="Feather" size={28} iconColor={Colors.gray} />
+                  </View>
+                )}
+                <View flex gap={5}>
+                  <Text type="textTwo" semiBold color={Colors.brand} translate={false} numberOfLines={2}>
+                    {isArabic ? product.titleAr || product.title : product.title}
+                  </Text>
+                  <Text type="small" color={Colors.grayMidDark} translate={false}>
+                    {t('partner.overview.soldCount', { count: product.soldCount })}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -275,4 +302,9 @@ const styles = StyleSheet.create({
   },
   chartWrapper: { paddingHorizontal: 16, paddingTop: 16 },
   chartPlaceholder: { height: 280, borderRadius: 8, backgroundColor: Colors.backgroundGray },
+  topProducts: { marginTop: 28, paddingHorizontal: 20, paddingTop: 28, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.borderLight },
+  topProductsTitle: { fontSize: 26, marginBottom: 10 },
+  topProductRow: { minHeight: 104, paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.borderLight },
+  rank: { width: 42, fontSize: 28 },
+  productImage: { width: 78, height: 72, borderRadius: 8, backgroundColor: Colors.white },
 });

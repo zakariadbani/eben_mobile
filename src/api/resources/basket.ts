@@ -20,9 +20,16 @@ function requirePositiveInteger(value: number, name: string): void {
 
 /**
  * Fetch the current user's basket (with items eager-loaded).
+ * Offer lines carry `requestItemId`, `brandName`/`brandNameAr`, `offerReference`
+ * and the request `expiresAt`; product lines serve those fields as null.
  */
 export async function getBasket(): Promise<ApiResponse<Basket>> {
   return apiClient.get<Basket>('/basket') as Promise<ApiResponse<Basket>>;
+}
+
+/** Toggle EBEN Premium; every returned amount remains server-owned. */
+export async function updateBasketPremium(enabled: boolean): Promise<ApiResponse<Basket>> {
+  return apiClient.put<Basket>('/basket/premium', { enabled });
 }
 
 /**

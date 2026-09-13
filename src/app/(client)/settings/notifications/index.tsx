@@ -1,9 +1,11 @@
 /**
  * Notifications screen — empty + full states.
  *
- * Full state: list of notification rows with type icon, bilingual
- * title/body, relative timestamp, read/unread styling, "Détails"
- * action button, and a "Tout marquer comme lu" CTA.
+ * Full state (Figma Profile-Notifications_Full 84-24491): rows with a type
+ * icon, bilingual condensed title + body, unread dot in its own column,
+ * "il y a 5 heures" under the icon and a trailing chip — yellow "Détails" on
+ * unread rows, green "Vérifier les prix" on offers-ready rows (opens the
+ * request). The "N non lus" counter marks everything read.
  *
  * Empty state: illustration + "Vous n'avez pas de notifications".
  */
@@ -27,38 +29,58 @@ import Icon from "@/components/common/Icon";
 import EmptyListComponent from "@/components/screens/shared/app/EmptyListComponent";
 
 import { getNotifications, markNotificationRead, markAllRead } from "@/api";
+import { setClientHasUnreadNotifications } from "@/hooks/useClientUnreadNotifications";
 import type { Notification, NotificationType } from "@/interfaces/Notification";
 import Colors from "@/constants/Colors";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-/** Map notification type to an Ionicons icon name. */
-function iconForType(type: NotificationType): string {
-  const map: Record<NotificationType, string> = {
-    shipped: "cube-outline",
-    gift: "gift-outline",
-    delivered: "checkmark-circle-outline",
-    list_sent: "document-text-outline",
-    list_received: "mail-outline",
-    payment: "card-outline",
-    message: "chatbubble-outline",
-    return: "return-down-back-outline",
-    stock: "alert-circle-outline",
-    subscription: "repeat-outline",
-    review: "star-outline",
-    account_update: "person-outline",
-  };
-  return map[type] ?? "notifications-outline";
+interface TypeIcon {
+  name: string;
+  type: "MaterialCommunityIcons" | "Ionicons";
 }
 
-/** Relative time label (very lightweight, no external dep). */
-function relativeTime(isoDate: string, t: (k: string) => string): string {
-  const diffMs = Date.now() - new Date(isoDate).getTime();
-  const diffH = Math.floor(diffMs / 3_600_000);
-  const diffD = Math.floor(diffH / 24);
-  if (diffD >= 1) return `${t("il y a")} ${diffD} ${t("jour(s)")}`;
-  if (diffH >= 1) return `${t("il y a")} ${diffH} ${t("heure(s)")}`;
-  return t("À l'instant");
+/** Figma type icons: truck, star, gift, box, document out / in. */
+function iconForType(type: NotificationType, offersReady: boolean): TypeIcon {
+  if (offersReady) return { name: "file-download-outline", type: "MaterialCommunityIcons" };
+  const map: Record<NotificationType, TypeIcon> = {
+    shipped: { name: "truck-fast-outline", type: "MaterialCommunityIcons" },
+    gift: { name: "gift-outline", type: "Ionicons" },
+    delivered: { name: "package-variant-closed", type: "MaterialCommunityIcons" },
+    list_sent: { name: "file-send-outline", type: "MaterialCommunityIcons" },
+    list_received: { name: "file-download-outline", type: "MaterialCommunityIcons" },
+    offers_ready: { name: "file-download-outline", type: "MaterialCommunityIcons" },
+    payment: { name: "credit-card-outline", type: "MaterialCommunityIcons" },
+    message: { name: "chatbubble-outline", type: "Ionicons" },
+    return: { name: "return-down-back-outline", type: "Ionicons" },
+    stock: { name: "alert-circle-outline", type: "Ionicons" },
+    subscription: { name: "repeat-outline", type: "Ionicons" },
+    review: { name: "star-outline", type: "Ionicons" },
+    account_update: { name: "person-outline", type: "Ionicons" },
+  };
+  return map[type] ?? { name: "notifications-outline", type: "Ionicons" };
+}
+
+/**
+ * "Vous avez reçu vos offres": the `offers_ready` type, or the rows it replaced —
+ * `list_sent` + `data.kind === "offers_ready"` and the legacy `list_received` type.
+ */
+function isOffersReadyNotification(item: Pick<Notification, "type" | "data">): boolean {
+  return item.type === "offers_ready"
+    || item.type === "list_received"
+    || (item.type === "list_sent" && item.data?.kind === "offers_ready");
+}
+
+/** "il y a 5 heures" with plural forms (FR + AR). */
+function relativeTime(isoDate: string, t: (key: string, options?: Record<string, unknown>) => string): string {
+  const diffMs = Math.max(0, Date.now() - new Date(isoDate).getTime());
+  const minutes = Math.floor(diffMs / 60_000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days >= 1) return t("partner.notifications.timeDays", { count: days });
+  if (hours >= 1) return t("partner.notifications.timeHours", { count: hours });
+  if (minutes >= 1) return t("partner.notifications.timeMinutes", { count: minutes });
+  return t("partner.notifications.timeNow");
 }
 
 // ─── Item Component ──────────────────────────────────────────────────────────
@@ -74,83 +96,95 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
 }) => {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === "ar";
+  const offersReady = isOffersReadyNotification(item);
+  const isReview = item.type === "review";
 
-  const title = isAr && item.titleAr ? item.titleAr : item.title;
+  const rawTitle = isAr && item.titleAr ? item.titleAr : item.title;
+  const title = rawTitle || (offersReady ? t("settings.notifications.offersReadyTitle") : "");
   const body = isAr && item.messageAr ? item.messageAr : item.message;
+  const icon = iconForType(item.type, offersReady);
 
   return (
+    // Whole row is tappable, but only the text row and the chip are
+    // accessibility elements so the chip stays reachable for screen readers.
     <TouchableOpacity
       onPress={() => onOpen(item)}
-      accessibilityRole="button"
-      accessibilityLabel={title}
-      style={[
-        styles.row,
-        isAr && styles.rowRtl,
-        item.isRead ? styles.rowRead : styles.rowUnread,
-      ]}
+      accessible={false}
+      style={[styles.row, item.isRead ? styles.rowRead : styles.rowUnread]}
     >
-      {/* Unread dot (top-right of text area) */}
-      {!item.isRead && (
-        <RNView style={[styles.unreadDot, isAr && styles.unreadDotRtl]} />
-      )}
+      <TouchableOpacity
+        onPress={() => onOpen(item)}
+        accessibilityRole="button"
+        accessibilityLabel={title}
+        activeOpacity={0.8}
+        style={[styles.mainRow, isAr && styles.rowRtl]}
+      >
+        {/* Type icon — no background container per Figma */}
+        <RNView style={styles.iconWrapper}>
+          <Icon
+            name={icon.name}
+            type={icon.type}
+            size={24}
+            iconColor={item.isRead ? Colors.gray : Colors.brand}
+          />
+        </RNView>
 
-      {/* Type icon — no background container per Figma */}
-      <RNView style={styles.iconWrapper}>
-        <Icon
-          name={iconForType(item.type)}
-          type="Ionicons"
-          size={24}
-          iconColor={item.isRead ? Colors.gray : Colors.brand}
-        />
-      </RNView>
-
-      {/* Text */}
-      <RNView style={styles.textBlock}>
-        <Text
-          type="label"
-          semiBold={!item.isRead}
-          color={item.isRead ? Colors.grayMidDark : Colors.brand}
-          numberOfLines={3}
-          translate={false}
-        >
-          {title}
-          {": "}
+        {/* Text */}
+        <RNView style={styles.textBlock}>
           <Text
-            type="label"
+            type="text"
             color={item.isRead ? Colors.gray : Colors.innerText}
+            numberOfLines={3}
             translate={false}
+            style={styles.body}
           >
+            <Text
+              type="textTwo"
+              semiBold
+              color={item.isRead ? Colors.grayMidDark : Colors.brand}
+              translate={false}
+              style={styles.title}
+            >
+              {`${title} : `}
+            </Text>
             {body}
           </Text>
-        </Text>
+        </RNView>
 
-        {/* Footer row: timestamp + action */}
-        <View flexDirection="row" style={styles.footer} gap={8}>
-          <Text type="small" color={Colors.gray} translate={false}>
-            {relativeTime(item.createdAt, t)}
-          </Text>
-          {/* Détails button for all unread non-list_received notifications */}
-          {!item.isRead && item.type !== "list_received" && (
-            <TouchableOpacity
-              style={styles.detailsBtn}
-              onPress={() => onOpen(item)}
-              accessibilityLabel={t("Marquer comme lu")}
-            >
-              <Text type="small" color={Colors.brand} semiBold>
-                {t('settings.notifications.details')}
-              </Text>
-            </TouchableOpacity>
-          )}
-          {item.type === "list_received" && (
-            <Button
-              title={"Vérifier les prix"}
-              variant="primary"
-              fit
-              style={styles.ctaBtn}
-              navigateTo="/(client)/requests"
-            />
-          )}
-        </View>
+        {/* Unread dot — own column, vertically centred, never over the text */}
+        <RNView style={styles.dotColumn}>
+          {!item.isRead ? <RNView style={styles.unreadDot} testID="notification-unread-dot" /> : null}
+        </RNView>
+      </TouchableOpacity>
+
+      {/* Footer row: timestamp under the icon, action chip on the trailing edge */}
+      <RNView style={[styles.footer, isAr && styles.rowRtl]}>
+        <Text type="label" color={Colors.gray} translate={false}>
+          {relativeTime(item.createdAt, t)}
+        </Text>
+        {offersReady ? (
+          <TouchableOpacity
+            style={[styles.chip, styles.chipGreen]}
+            onPress={() => onOpen(item)}
+            accessibilityRole="button"
+            accessibilityLabel={t("home.checkPrices")}
+          >
+            <Text type="labelTwo" semiBold color={Colors.brand} translate={false}>
+              {t("home.checkPrices")}
+            </Text>
+          </TouchableOpacity>
+        ) : !item.isRead ? (
+          <TouchableOpacity
+            style={styles.chip}
+            onPress={() => onOpen(item)}
+            accessibilityRole="button"
+            accessibilityLabel={isReview ? t("settings.notifications.rate") : t("Marquer comme lu")}
+          >
+            <Text type="labelTwo" color={Colors.brand} semiBold>
+              {t(isReview ? 'settings.notifications.rate' : 'settings.notifications.details')}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </RNView>
     </TouchableOpacity>
   );
@@ -171,6 +205,11 @@ const NotificationsScreen: React.FC = () => {
 
   const visibleItems = items;
   const unreadCount = visibleItems.filter((n) => !n.isRead).length;
+
+  // Keep the Home header bell dot in sync with what this screen shows.
+  useEffect(() => {
+    if (!loading && !error) setClientHasUnreadNotifications(unreadCount > 0);
+  }, [error, loading, unreadCount]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -225,7 +264,8 @@ const NotificationsScreen: React.FC = () => {
     const orderId = positiveId(data.orderId ?? data.order_id);
     const requestId = positiveId(data.requestId ?? data.request_id);
     const productId = positiveId(data.productId ?? data.product_id);
-    if (orderId !== null) router.push(`/(client)/settings/orders/${orderId}` as never);
+    if (item.type === 'review' && productId !== null) router.push(`/(client)/products/${productId}/review` as never);
+    else if (orderId !== null) router.push(`/(client)/settings/orders/${orderId}` as never);
     else if (requestId !== null) router.push(`/(client)/requests/${requestId}` as never);
     else if (productId !== null) router.push(`/(client)/products/${productId}` as never);
   }, [handleMarkRead, router]);
@@ -238,13 +278,13 @@ const NotificationsScreen: React.FC = () => {
         style={styles.sectionHeader}
         gap={8}
       >
-        <Icon name="notifications-outline" type="Ionicons" size={22} iconColor={Colors.brand} />
-        <Text type="label" semiBold color={Colors.brand} flex>
+        <Icon name="notifications-outline" type="Ionicons" size={26} iconColor={Colors.brand} />
+        <Text type="textTwo" semiBold color={Colors.brand} flex>
           {t('settings.notifications.title')}
         </Text>
         {unreadCount > 0 && (
           <TouchableOpacity onPress={handleMarkAllRead} style={styles.markAllBtn}>
-            <Text type="small" color={Colors.orange}>
+            <Text type="label" color={Colors.noticeUnread}>
               {t('settings.notifications.unread', { count: unreadCount })}
             </Text>
           </TouchableOpacity>
@@ -289,7 +329,8 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   listContent: {
-    paddingBottom: 32,
+    // Room for the WhatsApp FAB under the last notification (its unread dot stays reachable).
+    paddingBottom: 96,
   },
   separator: {
     height: 1,
@@ -297,12 +338,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   row: {
-    paddingVertical: 12,
+    paddingTop: 16,
+    paddingBottom: 12,
     paddingHorizontal: 16,
+    gap: 8,
+  },
+  mainRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: 12,
-    position: "relative",
   },
   rowRtl: {
     flexDirection: "row-reverse",
@@ -313,55 +357,53 @@ const styles = StyleSheet.create({
   rowRead: {
     backgroundColor: Colors.white,
   },
-  menuDot: {
-    position: "absolute",
-    top: 10,
-    right: 12,
-    padding: 4,
-    zIndex: 1,
-  },
-  menuDotRtl: {
-    right: undefined,
-    left: 12,
-  },
-  unreadDot: {
-    position: "absolute",
-    top: 14,
-    // Positioned at the right of the text area (after icon + gap)
-    right: 36,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.noticeUnread,
-  },
-  unreadDotRtl: {
-    right: undefined,
-    left: 36,
-  },
   iconWrapper: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     justifyContent: "center",
     alignItems: "center",
     flexShrink: 0,
   },
   textBlock: {
     flex: 1,
-    gap: 6,
+    minWidth: 0,
+  },
+  body: {
+    fontSize: 16,
+    lineHeight: 21,
+  },
+  title: {
+    fontSize: 18,
+    lineHeight: 21,
+  },
+  dotColumn: {
+    width: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.orange,
   },
   footer: {
+    flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 8,
+    minHeight: 30,
   },
-  detailsBtn: {
+  chip: {
+    minHeight: 30,
+    justifyContent: "center",
     backgroundColor: Colors.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    paddingHorizontal: 12,
     borderRadius: 4,
   },
-  ctaBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+  chipGreen: {
+    backgroundColor: Colors.green,
   },
 });
 

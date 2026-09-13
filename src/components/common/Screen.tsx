@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   KeyboardAvoidingViewProps,
   ScrollView,
+  ScrollViewProps,
 } from "react-native";
 import { SafeAreaView, Edge } from "react-native-safe-area-context";
 import Colors from "@/constants/Colors";
@@ -29,6 +30,11 @@ interface ScreenProps {
   useSafeArea?: boolean; // Decide between SafeAreaView and View
   whatsapp?: boolean; // Decide between SafeAreaView and View
   edges?: Edge[]; // Which safe-area edges to apply
+  /**
+   * Scrollable screens only. "handled" (default) lets the first tap on a button
+   * fire while the keyboard is open instead of only dismissing the keyboard.
+   */
+  keyboardShouldPersistTaps?: ScrollViewProps["keyboardShouldPersistTaps"];
 }
 
 export const Screen: React.FC<ScreenProps> = ({
@@ -46,6 +52,7 @@ export const Screen: React.FC<ScreenProps> = ({
   useSafeArea = true,
   whatsapp = true,
   edges = ["bottom"],
+  keyboardShouldPersistTaps = "handled",
 }) => {
   // Choose between SafeAreaView and View
   const WrapperComponent = useSafeArea ? SafeAreaView : View;
@@ -70,7 +77,10 @@ export const Screen: React.FC<ScreenProps> = ({
       >
         {whatsapp && <WhatsappBtn />}
         {scrollable ? (
-          <ScrollView contentContainerStyle={[styles.scrollContent, whatsapp && styles.whatsappInset]}>
+          <ScrollView
+            contentContainerStyle={[styles.scrollContent, whatsapp && styles.whatsappInset]}
+            keyboardShouldPersistTaps={keyboardShouldPersistTaps}
+          >
             {children}
           </ScrollView>
         ) : (

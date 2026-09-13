@@ -7,6 +7,7 @@ jest.mock('../../config', () => ({
 import {
   acceptOffer,
   createRequest,
+  getOffer,
   getOffers,
   getRequest,
   sendRequest,
@@ -14,10 +15,12 @@ import {
 import { getCategoryBrands } from '@/api/resources/categories';
 import {
   addToBasket,
+  applyCoupon,
   getBasket,
   removeBasketItem,
   updateBasketItem,
 } from '@/api/resources/basket';
+import { getNotifications, markAllRead, markNotificationRead } from '@/api/resources/notifications';
 import { getOrder, placeOrder } from '@/api/resources/orders';
 import {
   confirmWithdrawal,
@@ -212,7 +215,7 @@ describe('mock golden path', () => {
     await expect(submitOffer(created.data.id, { lines: [{ ...line, priceFerrailleur: Number.MAX_VALUE }] })).rejects.toThrow('Invalid offer lines');
   });
 
-  it('replaces a selected competing offer for the same request item', async () => {
+  it('keeps several selected offers of the same request item in the basket and counts them in offersCount', async () => {
     const created = await createRequest({
       vehicleId: 1,
       items: [{ categoryId: 100, quantity: 1, condition: 'occasion' }],
@@ -225,15 +228,141 @@ describe('mock golden path', () => {
     const second = await submitOffer(created.data.id, {
       lines: [{ requestItemId, priceFerrailleur: 120, condition: 'occasion', description: null, images: [] }],
     });
+    expect((await getRequest(created.data.id)).data.offersCount).toBe(2);
 
     await acceptOffer(first.data.offerId);
     await acceptOffer(second.data.offerId);
+    // Re-accepting an offer already in the basket does not duplicate its line.
+    await acceptOffer(first.data.offerId);
 
     expect((await getBasket()).data.items).toEqual([
-      expect.objectContaining({ offerId: second.data.offerId, unitPrice: 127.2 }),
+      expect.objectContaining({ offerId: first.data.offerId, requestItemId, unitPrice: 106 }),
+      expect.objectContaining({ offerId: second.data.offerId, requestItemId, unitPrice: 127.2 }),
     ]);
-    expect((await getPrestataireOffer(first.data.offerId)).data.status).toBe('validated');
+    expect((await getPrestataireOffer(first.data.offerId)).data.status).toBe('selected');
     expect((await getPrestataireOffer(second.data.offerId)).data.status).toBe('selected');
+    // validated + selected: both still count.
+    expect((await getRequest(created.data.id)).data.offersCount).toBe(2);
+  });
+
+  it('expires the request\'s other offers when an order is placed and drops them from offersCount', async () => {
+    const created = await createRequest({
+      vehicleId: 1,
+      items: [
+        { categoryId: 100, quantity: 1, condition: 'occasion' },
+        { categoryId: 101, quantity: 1, condition: 'occasion' },
+      ],
+    });
+    await sendRequest(created.data.id);
+    const [pads, hose] = (await getRequest(created.data.id)).data.items!;
+    const line = (requestItemId: number, priceFerrailleur: number) =>
+      ({ requestItemId, priceFerrailleur, condition: 'occasion' as const, description: null, images: [] });
+    const bought = await submitOffer(created.data.id, { lines: [line(pads!.id, 100)] });
+    const rival = await submitOffer(created.data.id, { lines: [line(pads!.id, 90)] });
+    const unanswered = await submitOffer(created.data.id, { lines: [line(hose!.id, 40)] });
+    expect((await getRequest(created.data.id)).data.offersCount).toBe(3);
+
+    await acceptOffer(bought.data.offerId);
+    await placeOrder({ addressId: 1, paymentMethod: 'cod' });
+
+    expect((await getPrestataireOffer(bought.data.offerId)).data.status).toBe('selected');
+    expect((await getPrestataireOffer(rival.data.offerId)).data.status).toBe('expired');
+    expect((await getPrestataireOffer(unanswered.data.offerId)).data.status).toBe('expired');
+    const request = (await getRequest(created.data.id)).data;
+    expect(request.status).toBe('ordered');
+    expect(request.offersCount).toBe(1);
+    // Expired offers are no longer served to the client.
+    expect((await getOffers(created.data.id)).data.map(({ id }) => id)).toEqual([bought.data.offerId]);
+    await expect(getOffer(rival.data.offerId)).rejects.toThrow('Offer not found');
+  });
+
+  it('opens the 24 h order window and notifies the owner once on the first validation', async () => {
+    const created = await createRequest({
+      vehicleId: 1,
+      items: [{ categoryId: 100, quantity: 1, condition: 'occasion', brandId: 1 }],
+    });
+    await sendRequest(created.data.id);
+    const { items, reference } = (await getRequest(created.data.id)).data;
+    const line = { requestItemId: items![0]!.id, priceFerrailleur: 100, condition: 'occasion' as const, description: null, images: [] };
+    const before = Date.now();
+
+    await submitOffer(created.data.id, { lines: [line] });
+    const validated = (await getRequest(created.data.id)).data;
+    expect(validated.status).toBe('validated');
+    const expiresAt = new Date(validated.expiresAt!).getTime();
+    expect(expiresAt).toBeGreaterThanOrEqual(before + 24 * 3600000);
+    expect(expiresAt).toBeLessThanOrEqual(Date.now() + 24 * 3600000);
+
+    const offersReady = (await getNotifications()).data.filter(({ data }) => data?.kind === 'offers_ready');
+    expect(offersReady).toEqual([expect.objectContaining({
+      type: 'offers_ready',
+      isRead: false,
+      data: { requestId: created.data.id, requestReference: reference, kind: 'offers_ready' },
+    })]);
+
+    await submitOffer(created.data.id, { lines: [{ ...line, priceFerrailleur: 90 }] });
+    expect((await getRequest(created.data.id)).data.expiresAt).toBe(validated.expiresAt);
+    expect((await getNotifications()).data.filter(({ data }) => data?.kind === 'offers_ready')).toHaveLength(1);
+
+    expect((await markNotificationRead(offersReady[0]!.id)).data.isRead).toBe(true);
+    const unread = (await getNotifications()).data.filter(({ isRead }) => !isRead).length;
+    expect((await markAllRead()).data.updated).toBe(unread);
+    expect((await getNotifications()).data.every(({ isRead }) => isRead)).toBe(true);
+  });
+
+  it('serves offer basket lines with part, brand, offer reference and deadline, and keeps selected offers visible', async () => {
+    const created = await createRequest({
+      vehicleId: 1,
+      items: [
+        { categoryId: 100, quantity: 1, condition: 'occasion', brandId: 1 },
+        { categoryId: 100, quantity: 1, condition: 'occasion', brandId: 2 },
+      ],
+    });
+    await sendRequest(created.data.id);
+    const [ridex, brembo] = (await getRequest(created.data.id)).data.items!;
+    const offer = (requestItemId: number, priceFerrailleur: number) =>
+      ({ requestItemId, priceFerrailleur, condition: 'occasion' as const, description: null, images: [] });
+    await submitOffer(created.data.id, { lines: [offer(ridex!.id, 250), offer(brembo!.id, 380)] });
+    const offers = (await getOffers(created.data.id)).data;
+    const ridexOffer = offers.find(({ requestItemId }) => requestItemId === ridex!.id)!;
+
+    const basket = await acceptOffer(ridexOffer.id);
+    const { expiresAt } = (await getRequest(created.data.id)).data;
+    expect(basket.data.items).toEqual([expect.objectContaining({
+      offerId: ridexOffer.id,
+      requestItemId: ridex!.id,
+      brandName: 'RIDEX',
+      brandNameAr: 'ريدكس',
+      offerReference: ridexOffer.reference,
+      expiresAt,
+      unitPrice: 265,
+    })]);
+
+    const afterAccept = (await getOffers(created.data.id)).data;
+    expect(afterAccept).toHaveLength(2);
+    expect(afterAccept.find(({ id }) => id === ridexOffer.id)?.status).toBe('selected');
+    expect((await getOffer(ridexOffer.id)).data).toEqual(expect.objectContaining({ id: ridexOffer.id, status: 'selected' }));
+
+    const product = (await addToBasket(1002, 1)).data.items!.find(({ offerId }) => offerId === 1002)!;
+    expect(product).toEqual(expect.objectContaining({
+      requestItemId: null, brandName: null, brandNameAr: null, offerReference: null, expiresAt: null,
+    }));
+  });
+
+  it('attaches a valid voucher to the basket and re-quotes it from the server totals', async () => {
+    const seeded = (await getBasket()).data;
+    expect(seeded.items?.every(({ requestItemId, offerReference }) => requestItemId === null && offerReference === null)).toBe(true);
+
+    const coupon = await applyCoupon(' eben100 ');
+    expect(coupon.data).toEqual({ valid: true, discountAmount: 100, code: 'EBEN100' });
+    const discounted = (await getBasket()).data;
+    expect(discounted).toMatchObject({ discountAmount: 100, total: Math.round((seeded.subtotal - 100) * 100) / 100 });
+
+    expect((await applyCoupon('NOPE')).data).toEqual({ valid: false, discountAmount: 0, code: 'NOPE' });
+    expect((await getBasket()).data).toMatchObject({ discountAmount: 0, total: seeded.total });
+
+    for (const item of seeded.items ?? []) await removeBasketItem(item.id);
+    await expect(applyCoupon('EBEN100')).rejects.toThrow('Le panier est vide.');
   });
 
   it('mutates direct-product basket items and rejects unknown ids', async () => {

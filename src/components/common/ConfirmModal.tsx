@@ -84,6 +84,8 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
       visible={visible}
       animationType="none"
       onRequestClose={slideOut}
+      // Dim the status bar too (Android): the overlay covers the whole screen.
+      statusBarTranslucent
       style={{ zIndex: zIndexValue }}
     >
       {/* This TouchableOpacity closes the modal when clicking outside */}

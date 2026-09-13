@@ -7,7 +7,8 @@ import type { Address } from '@/interfaces/Address';
 import type { Vehicle } from '@/interfaces/Vehicle';
 import type { Review } from '@/interfaces/Review';
 import type { Pneumatic } from '@/interfaces/Pneumatic';
-import { mockOrders } from './mockOrders';
+import type { Notification } from '@/interfaces/Notification';
+import { mockNotifications, mockOrders } from './mockOrders';
 import { mockPartnerOrders, mockPrestataireIncomingRequests, mockPrestataireOffers, mockPrestataireWallet, mockWithdrawals } from './mockPrestataire';
 import { mockBasket, mockProducts, mockReviews } from './mockProducts';
 import { mockVehicles, mockCarBrands, mockCarModels, mockCarMotorizations } from './mockVehicles';
@@ -21,6 +22,7 @@ import type { ConfirmWithdrawalPayload, RequestWithdrawalPayload, ShipOfferPaylo
 import type { CreateRequestPayload } from '../resources/requests';
 import type { AddAddressPayload, UpdateAddressPayload } from '../resources/addresses';
 import type { AddVehiclePayload } from '../resources/vehicles';
+import type { CouponResult } from '../resources/basket';
 import { DEFAULT_PAGE_SIZE } from '../config';
 import type { ApiResponse, Paginated } from '../types';
 
@@ -33,17 +35,24 @@ export interface MockShipment {
 }
 
 type Envelope = ApiResponse<unknown> | Paginated<unknown>;
-type State = { requests: Request[]; offers: Offer[]; basket: Basket; orders: Order[]; partnerOrders: PrestataireOrder[]; shipments: MockShipment[]; wallet: PrestataireWallet; withdrawals: Withdrawal[]; addresses: Address[]; vehicles: Vehicle[]; reviews: Review[] };
+/** Voucher attached to the basket (backend `baskets.voucher_id`); its discount is re-quoted on every pricing. */
+type MockVoucher = { code: string; amount: number };
+type State = { requests: Request[]; offers: Offer[]; basket: Basket; voucher: MockVoucher | null; orders: Order[]; partnerOrders: PrestataireOrder[]; shipments: MockShipment[]; wallet: PrestataireWallet; withdrawals: Withdrawal[]; addresses: Address[]; vehicles: Vehicle[]; reviews: Review[]; notifications: Notification[] };
+/** Client order window opened by the first offer validation (backend OfferService::openOrderWindow). */
+const ORDER_WINDOW_HOURS = 24;
+/** Mock voucher codes (backend VoucherService): fixed discount capped at the subtotal. */
+const MOCK_VOUCHERS: Record<string, number> = { EBEN100: 100 };
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const now = () => new Date().toISOString();
 const nextId = (rows: { id: number }[]) => Math.max(0, ...rows.map(({ id }) => id)) + 1;
 const roundMoney = (value: number) => Math.round(value * 100) / 100;
-const priceBasket = (basket: Basket): Basket => {
+const priceBasket = (basket: Basket, voucher: MockVoucher | null = null): Basket => {
   const subtotal = roundMoney((basket.items ?? []).reduce(
     (sum, item) => sum + item.unitPrice * item.quantity,
     0,
   ));
-  const taxable = Math.max(0, roundMoney(subtotal - basket.discountAmount + basket.shippingFee));
+  if (voucher) basket.discountAmount = Math.min(voucher.amount, subtotal);
+  const taxable = Math.max(0, roundMoney(subtotal - basket.discountAmount + basket.shippingFee + basket.premiumFee));
   basket.subtotal = subtotal;
   basket.taxAmount = roundMoney(taxable - taxable / 1.2);   // embedded VAT, informational
   basket.total = taxable;                                    // subtotal − discount + shipping, all TTC
@@ -70,7 +79,14 @@ const seed = (): State => {
   return {
     requests,
     offers: [...offers.values()],
-    basket: priceBasket(clone(mockBasket)),
+    // Seeded lines are stock products: every offer-derived field is null.
+    basket: priceBasket({
+      ...clone(mockBasket),
+      items: clone(mockBasket).items?.map((item) => ({
+        requestItemId: null, brandName: null, brandNameAr: null, offerReference: null, expiresAt: null, ...item,
+      })),
+    }),
+    voucher: null,
     orders: [...orders.values()],
     partnerOrders: clone(mockPartnerOrders),
     shipments: [],
@@ -79,6 +95,7 @@ const seed = (): State => {
     addresses: clone(mockAddresses),
     vehicles: clone(mockVehicles),
     reviews: clone(mockReviews),
+    notifications: clone(mockNotifications),
   };
 };
 let state = seed();
@@ -112,6 +129,9 @@ const toClientOffer = (offer: Offer): ClientOfferItem => {
     categoryImage: requestItem?.categoryImage ?? null,
     brandName: requestItem?.brandName ?? null,
     brandNameAr: requestItem?.brandNameAr ?? null,
+    condition: requestItem?.condition ?? 'occasion',
+    quantity: requestItem?.quantity ?? 1,
+    vehicle: null,
   } as ClientOfferItem;
 };
 const toPrestataireOffer = (offer: Offer): PrestataireOffer => {
@@ -134,6 +154,8 @@ const toPrestataireOffer = (offer: Offer): PrestataireOffer => {
     ferrailleurName: null,
     brandName: requestItem?.brandName ?? null,
     brandNameAr: requestItem?.brandNameAr ?? null,
+    vehicle: state.requests.find(({ id }) => id === offer.requestId)?.vehicle ?? null,
+    paymentStatus: null,
     shippingEligible: offer.status === 'selected' && !state.shipments.some(({ offerId }) => offerId === offer.id),
   } as PrestataireOffer;
 };
@@ -183,9 +205,40 @@ function sendRequest(id: number) {
   row.status = 'pending'; row.expiresAt ??= new Date(Date.now() + 7200000).toISOString(); row.updatedAt = now();
   return one({ id, reference: row.reference, status: 'pending' as const });
 }
+/** `Request.offersCount` counts the client-visible offers: validated + selected. */
+function refreshOffersCount(request: Request) {
+  request.offersCount = state.offers.filter((offer) =>
+    offer.requestId === request.id && ['validated', 'selected'].includes(offer.status)
+  ).length;
+}
+/**
+ * First validation of a request's offers: the client "receives" them. Mirrors
+ * backend OfferService::openOrderWindow — status `validated`, order window
+ * `expiresAt` = max(current, now + 24 h), one owner notification of type
+ * `offers_ready` (with `data.kind = offers_ready`, kept from the interim
+ * `list_sent` rows). Later validations are no-ops.
+ */
+function openOrderWindow(request: Request, timestamp: string) {
+  if (request.status === 'validated') return;
+  const windowEnd = Date.now() + ORDER_WINDOW_HOURS * 3600000;
+  const current = request.expiresAt ? new Date(request.expiresAt).getTime() : 0;
+  request.status = 'validated';
+  request.expiresAt = new Date(Math.max(current, windowEnd)).toISOString();
+  const hours = String(ORDER_WINDOW_HOURS);
+  state.notifications.unshift({
+    id: nextId(state.notifications), userId: request.userId, type: 'offers_ready', channel: 'database',
+    title: 'Vos offres sont prêtes',
+    titleAr: 'عروضكم جاهزة',
+    message: `Vous avez reçu vos offres pour la demande ${request.reference}. Vous avez ${hours} heures pour passer commande.`,
+    messageAr: `توصلتم بعروضكم الخاصة بالطلب ${request.reference}. لديكم ${hours} ساعة لإتمام الطلب.`,
+    data: { requestId: request.id, requestReference: request.reference, kind: 'offers_ready' },
+    isRead: false, readAt: null, expiresAt: request.expiresAt, createdAt: timestamp,
+  });
+}
 function submitOffer(requestId: number, payload: SubmitOfferPayload) {
   const request = requestById(requestId);
-  if (!['pending', 'offers_received'].includes(request.status)) throw new Error('Request is not open');
+  // The mock validates offers on submission, so a validated request still accepts offers here.
+  if (!['pending', 'offers_received', 'validated'].includes(request.status)) throw new Error('Request is not open');
   const itemIds = new Set((request.items ?? []).map(({ id }) => id));
   const pricedLines = payload.lines.map((line) => {
     const priceFerrailleur = roundMoney(line.priceFerrailleur);
@@ -212,13 +265,15 @@ function submitOffer(requestId: number, payload: SubmitOfferPayload) {
     state.offers.unshift({
       id, reference: String(10000 + id), requestId, ferrailleurId: 10, requestItemId: line.requestItemId,
       priceFerrailleur, priceClient, priceBc,
-      description: line.description, audioUrl: null, availability: 'available', status: 'validated',
-      adminNotes: null, validatedBy: 1, validatedAt: timestamp, createdAt: timestamp, updatedAt: timestamp, images: line.images,
+      description: line.description, availability: 'available', status: 'validated',
+      adminNotes: null, validatedBy: 1, validatedAt: timestamp, createdAt: timestamp, updatedAt: timestamp,
+      images: line.images, audioUrl: line.audio ?? null,
     });
     id += 1;
   });
-  request.offersCount = state.offers.filter((offer) => offer.requestId === requestId).length;
-  request.status = 'offers_received'; request.updatedAt = timestamp;
+  refreshOffersCount(request);
+  request.updatedAt = timestamp;
+  openOrderWindow(request, timestamp);
   return one({ success: true, offerId: firstId });
 }
 function acceptOffer(offerId: number) {
@@ -232,27 +287,19 @@ function acceptOffer(offerId: number) {
     state.basket = { ...state.basket, requestId: request.id, items: [], updatedAt: now() };
   }
   state.basket.items ??= [];
-  const competingOffers = state.offers.filter((candidate) =>
-    candidate.id !== offer.id &&
-    candidate.requestId === offer.requestId &&
-    candidate.requestItemId === offer.requestItemId &&
-    candidate.status === 'selected'
-  );
-  const competingIds = new Set(competingOffers.map(({ id }) => id));
-  competingOffers.forEach((candidate) => {
-    candidate.status = 'validated';
-    candidate.updatedAt = now();
-  });
-  state.basket.items = state.basket.items.filter((item) => !competingIds.has(item.offerId));
+  // Several selected offers of the same request item coexist in the basket
+  // (Figma 63-17933): accepting one never demotes another.
   if (!state.basket.items.some((item) => item.offerId === offer.id)) {
     state.basket.items.push({
       id: nextId(state.basket.items), basketId: state.basket.id, offerId: offer.id, categoryId: requestItem.categoryId,
       quantity: requestItem.quantity, unitPrice: offer.priceClient, createdAt: now(), updatedAt: now(),
       categoryTitle: requestItem.categoryTitle, categoryTitleAr: requestItem.categoryTitleAr, categoryImage: requestItem.categoryImage,
+      requestItemId: requestItem.id, brandName: requestItem.brandName ?? null, brandNameAr: requestItem.brandNameAr ?? null,
+      offerReference: offer.reference, expiresAt: request.expiresAt,
     });
   }
   state.basket.updatedAt = now();
-  return one(clone(priceBasket(state.basket)));
+  return one(clone(priceBasket(state.basket, state.voucher)));
 }
 function addProduct(productId: number, quantity: number) {
   const product = mockProducts.find(({ id }) => id === productId);
@@ -265,9 +312,10 @@ function addProduct(productId: number, quantity: number) {
     id: nextId(state.basket.items), basketId: state.basket.id, offerId: productId, categoryId: product.categoryId,
     quantity, unitPrice: product.promoPrice ?? product.price, createdAt: now(), updatedAt: now(),
     categoryTitle: product.categoryName, categoryTitleAr: product.categoryNameAr, categoryImage: product.images[0] ?? null,
+    requestItemId: null, brandName: null, brandNameAr: null, offerReference: null, expiresAt: null,
   });
   state.basket.updatedAt = now();
-  return one(clone(priceBasket(state.basket)));
+  return one(clone(priceBasket(state.basket, state.voucher)));
 }
 function changeBasketItem(itemId: number, quantity: number) {
   const items = state.basket.items ?? [];
@@ -276,7 +324,40 @@ function changeBasketItem(itemId: number, quantity: number) {
   state.basket.items = quantity === 0 ? items.filter(({ id }) => id !== itemId) :
     items.map((item) => item.id === itemId ? { ...item, quantity, updatedAt: now() } : item);
   state.basket.updatedAt = now();
-  return one(clone(priceBasket(state.basket)));
+  return one(clone(priceBasket(state.basket, state.voucher)));
+}
+/** POST /basket/coupon — attaches (or detaches, when invalid) the voucher like BasketService::applyVoucher. */
+function applyCoupon(code: string) {
+  const normalized = code.trim().toUpperCase();
+  if (!(state.basket.items ?? []).length) throw new Error('Le panier est vide.');
+  const amount = MOCK_VOUCHERS[normalized];
+  state.voucher = amount === undefined ? null : { code: normalized, amount };
+  if (!state.voucher) state.basket.discountAmount = 0;
+  priceBasket(state.basket, state.voucher);
+  state.basket.updatedAt = now();
+  const result: CouponResult = state.voucher
+    ? { valid: true, discountAmount: state.basket.discountAmount, code: normalized }
+    : { valid: false, discountAmount: 0, code: normalized };
+  return one(result);
+}
+function markNotificationRead(id: number) {
+  const row = state.notifications.find((item) => item.id === id);
+  if (!row) throw new Error('Notification not found');
+  if (!row.isRead) { row.isRead = true; row.readAt = now(); }
+  return one(clone(row));
+}
+function markAllNotificationsRead() {
+  const unread = state.notifications.filter(({ isRead }) => !isRead);
+  const timestamp = now();
+  unread.forEach((row) => { row.isRead = true; row.readAt = timestamp; });
+  return one({ updated: unread.length });
+}
+function updateBasketPremium(enabled: boolean) {
+  state.basket.premium = enabled;
+  state.basket.premiumFee = enabled ? 55 : 0;
+  state.basket.updatedAt = now();
+  priceBasket(state.basket, state.voucher);
+  return one(clone(state.basket));
 }
 function placeOrder(payload: PlaceOrderPayload) {
   const basketItems = state.basket.items ?? [];
@@ -288,19 +369,29 @@ function placeOrder(payload: PlaceOrderPayload) {
     quantity: item.quantity, unitPrice: item.unitPrice, totalPrice: item.unitPrice * item.quantity,
     status: 'confirmed', createdAt: timestamp, updatedAt: timestamp,
     categoryTitle: item.categoryTitle, categoryTitleAr: item.categoryTitleAr,
+    images: state.offers.find(({ id: offerId }) => offerId === item.offerId)?.images ?? [],
   }));
-  const { subtotal, discountAmount, shippingFee, taxAmount, total } = priceBasket(state.basket);
+  const { subtotal, discountAmount, shippingFee, taxAmount, total } = priceBasket(state.basket, state.voucher);
   const order: Order = {
     id, reference: 'ORD-' + String(id).padStart(6, '0'), userId: 1, addressId: payload.addressId, couponId: null,
-    subtotal, discountAmount, shippingFee, taxAmount, total, status: 'confirmed',
+    subtotal, discountAmount, shippingFee, premiumFee: state.basket.premiumFee, taxAmount, total, returnedAmount: 0, status: 'confirmed',
     paymentMethod: payload.paymentMethod, paymentStatus: 'pending', notes: payload.notes ?? null,
     confirmedBy: null, confirmedAt: timestamp, createdAt: timestamp, updatedAt: timestamp, items,
   };
   state.orders.unshift(order);
   if (state.basket.requestId !== null) {
     const request = requestById(state.basket.requestId); request.status = 'ordered'; request.updatedAt = timestamp;
+    // The offers not purchased with this order are over for the request.
+    const purchased = new Set(basketItems.map(({ offerId }) => offerId));
+    state.offers.forEach((offer) => {
+      if (offer.requestId === request.id && !purchased.has(offer.id) && !['rejected', 'expired'].includes(offer.status)) {
+        offer.status = 'expired'; offer.updatedAt = timestamp;
+      }
+    });
+    refreshOffersCount(request);
   }
-  state.basket = priceBasket({ ...state.basket, requestId: null, items: [], updatedAt: timestamp });
+  state.voucher = null;
+  state.basket = priceBasket({ ...state.basket, requestId: null, premium: false, premiumFee: 0, items: [], discountAmount: 0, updatedAt: timestamp });
   return one(clone(order));
 }
 function shipOffer(offerId: number, payload: ShipOfferPayload) {
@@ -531,6 +622,10 @@ export function handleGoldenRequest(method: string, path: string, body?: unknown
   if (method === 'GET' && path === '/requests') return page(state.requests.map(summary));
   if (method === 'POST' && path === '/requests') return createRequest(body as CreateRequestPayload);
   if (method === 'GET' && path === '/basket') return one(clone(state.basket));
+  if (method === 'PUT' && path === '/basket/premium') return updateBasketPremium(Boolean((body as { enabled?: boolean } | undefined)?.enabled));
+  if (method === 'POST' && path === '/basket/coupon') return applyCoupon((body as { code?: string } | undefined)?.code ?? '');
+  if (method === 'GET' && path === '/notifications') return page(clone(state.notifications));
+  if (method === 'POST' && path === '/notifications/read-all') return markAllNotificationsRead();
   if (method === 'POST' && path === '/basket/items') {
     const value = body as { productId: number; quantity: number }; return addProduct(value.productId, value.quantity);
   }
@@ -556,6 +651,9 @@ export function handleGoldenRequest(method: string, path: string, body?: unknown
   if (method === 'GET' && match) return one(clone(requestById(Number(match[1]))));
   match = path.match(/^\/requests\/(\d+)\/send$/);
   if (method === 'POST' && match) return sendRequest(Number(match[1]));
+  match = path.match(/^\/notifications\/(\d+)\/read$/);
+  if (method === 'POST' && match) return markNotificationRead(Number(match[1]));
+  // Client offers include `selected` ones (already in the basket) so the owner can still see and remove them.
   match = path.match(/^\/requests\/(\d+)\/offers$/);
   if (method === 'GET' && match) {
     const id = Number(match[1]);

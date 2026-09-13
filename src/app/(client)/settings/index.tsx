@@ -4,7 +4,7 @@
  *
  * Header: avatar + "Hey {name}" + notification bell.
  * Sections: Orders + Offers + Wishlist | Mon profil | Préférences | À propos | Mentions légales
- * Bottom: Logout button (round).
+ * Bottom: Logout button (round), confirmed in a bottom sheet.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -18,11 +18,17 @@ import ItemMenuComponent from '@/components/screens/shared/app/ItemMenuComponent
 import Button from '@/components/common/Button';
 import Footer from '@/components/common/Footer';
 import Icon from '@/components/common/Icon';
+import ConfirmModal from '@/components/common/ConfirmModal';
+import HeaderBell from '@/components/common/navigation/HeaderBell';
 import Colors from '@/constants/Colors';
 import { useSession } from '@/context/AuthContext';
 import { getProfile } from '@/api/resources/users';
 import { getNotificationPreferences, updateNotificationPreferences } from '@/api/resources/notifications';
 import type { UserNotificationPreferences } from '@/interfaces/Notification';
+import {
+  refreshClientUnreadNotifications,
+  useClientUnreadNotifications,
+} from '@/hooks/useClientUnreadNotifications';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -62,6 +68,9 @@ const ClientMenuScreen: React.FC = () => {
   const [avatar, setAvatar] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState(false);
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const hasUnreadNotifications = useClientUnreadNotifications();
 
   const loadProfile = useCallback(async () => {
     setProfileLoading(true);
@@ -77,7 +86,11 @@ const ClientMenuScreen: React.FC = () => {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { void loadProfile(); }, [loadProfile]));
+  useFocusEffect(useCallback(() => {
+    void loadProfile();
+    // Same unread dot as the Home header bell.
+    void refreshClientUnreadNotifications();
+  }, [loadProfile]));
 
   const loadPreferences = useCallback(async () => {
     setPreferencesLoading(true);
@@ -213,9 +226,17 @@ const ClientMenuScreen: React.FC = () => {
     },
   ];
 
+  // Destructive and one tap away: always confirm first.
   const handleLogout = async () => {
-    await logOut();
-    router.replace('/(auth)' as never);
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logOut();
+      setLogoutConfirmVisible(false);
+      router.replace('/(auth)' as never);
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   const avatarUri = avatar ?? session?.user.avatar ?? null;
@@ -240,15 +261,11 @@ const ClientMenuScreen: React.FC = () => {
               <Text type="small" color={Colors.error}>{t('settings.retry')}</Text>
             </TouchableOpacity> : null}
           </View>
-          <TouchableOpacity
-            style={styles.bellBtn}
-            activeOpacity={0.7}
+          <HeaderBell
+            hasUnread={hasUnreadNotifications}
             onPress={() => router.push('/(client)/settings/notifications' as never)}
-            accessibilityRole="button"
             accessibilityLabel={t('settings.notifications')}
-          >
-            <Icon name="bell" size={22} iconColor={Colors.brand} type="Feather" />
-          </TouchableOpacity>
+          />
         </View>
 
         {preferencesError ? (
@@ -296,13 +313,29 @@ const ClientMenuScreen: React.FC = () => {
             iconType="custom"
             variant="pink"
             style={styles.buttonLogout}
-            onPress={() => { void handleLogout(); }}
+            onPress={() => setLogoutConfirmVisible(true)}
             accessibilityLabel={t('settings.logout')}
           />
         </View>
 
         <Footer />
       </View>
+
+      <ConfirmModal
+        visible={logoutConfirmVisible}
+        onClose={() => setLogoutConfirmVisible(false)}
+        secondaryButton={{ title: t('Annuler'), variant: 'gray', onPress: () => setLogoutConfirmVisible(false) }}
+        primaryButton={{
+          title: t('settings.logout'),
+          variant: 'pink',
+          disabled: loggingOut,
+          onPress: () => { void handleLogout(); },
+        }}
+      >
+        <View style={styles.logoutConfirm}>
+          <Text type="headerTitle">{t('settings.logoutConfirm')}</Text>
+        </View>
+      </ConfirmModal>
     </Screen>
   );
 };
@@ -340,11 +373,9 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     resizeMode: 'cover',
   },
-  bellBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+  logoutConfirm: {
+    paddingTop: 20,
+    paddingBottom: 40,
   },
   sectionTitle: {
     marginTop: 30,

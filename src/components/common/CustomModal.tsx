@@ -69,6 +69,8 @@ const CustomModal: React.FC<CustomModalProps> = ({
       transparent={true}
       visible={visible}
       onRequestClose={handleClose}
+      // Dim the status bar too (Android): the overlay covers the whole screen.
+      statusBarTranslucent
     >
       <View style={styles.modalBackground}>
         <View

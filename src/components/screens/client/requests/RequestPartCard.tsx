@@ -19,6 +19,8 @@ interface RequestPartCardProps {
   offersCount?: number;
   onOffers?: () => void;
   onResend?: () => void;
+  /** Offers of this part already in the basket: 1 = "Dans le panier", 2+ = "2 dans le panier". */
+  basketCount?: number;
 }
 
 /**
@@ -36,6 +38,7 @@ const RequestPartCard: React.FC<RequestPartCardProps> = ({
   offersCount,
   onOffers,
   onResend,
+  basketCount = 0,
 }) => {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === "ar";
@@ -63,6 +66,14 @@ const RequestPartCard: React.FC<RequestPartCardProps> = ({
         <Text type="small" color={Colors.gray} translate={false}>
           {`${t("requestFlow.quantity", { count: quantity })} · ${conditionLabel}`}
         </Text>
+        {basketCount > 0 ? (
+          <View flexDirection="row" alignItems="center" gap={6} style={styles.inBasket}>
+            <CustomIcon name="cart" size={14} tintColor={Colors.greenDark} />
+            <Text type="labelTwo" semiBold color={Colors.greenDark} translate={false}>
+              {basketCount > 1 ? t("clientOffers.inCartCount", { count: basketCount }) : t("clientOffers.inCart")}
+            </Text>
+          </View>
+        ) : null}
       </View>
       {offersCount !== undefined ? (
         <View alignItems="flex-end" justifyContent="space-between">
@@ -78,7 +89,7 @@ const RequestPartCard: React.FC<RequestPartCardProps> = ({
               style={[styles.requestAction, styles.offersAction]}
               onPress={onOffers}
             >
-              <Text type="defaultTwo" semiBold translate={false}>{t("Les offres")}</Text>
+              <Text type="labelTwo" semiBold translate={false}>{t("Les offres")}</Text>
               <CustomIcon name={isArabic ? "arrow_left" : "arrow_right"} size={16} />
             </TouchableOpacity>
           ) : (
@@ -88,7 +99,7 @@ const RequestPartCard: React.FC<RequestPartCardProps> = ({
               style={[styles.requestAction, styles.resendAction]}
               onPress={onResend}
             >
-              <Text type="defaultTwo" semiBold translate={false}>{t("requestFlow.resend")}</Text>
+              <Text type="labelTwo" semiBold translate={false}>{t("requestFlow.resend")}</Text>
               <Icon name="rotate-ccw" type="Feather" size={14} iconColor={Colors.brand} />
             </TouchableOpacity>
           )}
@@ -102,7 +113,8 @@ const styles = StyleSheet.create({
   card: { borderRadius: 7, padding: 12, marginBottom: 12, backgroundColor: Colors.white, shadowColor: Colors.gray, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.16, shadowRadius: 8, elevation: 4 },
   thumbnail: { width: 48, height: 48, borderRadius: 6 },
   thumbnailPlaceholder: { backgroundColor: Colors.backgroundGray },
-  requestAction: { minHeight: 26, borderRadius: 3, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", gap: 6 },
+  requestAction: { height: 26, borderRadius: 3, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", gap: 8 },
+  inBasket: { marginTop: 2 },
   offersAction: { backgroundColor: Colors.primary },
   resendAction: { backgroundColor: Colors.orange },
 });

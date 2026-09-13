@@ -1,5 +1,5 @@
 import React from "react";
-import { ActivityIndicator, Modal } from "react-native";
+import { ActivityIndicator, Modal, StyleSheet } from "react-native";
 import { act, fireEvent, render as rtlRender, waitFor } from "@testing-library/react-native";
 import {
   addToBasket,
@@ -22,6 +22,7 @@ import { Role, useSession } from "@/context/AuthContext";
 import { RequestDraftProvider } from "@/context/RequestDraftContext";
 import { WishlistProvider } from "@/context/WishlistContext";
 import i18n from "@/localization/i18n";
+import { formatDhs } from "@/helpers/money";
 import HomeScreen from "@/components/screens/client/HomeScreen";
 import CategoriesListScreen from "../categories";
 import CategoryDrillScreen from "../categories/[categoryId]";
@@ -31,7 +32,6 @@ import ProductDetailScreen from "../products/[productId]";
 import ReviewsScreen from "../products/[productId]/reviews";
 import WhatsappBtn from "@/components/common/WhatsappBtn";
 import ItemCategoryComponent from "@/components/screens/shared/app/ItemCategoryComponent";
-import ItemBasketComponent from "@/components/screens/shared/app/ItemBasketComponent";
 import ClientCheckoutForm from "@/components/screens/client/checkout/ClientCheckoutForm";
 import { mockAddresses } from "@/api/mock/mockOrders";
 
@@ -235,10 +235,47 @@ it("preserves the original Home sections while binding Client data", async () =>
   expect(screen.getAllByText(i18n.t("home.category", { value: "Plaquettes" }))).toHaveLength(2);
   expect(screen.getByText(i18n.t("home.list"))).toBeTruthy();
   expect(screen.getByText(i18n.t("home.learnMore"))).toBeTruthy();
-  expect(screen.getByText(i18n.t("home.limitedOffers"))).toBeTruthy();
+  // "OFFRES LIMITÉES d’" + EBEN logotype, announced as one header.
+  expect(screen.getByLabelText(i18n.t("home.limitedOffers"))).toBeTruthy();
   expect(screen.getAllByText(i18n.t("home.viewDemo"))).toHaveLength(2);
   expect(screen.getByText(i18n.t("home.startExperience"))).toBeTruthy();
   expect(screen.getByText(i18n.t("home.checkPrices"))).toBeTruthy();
+});
+
+it("keeps the Home FAB and reads long request deadlines in days on a one-line CTA, in Arabic too", async () => {
+  mockedUseSession.mockReturnValue({ role: Role.CLIENT } as ReturnType<typeof useSession>);
+  await i18n.changeLanguage("ar");
+  mockGetRequests.mockResolvedValue({
+    success: true,
+    data: [{ id: 7, reference: "REQ-QA-CAP", status: "validated", expiresDisplay: "655h 10min", createdAt: "2026-01-01" }],
+    pagination,
+  });
+  const screen = render(<HomeScreen />);
+
+  const days = i18n.t("countdown.daysHours", { days: 27, hours: 7 });
+  expect(await screen.findByText(i18n.t("home.expiresIn", { value: days }))).toBeTruthy();
+  expect(screen.getByText(i18n.t("home.checkPrices")).props.numberOfLines).toBe(1);
+  expect(screen.UNSAFE_queryAllByType(WhatsappBtn)).toHaveLength(1);
+  await i18n.changeLanguage("fr");
+});
+
+it("keeps spaced part numbers left-to-right and the product row on the right inset in Arabic", async () => {
+  mockGetProducts.mockResolvedValue({ success: true, data: [{ ...product, articleNumber: "0 986 424 622" }], pagination });
+  const insetsOf = (testID: string) => StyleSheet.flatten(screen.getByTestId(testID).props.contentContainerStyle);
+  await i18n.changeLanguage("ar");
+  let screen = render(<HomeScreen />);
+
+  // LTR isolate: the bidi algorithm would otherwise lay the digit groups out right-to-left ("622 424 986 0").
+  expect(await screen.findAllByText("رقم القطعة: \u20660 986 424 622\u2069")).toHaveLength(2);
+  expect(insetsOf("home-stock-products")).toEqual(expect.objectContaining({ paddingLeft: 16, flexDirection: "row-reverse" }));
+  expect(insetsOf("home-stock-products").paddingRight).toBeUndefined();
+  screen.unmount();
+
+  await i18n.changeLanguage("fr");
+  screen = render(<HomeScreen />);
+  expect(await screen.findAllByText("N° Article: 0 986 424 622")).toHaveLength(2);
+  expect(insetsOf("home-recent-products")).toEqual(expect.objectContaining({ paddingRight: 16 }));
+  expect(insetsOf("home-recent-products").paddingLeft).toBeUndefined();
 });
 
 it("does not advertise moderated offers to the Client before validation", async () => {
@@ -366,8 +403,24 @@ it("renders the regular price when promoPrice is zero instead of a false discoun
 
   const screen = render(<HomeScreen />);
 
-  expect(await screen.findByText(i18n.t("home.price", { value: "100,00" }))).toBeTruthy();
-  expect(screen.queryByText(i18n.t("home.price", { value: "0,00" }))).toBeNull();
+  expect(await screen.findByText(i18n.t("home.price", { price: "100,00 Dhs" }))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("home.price", { price: "0,00 Dhs" }))).toBeNull();
+});
+
+it("matches the Figma purchase sheet with Acheter, old price and discount", async () => {
+  mockedUseSession.mockReturnValue({ role: Role.CLIENT } as ReturnType<typeof useSession>);
+  mockParams = { productId: "91" };
+  mockGetProduct.mockResolvedValueOnce({
+    success: true,
+    data: { ...product, price: 100, promoPrice: 75 },
+  });
+  const screen = render(<ProductDetailScreen />);
+
+  fireEvent.press(await screen.findByRole("button", { name: i18n.t("Ajouter au panier") }));
+
+  expect(screen.getByRole("button", { name: i18n.t("Acheter") })).toBeTruthy();
+  expect(screen.getAllByText(i18n.t("home.price", { price: "100,00 Dhs" }))).toHaveLength(2);
+  expect(screen.getAllByText("-25%")).toHaveLength(2);
 });
 
 it("renders category loading, live data, and retry after a failed read", async () => {
@@ -409,7 +462,8 @@ it("shows every saved address by its saved label", () => {
       addresses={mockAddresses}
       selectedAddressId={mockAddresses[0]!.id}
       onSelectAddress={jest.fn()}
-      onAddAddress={jest.fn()}
+      onSelectNewAddress={jest.fn()}
+      onCreateAddress={jest.fn().mockResolvedValue(undefined)}
       selectedPaymentMethod="cod"
       onSelectPaymentMethod={jest.fn()}
     />,
@@ -426,7 +480,8 @@ it("shows only payment methods users can currently select", () => {
       addresses={[]}
       selectedAddressId={null}
       onSelectAddress={jest.fn()}
-      onAddAddress={jest.fn()}
+      onSelectNewAddress={jest.fn()}
+      onCreateAddress={jest.fn().mockResolvedValue(undefined)}
       selectedPaymentMethod="cod"
       onSelectPaymentMethod={jest.fn()}
     />,
@@ -435,26 +490,39 @@ it("shows only payment methods users can currently select", () => {
   expect(screen.getByText(i18n.t("Paiement à la livraison"))).toBeTruthy();
   expect(screen.queryByText(i18n.t("Payer avec Cash Plus"))).toBeNull();
   expect(screen.queryByText(i18n.t("Virement bancaire"))).toBeNull();
-  expect(screen.queryByText(i18n.t("checkout.paymentDetails"))).toBeNull();
+  expect(screen.getByText(i18n.t("checkout.paymentDetails"))).toBeTruthy();
 });
-it("localizes basket category labels and price units", () => {
+
+it("reveals and submits the API-supported inline checkout address fields", async () => {
+  const onSelectNewAddress = jest.fn();
+  const onCreateAddress = jest.fn().mockResolvedValue(undefined);
   const screen = render(
-    <ItemBasketComponent
-      item={{
-        id: 1,
-        title: "Plaquettes",
-        categoryLabel: "Freins",
-        unitPrice: 99.5,
-        quantity: 1,
-      }}
-      onIncrement={jest.fn()}
-      onDecrement={jest.fn()}
-      onRemove={jest.fn()}
+    <ClientCheckoutForm
+      addresses={mockAddresses}
+      selectedAddressId={mockAddresses[0]!.id}
+      onSelectAddress={jest.fn()}
+      onSelectNewAddress={onSelectNewAddress}
+      onCreateAddress={onCreateAddress}
+      selectedPaymentMethod="cod"
+      onSelectPaymentMethod={jest.fn()}
     />,
   );
 
-  expect(screen.getByText(i18n.t("home.category", { value: "Freins" }))).toBeTruthy();
-  expect(screen.getByText("99,5 Dhs")).toBeTruthy();
+  expect(screen.getByText(i18n.t("checkout.paymentDetails"))).toBeTruthy();
+  fireEvent.press(screen.getByRole("radio", { name: i18n.t("checkout.useNewAddress") }));
+  expect(onSelectNewAddress).toHaveBeenCalledTimes(1);
+
+  fireEvent.changeText(screen.getByLabelText(i18n.t("settings.address.line1")), "12 rue Atlas");
+  fireEvent.changeText(screen.getByLabelText(i18n.t("settings.address.city")), "Casablanca");
+  fireEvent.changeText(screen.getByLabelText(i18n.t("checkout.neighborhood")), "Maarif");
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("checkout.saveAddress") }));
+
+  await waitFor(() => expect(onCreateAddress).toHaveBeenCalledWith({
+    addressLine1: "12 rue Atlas",
+    city: "Casablanca",
+    region: "Maarif",
+    country: "Morocco",
+  }));
 });
 it("keeps long category labels readable within two lines", () => {
   const screen = render(<ItemCategoryComponent item={{
@@ -563,7 +631,7 @@ it("maps validated tyre query filters to the live pneumatic search", async () =>
     vehicleType: "4x4",
   }));
   expect(mockGetProductsByCategory).not.toHaveBeenCalled();
-  expect(await screen.findByText("\u0631\u0642\u0645 \u0627\u0644\u0642\u0637\u0639\u0629: 205/55 R16")).toBeTruthy();
+  expect(await screen.findByText("\u0631\u0642\u0645 \u0627\u0644\u0642\u0637\u0639\u0629: \u2066205/55 R16\u2069")).toBeTruthy();
 });
 
 it("rejects invalid result query ids before making a public request", async () => {
@@ -612,7 +680,7 @@ it("uses list-add language for occasion products instead of a basket purchase", 
 
   expect(await screen.findByRole("button", { name: i18n.t("Ajoutez à la liste") })).toBeTruthy();
   expect(screen.queryByRole("button", { name: i18n.t("Ajouter au panier") })).toBeNull();
-  expect(screen.queryByText(`${product.price.toLocaleString("fr-MA")} Dhs TTC`)).toBeNull();
+  expect(screen.queryByText(i18n.t("home.price", { price: formatDhs(product.price) }))).toBeNull();
 });
 it("shows an honest empty-media state without photo-specific occasion guidance", async () => {
   mockParams = { productId: "91", state: "extra-info" };
@@ -646,7 +714,7 @@ it("routes guest basket and wishlist actions to Client login without protected c
   const screen = render(<ProductDetailScreen />);
   await screen.findByText("Plaquettes live");
 
-  fireEvent.press(screen.getByLabelText("Ajouter à la liste"));
+  fireEvent.press(screen.getByLabelText(i18n.t("Ajouter à la liste de souhaits")));
   fireEvent.press(screen.getByRole("button", { name: i18n.t("Ajouter au panier") }));
 
   expect(mockPush).toHaveBeenCalledWith({
@@ -680,7 +748,7 @@ it("allows a Client detail mutation to call the protected resource", async () =>
   const screen = render(<ProductDetailScreen />);
   await screen.findByText("Plaquettes live");
 
-  fireEvent.press(screen.getByLabelText("Ajouter à la liste"));
+  fireEvent.press(screen.getByLabelText(i18n.t("Ajouter à la liste de souhaits")));
   await waitFor(() => expect(addToWishlist).toHaveBeenCalledWith(91));
 });
 
@@ -969,7 +1037,7 @@ it("always shows price and the wishlist heart, and never renders a Liste button 
   await stockScreen.findByText("Plaquettes live");
 
   expect(stockScreen.getByText(i18n.t("home.category", { value: "Plaquettes" }))).toBeTruthy();
-  expect(stockScreen.getByText("299 dhs")).toBeTruthy();
+  expect(stockScreen.getByText("299,00 dhs")).toBeTruthy();
   expect(stockScreen.getByLabelText(i18n.t("Ajouter à la liste de souhaits"))).toBeTruthy();
   stockScreen.unmount();
 
@@ -977,7 +1045,7 @@ it("always shows price and the wishlist heart, and never renders a Liste button 
   const occasionScreen = render(<CategoryResultsScreen />);
   await occasionScreen.findByText("Plaquettes live");
 
-  expect(occasionScreen.getByText("299 dhs")).toBeTruthy();
+  expect(occasionScreen.getByText("299,00 dhs")).toBeTruthy();
   expect(occasionScreen.getByLabelText(i18n.t("Ajouter à la liste de souhaits"))).toBeTruthy();
   expect(occasionScreen.queryByRole("button", { name: i18n.t("Liste") })).toBeNull();
   expect(occasionScreen.queryByRole("button", { name: i18n.t("Retirer de la liste") })).toBeNull();

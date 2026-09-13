@@ -62,7 +62,19 @@ const CountdownRing: React.FC<CountdownRingProps> = ({
         />
       </Svg>
       <View style={styles.center} alignItems="center" justifyContent="center">
-        <Text type="titleTwo" semiBold size={34} translate={false}>{label}</Text>
+        <Text
+          type="titleTwo"
+          semiBold
+          size={34}
+          center
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.6}
+          translate={false}
+          style={{ maxWidth: size - strokeWidth * 2 - 24 }}
+        >
+          {label}
+        </Text>
         <Text type="label" color={Colors.grayMidDark}>{caption}</Text>
       </View>
     </View>

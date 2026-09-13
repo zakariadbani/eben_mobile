@@ -45,6 +45,9 @@ export interface RequestItem {
   categoryTitle?: string;
   categoryTitleAr?: string;
   categoryImage?: string | null;
+  categoryFamily?: import('./Category').CategoryFamily | null;
+  /** Server count of validated + selected client-visible offers for this line. */
+  offersCount?: number;
   /** Nullable part-brand line (D1/D3). Backend adds these fields in Part D. */
   brandId?: number | null;
   brandName?: string | null;
@@ -84,6 +87,8 @@ export interface Request {
   items?: RequestItem[];
   /** ws.ts field: `images` — URLs attached to the request. */
   images?: string[];
+  /** Present on Prestataire incoming-request responses. */
+  vehicle?: import('./Vehicle').VehicleSummary | null;
 }
 
 /** Summary shape used in list screens — matches ws.ts `dataRequests` entries. */
@@ -93,5 +98,7 @@ export interface RequestSummary {
   status: RequestStatus;
   /** Display string e.g. "12h 00min" — computed from expiresAt by the API. */
   expiresDisplay: string | null;
+  /** ISO-8601 deadline when the API sends it (preferred over `expiresDisplay`). */
+  expiresAt?: string | null;
   createdAt: string;
 }

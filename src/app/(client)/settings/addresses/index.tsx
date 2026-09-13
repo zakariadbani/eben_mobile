@@ -16,6 +16,7 @@ import ConfirmModal from '@/components/common/ConfirmModal';
 import Colors from '@/constants/Colors';
 import { getAddresses, deleteAddress, setDefaultAddress } from '@/api';
 import ItemAddressComponent from '@/components/screens/client/addresses/ItemAddressComponent';
+import EmptyListComponent from '@/components/screens/shared/app/EmptyListComponent';
 import type { Address } from '@/interfaces/Address';
 import { useTranslation } from 'react-i18next';
 
@@ -109,7 +110,7 @@ export default function MyAddressesScreen() {
 
   return (
     <>
-      <Screen scrollable whatsapp={false}>
+      <Screen scrollable>
         <View style={styles.container}>
           {error ? <View style={styles.emptySection} alignItems="center" gap={12}>
             <Text accessibilityRole="alert" color={Colors.error}>{error}</Text>
@@ -118,10 +119,12 @@ export default function MyAddressesScreen() {
           {mutationError ? <Text accessibilityRole="alert" color={Colors.error} center>{mutationError}</Text> : null}
           {!error && isEmpty ? (
             /* ── Empty state ── */
-            <View style={styles.emptySection} alignItems="center">
-              <Text type="default" color={Colors.gray} center style={styles.emptyText}>
-                {t('addresses.empty')}
-              </Text>
+            <View>
+              <EmptyListComponent
+                title=""
+                illustrationSize={240}
+                styleContainer={styles.emptyIllustration}
+              />
             </View>
           ) : !error ? (
             /* ── Default address section ── */
@@ -172,10 +175,12 @@ export default function MyAddressesScreen() {
               <Text type="headerTitle" bold style={styles.othersTitle}>
                 {t('addresses.otherTitle')}
               </Text>
-              <View style={styles.emptySection} alignItems="center">
-                <Text type="default" color={Colors.gray} center>
-                  {t('addresses.empty')}
-                </Text>
+              <View>
+                <EmptyListComponent
+                  title=""
+                  illustrationSize={240}
+                  styleContainer={styles.emptyIllustration}
+                />
               </View>
             </View>
           )}
@@ -222,8 +227,10 @@ const styles = StyleSheet.create({
   emptySection: {
     paddingVertical: 40,
   },
-  emptyText: {
-    marginBottom: 8,
+  emptyIllustration: {
+    flex: 0,
+    paddingVertical: 16,
+    paddingHorizontal: 0,
   },
   addButtonContainer: {
     marginBottom: 24,

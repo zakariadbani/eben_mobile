@@ -28,9 +28,24 @@ describe("formatCountdown", () => {
     expect(formatCountdown(undefined as unknown as string | null, "Expiré")).toBe("—");
   });
 
-  it("does not cap the hour component past two digits", () => {
-    const expiresAt = new Date(NOW + (100 * 3600 + 5 * 60) * 1000).toISOString();
-    expect(formatCountdown(expiresAt, "Expiré")).toBe("100h 05min");
+  it("reads in days from 24 hours so long deadlines never show 655h", () => {
+    const at = (minutes: number) => new Date(NOW + minutes * 60_000).toISOString();
+    expect(formatCountdown(at(24 * 60 - 1), "Expiré")).toBe("23h 59min");
+    expect(formatCountdown(at(24 * 60), "Expiré")).toBe("1j 0h");
+    expect(formatCountdown(at(655 * 60 + 10), "Expiré")).toBe("27j 7h");
+  });
+
+  it("localizes the units through an optional format", () => {
+    const format = {
+      hours: (hours: number, minutes: string) => `${hours} ساعة و ${minutes} دقيقة`,
+      days: (days: number, hours: number) => `${days} يوم و ${hours} ساعة`,
+    };
+    expect(formatCountdown(new Date(NOW + 125 * 60_000).toISOString(), "منتهي", format)).toBe("2 ساعة و 05 دقيقة");
+    expect(formatCountdown(new Date(NOW + 50 * 3600_000).toISOString(), "منتهي", format)).toBe("2 يوم و 2 ساعة");
+  });
+
+  it("returns a placeholder for an unparsable deadline", () => {
+    expect(formatCountdown("not-a-date", "Expiré")).toBe("—");
   });
 });
 

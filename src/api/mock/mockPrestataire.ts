@@ -86,7 +86,9 @@ export const mockPrestataireDashboardStats: PrestataireDashboardStats = {
   offersActiveCount: 4,      // partner's offers still pending/validated
   offersAcceptedCount: 7,    // offers where client said yes
   offersSentCount: 18,       // total offers sent (all statuses)
+  missedRequestsCount: 3,
   pendingPayout: 6_230.00,   // wallet balance available to withdraw
+  comparison: { period: '30d', sales: 18_450, salesPrev: 16_200, requestsReceived: 12, requestsReceivedPrev: 10, offersSent: 18, offersSentPrev: 15, accepted: 7, acceptedPrev: 6 },
   recentOffers: getMockRecentOffers(),
 };
 
@@ -219,6 +221,7 @@ export const mockPrestataireIncomingRequests: Request[] = [
       RESEND_OFFER_IMAGE_URI,
       RESEND_OFFER_IMAGE_URI,
     ],
+    vehicle: { brandName: 'BMW', modelName: 'X5 (E53)', motorisation: '4.8 Essence', year: 2004 },
   },
   {
     id: 102,
@@ -236,6 +239,7 @@ export const mockPrestataireIncomingRequests: Request[] = [
     updatedAt: '2024-10-10T07:30:00Z',
     items: mockPrestataireIncomingRequestItems.filter((i) => i.requestId === 102),
     images: [],
+    vehicle: { brandName: 'Dacia', modelName: 'Logan', motorisation: '1.5 dCi', year: 2019 },
   },
   {
     id: 103,
@@ -253,6 +257,7 @@ export const mockPrestataireIncomingRequests: Request[] = [
     updatedAt: '2024-10-10T06:15:00Z',
     items: mockPrestataireIncomingRequestItems.filter((i) => i.requestId === 103),
     images: [AUTO_PART_IMAGE_URI],
+    vehicle: { brandName: 'Renault', modelName: 'Clio IV', motorisation: null, year: 2019 },
   },
   {
     id: 104,
@@ -270,6 +275,7 @@ export const mockPrestataireIncomingRequests: Request[] = [
     updatedAt: '2024-10-09T22:00:00Z',
     items: mockPrestataireIncomingRequestItems.filter((i) => i.requestId === 104),
     images: [],
+    vehicle: null,
   },
 ];
 
@@ -429,6 +435,9 @@ const mockPartnerOrderItems: PrestataireOrderItem[] = [
     updatedAt: '2024-10-08T14:00:00Z',
     categoryTitle: 'Flexible de frein avant',
     categoryTitleAr: 'خرطوم الفرامل الأمامي',
+    images: [],
+    vehicle: { brandName: 'Renault', modelName: 'Clio IV', motorisation: null, year: 2019 },
+    paymentStatus: 'completed',
     purchaseOrder: {
       id: 401,
       reference: 'BC-20241008-401',
@@ -457,6 +466,9 @@ const mockPartnerOrderItems: PrestataireOrderItem[] = [
     updatedAt: '2024-10-08T14:00:00Z',
     categoryTitle: 'Disque de frein avant',
     categoryTitleAr: 'قرص الفرامل الأمامي',
+    images: [AUTO_PART_IMAGE_URI],
+    vehicle: null,
+    paymentStatus: 'completed',
     purchaseOrder: {
       id: 402,
       reference: 'BC-20241008-402',
@@ -485,6 +497,9 @@ const mockPartnerOrderItems: PrestataireOrderItem[] = [
     updatedAt: '2024-10-05T16:00:00Z',
     categoryTitle: 'Kit de distribution',
     categoryTitleAr: 'طقم التوزيع',
+    images: [AUTO_PART_IMAGE_URI],
+    vehicle: { brandName: 'Dacia', modelName: 'Logan', motorisation: '1.5 dCi', year: 2019 },
+    paymentStatus: 'completed',
     purchaseOrder: {
       id: 403,
       reference: 'BC-20241005-403',
@@ -513,6 +528,9 @@ const mockPartnerOrderItems: PrestataireOrderItem[] = [
     updatedAt: '2024-09-25T11:00:00Z',
     categoryTitle: 'Flexible de frein avant',
     categoryTitleAr: 'خرطوم الفرامل الأمامي',
+    images: [],
+    vehicle: { brandName: 'Renault', modelName: 'Clio IV', motorisation: null, year: 2019 },
+    paymentStatus: 'completed',
     purchaseOrder: {
       id: 404,
       reference: 'BC-20240920-404',
@@ -596,6 +614,7 @@ export const mockPrestataireCompany: PrestataireCompany = {
   id: 1,
   userId: 10,
   legalName: 'Auto Pièces Casa SARL',
+  legalForm: 'SARL AU',
   ice: '001234567000078',
   rc: 'CAS/2018/B/00456',
   taxId: '45678901',
@@ -608,6 +627,11 @@ export const mockPrestataireCompany: PrestataireCompany = {
   phone: '+212522345678',
   email: 'contact@autopieces-casa.ma',
   specializations: [1, 2, 4],
+  bank: { ibanMasked: '********************1234', holder: 'Auto Pièces Casa SARL', bankName: 'Attijariwafa Bank' },
+  brandGroups: [
+    { group: 'mecanique', brands: [{ id: 1, name: 'Dacia', nameAr: 'داسيا', logo: null, relatedParts: [{ id: 100, title: 'Freins', titleAr: 'الفرامل' }] }] },
+    { group: 'carrosserie', brands: [] },
+  ],
   status: 'active',
   createdAt: '2023-03-15T08:00:00Z',
   updatedAt: '2024-08-20T14:00:00Z',

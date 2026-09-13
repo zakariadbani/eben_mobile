@@ -12,7 +12,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { getPrestataireIncomingRequests, getPrestataireOffers } from "@/api/resources/prestataire";
+import { getPrestataireIncomingRequests, getPrestataireOffers, getPrestataireStats } from "@/api/resources/prestataire";
 import Screen from "@/components/common/Screen";
 import PartnerSupportBanner from "@/components/common/PartnerSupportBanner";
 import PickerInput from "@/components/common/PickerInput";
@@ -29,6 +29,7 @@ import { setPartnerOpenRequestsCount, usePartnerBadges } from "@/hooks/usePartne
 import Colors from "@/constants/Colors";
 import type { PrestataireOffer } from "@/interfaces/Offer";
 import type { Request } from "@/interfaces/Request";
+import type { DashboardComparisonPeriod, PrestataireDashboardStats } from "@/interfaces/PrestataireDashboard";
 
 type OffersView = "hub" | "incoming" | "accepted" | "sent";
 
@@ -87,6 +88,7 @@ export default function PrestataireOffersScreen(): React.ReactElement {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [periodDays, setPeriodDays] = useState<number>(DEFAULT_PERIOD_DAYS);
+  const [serverStats, setServerStats] = useState<PrestataireDashboardStats | null>(null);
   const loadedRef = useRef(false);
   // Late responses must not update a screen that has already been unmounted.
   const mountedRef = useRef(true);
@@ -150,6 +152,16 @@ export default function PrestataireOffersScreen(): React.ReactElement {
     setRefreshing(true);
     void load(true);
   }, [load]);
+
+  useEffect(() => {
+    if (view !== "hub") return;
+    let cancelled = false;
+    const period = `${periodDays}d` as DashboardComparisonPeriod;
+    getPrestataireStats(period)
+      .then((result) => { if (!cancelled) setServerStats(result.data); })
+      .catch(() => { if (!cancelled) setServerStats(null); });
+    return () => { cancelled = true; };
+  }, [periodDays, view]);
 
   const active = useMemo(() => offers.filter((offer) => offer.status === "validated"), [offers]);
   const accepted = useMemo(() => offers.filter((offer) => offer.status === "selected"), [offers]);
@@ -217,19 +229,21 @@ export default function PrestataireOffersScreen(): React.ReactElement {
   const groupedIncoming = useMemo(() => {
     const groups = new Map<number, { categoryId: number; label: string; pairs: typeof visiblePairs }>();
     visiblePairs.forEach((pair) => {
-      const label = isArabic
-        ? pair.item.categoryTitleAr ?? pair.item.categoryTitle
-        : pair.item.categoryTitle;
-      const existing = groups.get(pair.item.categoryId);
+      const family = pair.item.categoryFamily;
+      const categoryId = family?.id ?? pair.item.categoryId;
+      const label = family
+        ? (isArabic ? family.titleAr || family.title : family.title)
+        : (isArabic ? pair.item.categoryTitleAr ?? pair.item.categoryTitle : pair.item.categoryTitle);
+      const existing = groups.get(categoryId);
       if (existing) existing.pairs.push(pair);
-      else groups.set(pair.item.categoryId, { categoryId: pair.item.categoryId, label: label ?? t("partner.offers.unknownPart"), pairs: [pair] });
+      else groups.set(categoryId, { categoryId, label: label ?? t("partner.offers.unknownPart"), pairs: [pair] });
     });
     return Array.from(groups.values());
   }, [visiblePairs, isArabic, t]);
 
   const incomingPartsCount = useMemo(() => flattenIncoming(incoming).length, [incoming]);
 
-  const periodStats = useMemo(() => {
+  const rejectedStats = useMemo(() => {
     const now = Date.now();
     const from = now - periodDays * DAY_MS;
     const previousFrom = from - periodDays * DAY_MS;
@@ -239,15 +253,8 @@ export default function PrestataireOffersScreen(): React.ReactElement {
       const value = offerCount(match, from, now + 1);
       return { value, trend: formatTrend(value, offerCount(match, previousFrom, from), higherIsBad) };
     };
-    const receivedNow = countBetween(incoming, (request) => request.createdAt, from, now + 1);
-    const receivedBefore = countBetween(incoming, (request) => request.createdAt, previousFrom, from);
-    return {
-      received: { value: receivedNow, trend: formatTrend(receivedNow, receivedBefore) },
-      sent: metric(() => true),
-      accepted: metric((offer) => offer.status === "selected"),
-      rejected: metric((offer) => offer.status === "rejected", true),
-    };
-  }, [incoming, offers, periodDays]);
+    return metric((offer) => offer.status === "rejected", true);
+  }, [offers, periodDays]);
 
   // Edge-to-edge Android draws under the status bar: the yellow bar extends
   // behind it and the row starts below the top inset (same as CustomHeader).
@@ -278,6 +285,10 @@ export default function PrestataireOffersScreen(): React.ReactElement {
     ];
     const periodItems = PERIOD_DAYS.map((days) => ({ id: days, title: t("partner.offers.stats.periodDays", { count: days }) }));
     const selectedPeriod = periodItems.find((item) => item.id === periodDays);
+    const comparison = serverStats?.comparison;
+    const receivedTrend = comparison ? formatTrend(comparison.requestsReceived, comparison.requestsReceivedPrev) : NO_TREND;
+    const sentTrend = comparison ? formatTrend(comparison.offersSent, comparison.offersSentPrev) : NO_TREND;
+    const acceptedTrend = comparison ? formatTrend(comparison.accepted, comparison.acceptedPrev) : NO_TREND;
 
     return (
       <>
@@ -328,12 +339,11 @@ export default function PrestataireOffersScreen(): React.ReactElement {
           </View> : null}
 
           {!loading && !error ? <View style={styles.statsGrid} flexDirection="row">
-            <PartnerStatCard style={styles.statCard} label={t("partner.offers.stats.received")} value={periodStats.received.value} trend={periodStats.received.trend.text} trendTone={periodStats.received.trend.tone} />
-            {/* Missed requests are not exposed by the API yet: "—" placeholder. */}
-            <PartnerStatCard style={styles.statCard} icon="file-remove-outline" label={t("partner.offers.stats.missed")} value={null} trend={NO_TREND.text} />
-            <PartnerStatCard style={styles.statCard} icon="file-send-outline" label={t("partner.offers.stats.sent")} value={periodStats.sent.value} trend={periodStats.sent.trend.text} trendTone={periodStats.sent.trend.tone} />
-            <PartnerStatCard style={styles.statCard} icon="file-check-outline" label={t("partner.offers.stats.accepted")} value={periodStats.accepted.value} trend={periodStats.accepted.trend.text} trendTone={periodStats.accepted.trend.tone} />
-            <PartnerStatCard style={styles.statCard} icon="file-cancel-outline" label={t("partner.offers.stats.rejected")} value={periodStats.rejected.value} trend={periodStats.rejected.trend.text} trendTone={periodStats.rejected.trend.tone} />
+            <PartnerStatCard style={styles.statCard} label={t("partner.offers.stats.received")} value={comparison?.requestsReceived ?? null} trend={receivedTrend.text} trendTone={receivedTrend.tone} />
+            <PartnerStatCard style={styles.statCard} icon="file-remove-outline" label={t("partner.offers.stats.missed")} value={serverStats?.missedRequestsCount ?? null} />
+            <PartnerStatCard style={styles.statCard} icon="file-send-outline" label={t("partner.offers.stats.sent")} value={comparison?.offersSent ?? null} trend={sentTrend.text} trendTone={sentTrend.tone} />
+            <PartnerStatCard style={styles.statCard} icon="file-check-outline" label={t("partner.offers.stats.accepted")} value={comparison?.accepted ?? null} trend={acceptedTrend.text} trendTone={acceptedTrend.tone} />
+            <PartnerStatCard style={styles.statCard} icon="file-cancel-outline" label={t("partner.offers.stats.rejected")} value={rejectedStats.value} trend={rejectedStats.trend.text} trendTone={rejectedStats.trend.tone} />
             <View style={styles.showMoreCell} alignItems="center" justifyContent="center">
               <TouchableOpacity style={styles.smallButton} onPress={() => router.push("/(prestataire)/profile/overview")} accessibilityRole="button">
                 <Text type="labelTwo" semiBold>{t("partner.offers.showMore")}</Text>

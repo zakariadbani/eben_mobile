@@ -12,6 +12,19 @@ import type { OfferStatus } from './Offer';
 
 /** Canonical Laravel dashboard aggregation periods. */
 export type DashboardPeriod = '1j' | '7j' | '1m' | '6m' | '1a' | 'max';
+export type DashboardComparisonPeriod = '7d' | '30d' | '90d';
+
+export interface DashboardComparison {
+  period: DashboardComparisonPeriod;
+  sales: number;
+  salesPrev: number;
+  requestsReceived: number;
+  requestsReceivedPrev: number;
+  offersSent: number;
+  offersSentPrev: number;
+  accepted: number;
+  acceptedPrev: number;
+}
 
 /** One server-aggregated point in a Prestataire dashboard series. */
 export interface PrestataireDashboardSeriesBucket {
@@ -24,10 +37,18 @@ export interface PrestataireDashboardSeriesBucket {
   pendingPayout: number;
 }
 
+export interface PrestataireTopProduct {
+  title: string;
+  titleAr: string;
+  image: string | null;
+  soldCount: number;
+}
+
 /** Returned by GET /prestataire/dashboard/series. */
 export interface PrestataireDashboardSeries {
   period: DashboardPeriod;
   buckets: PrestataireDashboardSeriesBucket[];
+  topProducts: PrestataireTopProduct[];
 }
 
 /** Small summary row for a recent offer shown in the dashboard feed. */
@@ -68,8 +89,10 @@ export interface PrestataireDashboardStats {
   offersAcceptedCount: number;
   /** Total offers sent (all statuses included). */
   offersSentCount: number;
+  missedRequestsCount: number;
   /** Wallet balance available for withdrawal — MAD. */
   pendingPayout: number;
+  comparison: DashboardComparison;
   /** Latest N offers for the dashboard feed. Optional — may be absent on summary-only calls. */
   recentOffers?: RecentOfferSummary[];
 }

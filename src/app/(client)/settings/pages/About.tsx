@@ -111,14 +111,14 @@ const AboutScreen: React.FC = () => {
           <View flexDirection="row" gap={10} style={styles.contactRow}>
             <Icon name="mail-outline" type="Ionicons" size={18} iconColor={Colors.gray} />
             <Text type="default" color={Colors.grayMidDark} translate={false}>
-              info@eben.ma
+              {t("about.email")}
             </Text>
           </View>
 
           <View flexDirection="row" gap={10} style={styles.contactRow}>
             <Icon name="call-outline" type="Ionicons" size={18} iconColor={Colors.gray} />
             <Text type="default" color={Colors.grayMidDark} translate={false}>
-              +212 6 61 39 39 71
+              {t("about.phone")}
             </Text>
           </View>
 

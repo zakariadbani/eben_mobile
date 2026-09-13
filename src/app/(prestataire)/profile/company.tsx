@@ -26,7 +26,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { getBrands, getPrestataireCompany, updatePrestataireCompany } from '@/api';
+import { getBrands, getCategoryTree, getPrestataireCompany, updatePrestataireCompany } from '@/api';
 import Button from '@/components/common/Button';
 import CustomHeader from '@/components/common/CustomHeader';
 import Icon from '@/components/common/Icon';
@@ -36,7 +36,8 @@ import { Text } from '@/components/common/Text';
 import View from '@/components/common/View';
 import Colors from '@/constants/Colors';
 import { usePartnerBadges } from '@/hooks/usePartnerBadges';
-import type { PrestataireCompany } from '@/interfaces/PrestataireCompany';
+import type { CompanyBrand, CompanyBrandGroupKey, PrestataireCompany } from '@/interfaces/PrestataireCompany';
+import type { CategoryFamily } from '@/interfaces/Category';
 import type { CarBrand } from '@/interfaces/Vehicle';
 
 interface SectionCardProps {
@@ -71,7 +72,7 @@ function DataLine({ label, value }: { label: string; value?: string | null }): R
 }
 
 /** Brand logo, or a grey initial badge when the brand has no logo or it fails to load. */
-function BrandLogo({ brand, label }: { brand?: CarBrand; label: string }): React.ReactElement {
+function BrandLogo({ brand, label }: { brand?: Pick<CarBrand, 'logo'>; label: string }): React.ReactElement {
   const [failed, setFailed] = useState(false);
   if (brand?.logo && !failed) {
     return <Image source={{ uri: brand.logo }} style={styles.brandLogo} resizeMode="contain" onError={() => setFailed(true)} accessibilityIgnoresInvertColors />;
@@ -89,23 +90,29 @@ export default function CompanyScreen(): React.ReactElement {
   const { hasUnreadNotifications } = usePartnerBadges();
   const [company, setCompany] = useState<PrestataireCompany | null>(null);
   const [brands, setBrands] = useState<CarBrand[]>([]);
+  const [partFamilies, setPartFamilies] = useState<CategoryFamily[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
   const [query, setQuery] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedBrandId, setSelectedBrandId] = useState<number | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<CompanyBrandGroupKey>('mecanique');
+  const [selectedRelatedPartIds, setSelectedRelatedPartIds] = useState<number[]>([]);
+  const [expandedGroups, setExpandedGroups] = useState<Record<CompanyBrandGroupKey, boolean>>({ mecanique: true, carrosserie: false });
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
-      const [companyResponse, brandsResponse] = await Promise.all([
+      const [companyResponse, brandsResponse, categoriesResponse] = await Promise.all([
         getPrestataireCompany(),
         getBrands(),
+        getCategoryTree(),
       ]);
       setCompany(companyResponse.data);
       setBrands(brandsResponse.data.filter((brand) => brand.status));
+      setPartFamilies(categoriesResponse.data.map(({ id, title, titleAr }) => ({ id, title, titleAr })));
     } catch {
       setError(true);
     } finally {
@@ -120,10 +127,8 @@ export default function CompanyScreen(): React.ReactElement {
     const brand = brandById.get(id);
     return (isArabic ? brand?.nameAr : brand?.name) ?? brand?.name ?? `#${id}`;
   }, [brandById, isArabic]);
-  const specializations = company?.specializations ?? [];
-  const visibleSpecializations = specializations.filter((id) =>
-    labelFor(id).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
-  );
+  const groups = company?.brandGroups ?? [];
+  const normalizedQuery = query.trim().toLocaleLowerCase();
   const brandItems = useMemo(
     () => brands.map((brand) => ({ id: brand.id, title: labelFor(brand.id) })),
     [brands, labelFor],
@@ -136,10 +141,15 @@ export default function CompanyScreen(): React.ReactElement {
     [{ text: t('Fermer'), style: 'cancel' }],
   );
 
-  const saveSpecializations = async (ids: number[]): Promise<boolean> => {
+  const saveBrandGroups = async (nextGroups: PrestataireCompany['brandGroups']): Promise<boolean> => {
     setSaving(true);
     try {
-      const response = await updatePrestataireCompany({ specializations: ids });
+      const response = await updatePrestataireCompany({
+        brandGroups: nextGroups.map((group) => ({
+          group: group.group,
+          brands: group.brands.map((brand) => ({ id: brand.id, relatedPartIds: brand.relatedParts.map((part) => part.id) })),
+        })),
+      });
       setCompany(response.data);
       return true;
     } catch {
@@ -153,18 +163,32 @@ export default function CompanyScreen(): React.ReactElement {
   const closeSheet = () => {
     setPickerOpen(false);
     setSelectedBrandId(null);
+    setSelectedRelatedPartIds([]);
   };
 
   const addBrand = async () => {
     if (!selectedBrandId) return;
-    if (specializations.includes(selectedBrandId)) {
+    if (groups.some((group) => group.group === selectedGroup && group.brands.some((brand) => brand.id === selectedBrandId))) {
       Alert.alert(t('partner.company.brandAlreadyAdded'));
       return;
     }
-    if (await saveSpecializations([...specializations, selectedBrandId])) closeSheet();
+    const nextGroups = [...groups];
+    const index = nextGroups.findIndex((group) => group.group === selectedGroup);
+    const catalogBrand = brandById.get(selectedBrandId);
+    if (!catalogBrand) return;
+    const nextBrand: CompanyBrand = {
+      id: catalogBrand.id,
+      name: catalogBrand.name,
+      nameAr: catalogBrand.nameAr ?? catalogBrand.name,
+      logo: catalogBrand.logo,
+      relatedParts: partFamilies.filter((part) => selectedRelatedPartIds.includes(part.id)),
+    };
+    if (index >= 0) nextGroups[index] = { ...nextGroups[index]!, brands: [...nextGroups[index]!.brands, nextBrand] };
+    else nextGroups.push({ group: selectedGroup, brands: [nextBrand] });
+    if (await saveBrandGroups(nextGroups)) closeSheet();
   };
 
-  const confirmRemove = (brandId: number) => Alert.alert(
+  const confirmRemove = (groupKey: CompanyBrandGroupKey, brandId: number) => Alert.alert(
     t('partner.company.removeBrandTitle'),
     t('partner.company.removeBrandBody'),
     [
@@ -172,13 +196,20 @@ export default function CompanyScreen(): React.ReactElement {
       {
         text: t('partner.company.removeBrandConfirm'),
         style: 'destructive',
-        onPress: () => { void saveSpecializations(specializations.filter((id) => id !== brandId)); },
+        onPress: () => { void saveBrandGroups(groups.map((group) => group.group === groupKey
+          ? { ...group, brands: group.brands.filter((brand) => brand.id !== brandId) }
+          : group)); },
       },
     ],
   );
 
   const hasAddress = [company?.addressLine1, company?.addressLine2, company?.city, company?.region]
     .some((value) => Boolean(value?.trim()));
+  const displayGroups = (['mecanique', 'carrosserie'] as const).map((group) => ({
+    group,
+    brands: (groups.find((entry) => entry.group === group)?.brands ?? []).filter((brand) =>
+      [brand.name, brand.nameAr].some((value) => value.toLocaleLowerCase().includes(normalizedQuery))),
+  }));
 
   const header = <CustomHeader title={t('partner.company.title')} showNotifications hasUnread={hasUnreadNotifications} />;
 
@@ -209,11 +240,17 @@ export default function CompanyScreen(): React.ReactElement {
         <SectionCard title={t('partner.company.sectionInfo')} supportLabel={t('partner.company.modifyRequest')} onSupport={() => showSupport(t('partner.company.sectionInfo'))}>
           <DataLine label="ICE" value={company.ice} />
           <DataLine label="RC" value={company.rc} />
+          <DataLine label={t('partner.company.legalForm')} value={company.legalForm} />
           <DataLine label={t('partner.company.taxId')} value={company.taxId} />
           <DataLine label={t('partner.company.legalName')} value={company.legalName} />
         </SectionCard>
         <SectionCard title={t('partner.company.sectionBank')} supportLabel={t('partner.company.modifyRequest')} onSupport={() => showSupport(t('partner.company.sectionBank'))}>
-          <Text type="default" color={Colors.grayDark}>{t('partner.company.bankSupportOnly')}</Text>
+          <DataLine label={t('partner.company.bankName')} value={company.bank.bankName} />
+          <DataLine label={t('partner.company.bankRib')} value={company.bank.ibanMasked} />
+          <DataLine label={t('partner.company.bankHolder')} value={company.bank.holder} />
+          {!company.bank.bankName && !company.bank.ibanMasked && !company.bank.holder ? (
+            <Text type="default" color={Colors.grayDark}>{t('partner.company.bankSupportOnly')}</Text>
+          ) : null}
         </SectionCard>
 
         <View style={styles.brandsSection}>
@@ -242,17 +279,43 @@ export default function CompanyScreen(): React.ReactElement {
               </TouchableOpacity>
             ) : null}
           </View>
-          {visibleSpecializations.length === 0 ? (
-            <Text type="label" color={Colors.gray} center style={styles.empty}>{query ? t('partner.company.noBrandResults') : t('partner.company.noBrands')}</Text>
-          ) : visibleSpecializations.map((id) => (
-            <View key={id} style={styles.brandRow} flexDirection="row" alignItems="center" gap={18}>
-              <BrandLogo brand={brandById.get(id)} label={labelFor(id)} />
-              <Text type="textTwo" semiBold color={Colors.brand} translate={false} flex>{labelFor(id)}</Text>
-              <TouchableOpacity onPress={() => confirmRemove(id)} disabled={saving} style={styles.clearButton} accessibilityRole="button" accessibilityLabel={t('partner.company.removeBrandAccessibility', { brand: labelFor(id) })}>
-                <Icon name="x-circle" size={24} iconColor={Colors.brand} type="Feather" />
-              </TouchableOpacity>
-            </View>
-          ))}
+          {displayGroups.map(({ group, brands: groupBrands }) => {
+            const expanded = expandedGroups[group];
+            return (
+              <View key={group} style={styles.groupBlock}>
+                <TouchableOpacity
+                  onPress={() => setExpandedGroups((current) => ({ ...current, [group]: !current[group] }))}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded }}
+                  accessibilityLabel={t(`partner.company.group.${group}`)}
+                >
+                  <View flexDirection="row" alignItems="center" gap={14} style={styles.groupHeader}>
+                    <Icon name={expanded ? 'minus' : 'plus'} size={26} iconColor={Colors.brand} type="Feather" />
+                    <Text type="subTitleTwo" semiBold color={Colors.brand}>{`partner.company.group.${group}`}</Text>
+                  </View>
+                </TouchableOpacity>
+                {expanded ? groupBrands.map((brand) => {
+                  const brandLabel = (isArabic ? brand.nameAr : brand.name) || brand.name;
+                  const parts = brand.relatedParts.map((part) => isArabic ? part.titleAr || part.title : part.title).join(', ');
+                  return (
+                    <View key={brand.id} style={styles.brandRow} flexDirection="row" alignItems="center" gap={18}>
+                      <BrandLogo brand={brand} label={brandLabel} />
+                      <View flex gap={2}>
+                        <Text type="textTwo" semiBold color={Colors.brand} translate={false}>{brandLabel}</Text>
+                        {parts ? <Text type="small" color={Colors.grayMidDark} translate={false}>{t('partner.company.relatedParts', { parts })}</Text> : null}
+                      </View>
+                      <TouchableOpacity onPress={() => confirmRemove(group, brand.id)} disabled={saving} style={styles.clearButton} accessibilityRole="button" accessibilityLabel={t('partner.company.removeBrandAccessibility', { brand: brandLabel })}>
+                        <Icon name="x-circle" size={24} iconColor={Colors.brand} type="Feather" />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                }) : null}
+              </View>
+            );
+          })}
+          {normalizedQuery && displayGroups.every((group) => group.brands.length === 0) ? (
+            <Text type="label" color={Colors.gray} center style={styles.empty}>{t('partner.company.noBrandResults')}</Text>
+          ) : null}
         </View>
       </ScrollView>
 
@@ -274,13 +337,45 @@ export default function CompanyScreen(): React.ReactElement {
                 placeholderColor={Colors.grayMidDark}
                 chevronColor={Colors.brand}
               />
+              <PickerInput
+                label={t('partner.company.sheetGroupLabel')}
+                items={[
+                  { id: 1, title: t('partner.company.group.mecanique') },
+                  { id: 2, title: t('partner.company.group.carrosserie') },
+                ]}
+                selectedItem={{ id: selectedGroup === 'mecanique' ? 1 : 2, title: t(`partner.company.group.${selectedGroup}`) }}
+                onSelectItem={(item) => setSelectedGroup(item.id === 1 ? 'mecanique' : 'carrosserie')}
+                fillColor={Colors.backgroundLight}
+                chevronColor={Colors.brand}
+              />
+              <Text type="default" color={Colors.brand} style={styles.partsLabel}>partner.company.sheetPartsLabel</Text>
+              <View flexDirection="row" style={styles.partsWrap}>
+                {partFamilies.map((part) => {
+                  const selected = selectedRelatedPartIds.includes(part.id);
+                  const label = (isArabic ? part.titleAr : part.title) || part.title;
+                  return (
+                    <TouchableOpacity
+                      key={part.id}
+                      style={[styles.partChip, selected && styles.partChipSelected]}
+                      onPress={() => setSelectedRelatedPartIds((current) => selected
+                        ? current.filter((id) => id !== part.id)
+                        : [...current, part.id])}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: selected }}
+                      accessibilityLabel={label}
+                    >
+                      <Text type="label" translate={false}>{label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </ScrollView>
             <View style={styles.stickyCta}>
               <Button
                 title={saving ? t('partner.company.sheetSaving') : t('partner.company.sheetCta')}
                 accessibilityLabel={t('partner.company.sheetCta')}
                 onPress={() => { void addBrand(); }}
-                disabled={saving || selectedBrandId === null}
+                disabled={saving || selectedBrandId === null || selectedRelatedPartIds.length === 0}
               />
             </View>
           </View>
@@ -312,6 +407,8 @@ const styles = StyleSheet.create({
   clearButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   empty: { paddingVertical: 16 },
   brandRow: { minHeight: 64 },
+  groupBlock: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.borderLight },
+  groupHeader: { minHeight: 64 },
   brandLogo: { width: 48, height: 40 },
   brandLogoFallback: { width: 40, borderRadius: 20, backgroundColor: Colors.backgroundGray },
   retry: { marginTop: 16 },
@@ -322,6 +419,10 @@ const styles = StyleSheet.create({
   sheetContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24 },
   handle: { width: 120, height: 5, borderRadius: 3, backgroundColor: Colors.grayDark, alignSelf: 'center', marginBottom: 24 },
   sheetTitle: { marginBottom: 24, fontSize: 26, lineHeight: 32 },
+  partsLabel: { marginTop: 16, marginBottom: 8 },
+  partsWrap: { flexWrap: 'wrap', gap: 8 },
+  partChip: { borderWidth: 1, borderColor: Colors.borderLight, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8 },
+  partChipSelected: { borderColor: Colors.brand, backgroundColor: Colors.noticeUnread },
   stickyCta: {
     paddingHorizontal: 16,
     paddingTop: 12,

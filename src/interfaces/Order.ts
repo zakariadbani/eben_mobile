@@ -23,6 +23,7 @@ export type OrderItemStatus =
   | 'preparing'
   | 'shipped'
   | 'delivered'
+  | 'returned'
   | 'cancelled';
 
 /** payment_method canonical values per knowledge-pack 010. `visa` not `card`. */
@@ -57,6 +58,8 @@ export interface OrderItem {
   /** Eagerly-loaded display data. */
   categoryTitle?: string;
   categoryTitleAr?: string;
+  categoryFamily?: import('./Category').CategoryFamily | null;
+  images: string[];
 }
 
 /**
@@ -73,8 +76,12 @@ export interface Order {
   subtotal: number;
   discountAmount: number;
   shippingFee: number;
+  /** Immutable server-owned Premium fee snapshot. */
+  premiumFee: number;
   /** Server-calculated tax snapshot. */
   taxAmount: number;
+  /** Server-calculated snapshot of returned line totals; do not subtract from total again. */
+  returnedAmount: number;
   total: number;
   status: OrderStatus;
   paymentMethod: PaymentMethodType;
@@ -109,6 +116,7 @@ export type PurchaseOrderStatus =
   | 'ready'
   | 'shipped'
   | 'received'
+  | 'returned'
   | 'cancelled';
 
 export interface PurchaseOrder {
@@ -152,10 +160,13 @@ export interface PrestataireOrderItem {
   quantity: number;
   netAmount: number;
   status: OrderItemStatus;
+  paymentStatus: PaymentStatus;
   createdAt: string;
   updatedAt: string;
   categoryTitle?: string;
   categoryTitleAr?: string;
+  images: string[];
+  vehicle: import('./Vehicle').VehicleSummary | null;
   purchaseOrder: PrestatairePurchaseOrder;
 }
 

@@ -437,7 +437,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     identity: SessionIdentity,
   ): Promise<void> => {
     const current = session;
-    if (!current || current.user.role !== 'client') throw new Error('No active Client session');
+    if (!current) throw new Error('No active session');
     const operationEpoch = authEpoch.current;
     const nextSession: AuthSession = {
       token: current.token,

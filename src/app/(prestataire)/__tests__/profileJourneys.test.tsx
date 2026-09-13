@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Switch } from 'react-native';
+import { Alert, Switch, TextInput as NativeTextInput } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import * as SecureStore from 'expo-secure-store';
 
@@ -14,19 +14,28 @@ import EditProfileScreen from '../profile/edit';
 import NotificationsScreen from '../profile/notifications';
 import OffersHistoryScreen from '../profile/offers-history';
 import ProfileScreen from '../profile';
+import VerifyChangedPartnerPhoneScreen from '../profile/verify-phone';
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 const mockRefreshSessionProfile = jest.fn().mockResolvedValue(undefined);
+const mockStartPhoneChangeVerification = jest.fn().mockResolvedValue(undefined);
+const mockResendPhoneChangeOtp = jest.fn().mockResolvedValue(undefined);
+const mockVerifyPhoneChange = jest.fn().mockResolvedValue(undefined);
+let mockPendingPhoneChangeVerificationPhone: string | null = null;
 const mockGetProfile = jest.fn();
 const mockUpdateProfile = jest.fn();
+const mockChangePassword = jest.fn();
 const mockGetCompany = jest.fn();
 const mockUpdateCompany = jest.fn();
 const mockGetBrands = jest.fn();
+const mockGetCategoryTree = jest.fn();
 const mockGetNotifications = jest.fn();
 const mockMarkRead = jest.fn();
 const mockMarkAllRead = jest.fn();
 const mockGetHistory = jest.fn();
 const mockUploadImages = jest.fn();
+const mockLogOut = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn().mockResolvedValue(null),
@@ -41,7 +50,7 @@ jest.mock('expo-secure-store', () => ({
 
 jest.mock('expo-router', () => ({
   Tabs: { Screen: () => null },
-  useRouter: () => ({ push: mockPush, back: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
   useFocusEffect: (callback: () => void) => {
     const ReactModule = require('react') as typeof React;
     ReactModule.useEffect(callback, [callback]);
@@ -49,7 +58,15 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('@/context/AuthContext', () => ({
-  useSession: () => ({ username: 'Partner Session', logOut: jest.fn(), refreshSessionProfile: mockRefreshSessionProfile }),
+  useSession: () => ({
+    username: 'Partner Session',
+    logOut: (...args: unknown[]) => mockLogOut(...args),
+    refreshSessionProfile: mockRefreshSessionProfile,
+    startPhoneChangeVerification: (...args: unknown[]) => mockStartPhoneChangeVerification(...args),
+    resendPhoneChangeOtp: (...args: unknown[]) => mockResendPhoneChangeOtp(...args),
+    verifyPhoneChange: (...args: unknown[]) => mockVerifyPhoneChange(...args),
+    pendingPhoneChangeVerificationPhone: mockPendingPhoneChangeVerificationPhone,
+  }),
 }));
 
 jest.mock('expo-image-picker', () => ({
@@ -62,9 +79,11 @@ jest.mock('@/api/resources/uploads', () => ({ uploadLocalImages: (...args: unkno
 jest.mock('@/api', () => ({
   getPrestataireProfile: (...args: unknown[]) => mockGetProfile(...args),
   updatePrestataireProfile: (...args: unknown[]) => mockUpdateProfile(...args),
+  changePrestatairePassword: (...args: unknown[]) => mockChangePassword(...args),
   getPrestataireCompany: (...args: unknown[]) => mockGetCompany(...args),
   updatePrestataireCompany: (...args: unknown[]) => mockUpdateCompany(...args),
   getBrands: (...args: unknown[]) => mockGetBrands(...args),
+  getCategoryTree: (...args: unknown[]) => mockGetCategoryTree(...args),
 }));
 
 jest.mock('@/api/resources/prestataire', () => ({
@@ -97,6 +116,7 @@ const company = {
   id: 3,
   userId: 7,
   legalName: 'Partner Company',
+  legalForm: 'SARL AU',
   ice: '001234567890123',
   rc: 'RC-1',
   taxId: 'IF-1',
@@ -109,6 +129,8 @@ const company = {
   phone: null,
   email: null,
   specializations: [42],
+  bank: { ibanMasked: '********************1234', holder: 'Partner Company', bankName: 'Bank Live' },
+  brandGroups: [{ group: 'mecanique' as const, brands: [{ id: 42, name: 'Marque existante', nameAr: 'ماركة قائمة', logo: null, relatedParts: [{ id: 10, title: 'Mécanique', titleAr: 'ميكانيك' }] }] }],
   status: 'active' as const,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
@@ -152,40 +174,51 @@ const offer = {
   brandNameAr: 'داسيا',
   ferrailleurName: 'Partner Live',
   shippingEligible: false,
+  paymentStatus: null,
 };
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  mockPendingPhoneChangeVerificationPhone = null;
   resetPartnerBadges();
   await i18n.changeLanguage('fr');
   mockGetSecureItem.mockResolvedValue(null);
   mockSetSecureItem.mockResolvedValue(undefined);
   mockGetProfile.mockResolvedValue({ success: true, data: profile });
   mockUpdateProfile.mockResolvedValue({ success: true, data: { ...profile, avatar: 'https://cdn.example/avatar.jpg' } });
+  mockChangePassword.mockResolvedValue({ success: true, data: { changed: true } });
   mockUploadImages.mockResolvedValue(['tmp/mobile/7/avatar.jpg']);
   mockGetCompany.mockResolvedValue({ success: true, data: company });
   mockGetBrands.mockResolvedValue({ success: true, data: [
     { id: 42, name: 'Marque existante', nameAr: 'ماركة قائمة', logo: null, status: true, sortOrder: 1 },
     { id: 77, name: 'Marque API live', nameAr: 'ماركة مباشرة', logo: null, status: true, sortOrder: 2 },
   ], pagination: { ...pagination, total: 2, to: 2 } });
-  mockUpdateCompany.mockResolvedValue({ success: true, data: { ...company, specializations: [42, 77] } });
+  mockGetCategoryTree.mockResolvedValue({ success: true, data: [{ id: 10, title: 'Mécanique', titleAr: 'ميكانيك' }] });
+  mockUpdateCompany.mockResolvedValue({ success: true, data: company });
   mockGetNotifications.mockResolvedValue({ success: true, data: [notification], pagination });
   mockMarkRead.mockResolvedValue({ success: true, data: { ...notification, isRead: true } });
   mockMarkAllRead.mockResolvedValue({ success: true, data: { updated: 1 } });
   mockGetHistory.mockResolvedValue({ success: true, data: [offer], pagination });
 });
 
-it('adds a specialization picked from the brand dropdown of the add sheet', async () => {
+it('adds a contracted brand group with its related part families', async () => {
   const screen = render(<CompanyScreen />);
   await screen.findByText('Marque existante');
   expect(screen.getByText(i18n.t('partner.company.dataLine', { label: i18n.t('partner.company.street'), value: 'Rue Live' }))).toBeTruthy();
   fireEvent.press(screen.getByRole('button', { name: i18n.t('partner.company.addBrandCta') }));
   fireEvent.press(screen.getByRole('button', { name: i18n.t('partner.company.sheetBrandLabel') }));
   fireEvent.press(await screen.findByRole('button', { name: 'Marque API live' }));
+  fireEvent.press(screen.getByRole('checkbox', { name: 'Mécanique' }));
   // The header "Ajouter" link and the sheet CTA share their copy; the sticky CTA renders last.
   const addButtons = screen.getAllByRole('button', { name: i18n.t('partner.company.sheetCta') });
   fireEvent.press(addButtons[addButtons.length - 1]!);
-  await waitFor(() => expect(mockUpdateCompany).toHaveBeenCalledWith({ specializations: [42, 77] }));
+  await waitFor(() => expect(mockUpdateCompany).toHaveBeenCalledWith({ brandGroups: [{
+    group: 'mecanique',
+    brands: [
+      { id: 42, relatedPartIds: [10] },
+      { id: 77, relatedPartIds: [10] },
+    ],
+  }] }));
 });
 
 it('shows the Figma hub: greeting, unread bell, legal section and persisted preference toggles', async () => {
@@ -207,6 +240,30 @@ it('shows the Figma hub: greeting, unread bell, legal section and persisted pref
 
   fireEvent.press(screen.getByRole('button', { name: i18n.t('partner.profile.privacy') }));
   expect(mockPush).toHaveBeenCalledWith({ pathname: '/(prestataire)/profile/legal', params: { section: 'privacy' } });
+});
+
+it('confirms logout in the same bottom sheet and copy as the client Profil', async () => {
+  const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  try {
+    const screen = render(<ProfileScreen />);
+    await screen.findByText(i18n.t('partner.profile.greeting', { name: 'Partner Live' }));
+
+    fireEvent.press(screen.getByRole('button', { name: i18n.t('partner.profile.logoutTitle') }));
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(mockLogOut).not.toHaveBeenCalled();
+    expect(screen.getByText(i18n.t('settings.logoutConfirm'))).toBeTruthy();
+
+    fireEvent.press(screen.getByRole('button', { name: i18n.t('Annuler') }));
+    expect(screen.queryByText(i18n.t('settings.logoutConfirm'))).toBeNull();
+    expect(mockLogOut).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByRole('button', { name: i18n.t('partner.profile.logoutTitle') }));
+    fireEvent.press(screen.getByRole('button', { name: i18n.t('settings.logout') }));
+    await waitFor(() => expect(mockLogOut).toHaveBeenCalledTimes(1));
+    expect(alertSpy).not.toHaveBeenCalled();
+  } finally {
+    alertSpy.mockRestore();
+  }
 });
 
 it('restores stored preference toggles', async () => {
@@ -256,21 +313,55 @@ it('requires the current password before changing the email and localizes a reje
   expect(screen.queryByText('The password is incorrect.')).toBeNull();
 });
 
-it('keeps phone and password read-only and routes their changes to the support button', async () => {
-  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+it('changes the phone with the current password and enters the role-owned OTP continuation', async () => {
+  const changed = { ...profile, phone: '+212600000109' };
+  mockUpdateProfile.mockResolvedValueOnce({ success: true, data: changed });
   const screen = render(<EditProfileScreen />);
   await screen.findAllByText('Partner Live');
 
   const modify = i18n.t('partner.editProfile.modify');
-  expect(screen.queryByRole('button', { name: `${modify} ${i18n.t('auth.fields.phone')}` })).toBeNull();
-  expect(screen.queryByRole('button', { name: `${modify} ${i18n.t('auth.fields.password')}` })).toBeNull();
-  fireEvent.press(screen.getByRole('button', { name: i18n.t('partner.editProfile.supportCta') }));
-  expect(alert).toHaveBeenCalledWith(
-    i18n.t('partner.editProfile.supportTitle'),
-    i18n.t('partner.editProfile.supportBody'),
-    expect.any(Array),
-  );
-  alert.mockRestore();
+  const phoneField = i18n.t('auth.fields.phone');
+  fireEvent.press(screen.getByRole('button', { name: `${modify} ${phoneField}` }));
+  fireEvent.changeText(screen.getByLabelText(phoneField), '06 00 00 01 09');
+  fireEvent.changeText(screen.getByLabelText(i18n.t('partner.editProfile.currentPassword')), 'current-secret');
+  fireEvent.press(screen.getByRole('button', { name: `${i18n.t('partner.editProfile.confirm')} ${phoneField}` }));
+
+  await waitFor(() => expect(mockUpdateProfile).toHaveBeenCalledWith({
+    phone: '+212600000109',
+    currentPassword: 'current-secret',
+  }));
+  expect(mockStartPhoneChangeVerification).toHaveBeenCalledWith(changed);
+  expect(mockReplace).toHaveBeenCalledWith('/(prestataire)/profile/verify-phone');
+});
+
+it('changes the password inline through the dedicated protected endpoint', async () => {
+  const screen = render(<EditProfileScreen />);
+  await screen.findAllByText('Partner Live');
+
+  const passwordField = i18n.t('auth.fields.password');
+  fireEvent.press(screen.getByRole('button', { name: `${i18n.t('partner.editProfile.modify')} ${passwordField}` }));
+  fireEvent.changeText(screen.getByLabelText(i18n.t('partner.editProfile.currentPassword')), 'current-secret');
+  fireEvent.changeText(screen.getByLabelText(i18n.t('partner.editProfile.newPassword')), 'new-secret-123');
+  fireEvent.changeText(screen.getByLabelText(i18n.t('partner.editProfile.passwordConfirmation')), 'new-secret-123');
+  fireEvent.press(screen.getByRole('button', { name: `${i18n.t('partner.editProfile.confirm')} ${passwordField}` }));
+
+  await waitFor(() => expect(mockChangePassword).toHaveBeenCalledWith({
+    currentPassword: 'current-secret',
+    password: 'new-secret-123',
+    passwordConfirmation: 'new-secret-123',
+  }));
+  expect(screen.queryByLabelText(i18n.t('partner.editProfile.newPassword'))).toBeNull();
+});
+
+it('verifies a changed phone through the durable Prestataire OTP route', async () => {
+  mockPendingPhoneChangeVerificationPhone = '+212600000109';
+  const screen = render(<VerifyChangedPartnerPhoneScreen />);
+
+  fireEvent.changeText(screen.UNSAFE_getByType(NativeTextInput), '123456');
+  fireEvent.press(screen.getByRole('button', { name: i18n.t('auth.otp.verify') }));
+
+  await waitFor(() => expect(mockVerifyPhoneChange).toHaveBeenCalledWith('123456'));
+  expect(mockReplace).toHaveBeenCalledWith('/(prestataire)/profile/edit');
 });
 
 it('shows an empty state in the head-office card when the company has no address', async () => {

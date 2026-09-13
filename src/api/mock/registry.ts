@@ -237,16 +237,21 @@ export const mockRegistry: Record<string, MockHandler> = {
   // ── Uploads ─────────────────────────────────────────────────────────────────
   'POST:/uploads/images': () =>
     single<{ path: string }>({ path: `tmp/mobile/mock/${++mockUploadSequence}.jpg` }),
+  'POST:/uploads/audio': () =>
+    single<{ path: string }>({ path: `tmp/mobile/mock/${++mockUploadSequence}.m4a` }),
   // ── Prestataire (partner) ───────────────────────────────────────────────────
   // Dashboard stats — KPIs for the partner home screen
   'GET:/prestataire/dashboard': () =>
     single<PrestataireDashboardStats>(mockPrestataireDashboardStats),
-  'GET:/prestataire/dashboard/series?period=1j': () => single({ period: '1j', buckets: [] }),
-  'GET:/prestataire/dashboard/series?period=7j': () => single({ period: '7j', buckets: [] }),
-  'GET:/prestataire/dashboard/series?period=1m': () => single({ period: '1m', buckets: [] }),
-  'GET:/prestataire/dashboard/series?period=6m': () => single({ period: '6m', buckets: [] }),
-  'GET:/prestataire/dashboard/series?period=1a': () => single({ period: '1a', buckets: [] }),
-  'GET:/prestataire/dashboard/series?period=max': () => single({ period: 'max', buckets: [] }),
+  'GET:/prestataire/dashboard?period=7d': () => single<PrestataireDashboardStats>({ ...mockPrestataireDashboardStats, comparison: { ...mockPrestataireDashboardStats.comparison, period: '7d' } }),
+  'GET:/prestataire/dashboard?period=30d': () => single<PrestataireDashboardStats>(mockPrestataireDashboardStats),
+  'GET:/prestataire/dashboard?period=90d': () => single<PrestataireDashboardStats>({ ...mockPrestataireDashboardStats, comparison: { ...mockPrestataireDashboardStats.comparison, period: '90d' } }),
+  'GET:/prestataire/dashboard/series?period=1j': () => single({ period: '1j', buckets: [], topProducts: [] }),
+  'GET:/prestataire/dashboard/series?period=7j': () => single({ period: '7j', buckets: [], topProducts: [] }),
+  'GET:/prestataire/dashboard/series?period=1m': () => single({ period: '1m', buckets: [], topProducts: [] }),
+  'GET:/prestataire/dashboard/series?period=6m': () => single({ period: '6m', buckets: [], topProducts: [] }),
+  'GET:/prestataire/dashboard/series?period=1a': () => single({ period: '1a', buckets: [], topProducts: [] }),
+  'GET:/prestataire/dashboard/series?period=max': () => single({ period: 'max', buckets: [], topProducts: [] }),
 
   // ── Prestataire P3: decline / resend ────────────────────────────────────────
   // POST /prestataire/requests/:requestId/decline
@@ -285,6 +290,12 @@ export const mockRegistry: Record<string, MockHandler> = {
     };
     return single<PrestataireProfile>(updated);
   },
+  'PUT:/basket/premium': (body) => single<Basket>({
+    ...mockBasket,
+    premium: Boolean((body as { enabled?: boolean }).enabled),
+    premiumFee: (body as { enabled?: boolean }).enabled ? 55 : 0,
+  }),
+  'PUT:/prestataire/password': () => single<{ changed: true }>({ changed: true }),
 
   // Company
   'GET:/prestataire/company': () =>

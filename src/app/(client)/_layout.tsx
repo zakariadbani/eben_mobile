@@ -1,5 +1,5 @@
-import { Href, Tabs, useRouter } from "expo-router";
-import React, { useState } from "react";
+import { Href, Tabs, useGlobalSearchParams, usePathname, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import { Image, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,6 +12,7 @@ import Colors from "@/constants/Colors";
 import CustomHeader from "@/components/common/CustomHeader";
 import CustomIcon from "@/components/common/CustomIcon";
 import GoBack from "@/components/common/GoBack";
+import HeaderBell from "@/components/common/navigation/HeaderBell";
 import { Text } from "@/components/common/Text";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { useSession } from "@/context/AuthContext";
@@ -19,11 +20,35 @@ import { CartProvider, useCart } from "@/context/CartContext";
 import { RequestDraftProvider } from "@/context/RequestDraftContext";
 import { WishlistProvider } from "@/context/WishlistContext";
 import { clientAuthHref } from "@/constants/clientReturnTo";
+import {
+  refreshClientUnreadNotifications,
+  useClientUnreadNotifications,
+} from "@/hooks/useClientUnreadNotifications";
 
 // Minimal type alias so tabBarIcon/tabBarLabel callbacks are typed without
 // depending on @react-navigation/bottom-tabs .d.ts (which is absent in this
 // version of the package).
 type FocusedParam = { focused: boolean; color: string };
+
+/** The five Figma tabs, in Figma order. */
+export type ClientTab = "home" | "search" | "list" | "cart" | "profile";
+
+/**
+ * Figma keeps the *section* tab highlighted on nested screens (e.g. "Liste" on
+ * a request detail, its offers and an offer detail; "Profil" on settings
+ * pages). Hidden routes are not focused tabs for react-navigation, so the
+ * section is derived from the pathname ("/requests/23/offers").
+ */
+export function clientSectionFromPath(pathname: string, from?: string): ClientTab | null {
+  const path = pathname.replace(/^\/\(client\)/, "");
+  if (path.startsWith("/requests")) return "list";
+  if (path.startsWith("/settings/notifications") && from === "home") return "home";
+  if (path.startsWith("/settings")) return "profile";
+  if (path.startsWith("/cart") || path.startsWith("/payment")) return "cart";
+  if (path.startsWith("/categories") || path.startsWith("/search") || path.startsWith("/products")) return "search";
+  if (path === "" || path === "/") return "home";
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // MainHeader stub — the real component lives at
@@ -172,6 +197,11 @@ const ClientHomeHeader: React.FC = () => {
     : "";
   const rtl = i18n.language === "ar";
   const insets = useSafeAreaInsets();
+  const hasUnread = useClientUnreadNotifications();
+
+  useEffect(() => {
+    if (session) void refreshClientUnreadNotifications();
+  }, [session]);
 
   return (
     <View style={[styles.homeSafeArea, { paddingTop: insets.top }]}>
@@ -188,14 +218,13 @@ const ClientHomeHeader: React.FC = () => {
             {String.fromCodePoint(0x1f44b)}
           </Text>
         </View>
-        <TouchableOpacity
-          onPress={() => router.push("/(client)/settings/notifications" as Href)}
-          style={styles.supportBtn}
-          accessibilityRole="button"
-          accessibilityLabel={t("Notifications")}
-        >
-          <CustomIcon name="notif" size={30} />
-        </TouchableOpacity>
+        <HeaderBell
+          hasUnread={hasUnread}
+          onPress={() => router.push({
+            pathname: "/(client)/settings/notifications",
+            params: { from: "home" },
+          })}
+        />
       </View>
     </View>
   );
@@ -209,6 +238,15 @@ function ClientTabs() {
   const { session } = useSession();
   const { itemCount } = useCart();
   const router = useRouter();
+  const { from } = useGlobalSearchParams<{ from?: string }>();
+  const section = clientSectionFromPath(usePathname() ?? "", from);
+  // Figma tab bar: icon + label only on the active (section) tab; icon-only elsewhere.
+  const tabIcon = (tab: ClientTab, icon: string) => ({ focused }: FocusedParam) => (
+    <TabBarIcon name={icon} focused={focused || section === tab} />
+  );
+  const tabLabel = (tab: ClientTab, label: string) => ({ focused }: FocusedParam) => (
+    focused || section === tab ? <TabBarLabel focused label={label} /> : null
+  );
   const [guestAuthVisible, setGuestAuthVisible] = useState(false);
   const insets = useSafeAreaInsets();
   const barHeight = (Platform.OS === "android" ? 60 : 56) + insets.bottom;
@@ -239,6 +277,16 @@ function ClientTabs() {
       headerTintColor={Colors.brand}
       showBackButton
     />
+  );
+
+  // Yellow back header whose long title ends in "…" on one line — Figma offers
+  // screens "Vos offers - Duralast Brake Rotor…".
+  const backHeaderSingleLine = (props: { options: { title?: string } }) => (
+    <CustomHeader showBackButton backgroundColor={Colors.primary} headerTintColor={Colors.brand}>
+      <Text type="headerTitle" numberOfLines={1} style={[styles.headerTitle, { color: Colors.brand }]}>
+        {props.options.title ?? ""}
+      </Text>
+    </CustomHeader>
   );
 
   // Black/brand header WITH back button — Figma "Recherche pneumatiques" screen
@@ -327,12 +375,9 @@ function ClientTabs() {
         name="index"
         options={{
           title: t("Accueil"),
-          tabBarIcon: ({ focused }: FocusedParam) => (
-            <TabBarIcon name="home" focused={focused} />
-          ),
-          tabBarLabel: ({ focused }: FocusedParam) => (
-            <TabBarLabel focused={focused} label={t("Accueil")} />
-          ),
+          tabBarIcon: tabIcon("home", "home"),
+          tabBarLabel: tabLabel("home", t("Accueil")),
+          tabBarAccessibilityLabel: t("Accueil"),
           header: () => <ClientHomeHeader />,
         }}
       />
@@ -344,12 +389,9 @@ function ClientTabs() {
         name="categories/index"
         options={{
           title: t("Recherche"),
-          tabBarIcon: ({ focused }: FocusedParam) => (
-            <TabBarIcon name="search" focused={focused} />
-          ),
-          tabBarLabel: ({ focused }: FocusedParam) => (
-            <TabBarLabel focused={focused} label={t("Recherche")} />
-          ),
+          tabBarIcon: tabIcon("search", "search"),
+          tabBarLabel: tabLabel("search", t("Recherche")),
+          tabBarAccessibilityLabel: t("Recherche"),
           header: mainHeaderFn,
         }}
       />
@@ -415,12 +457,9 @@ function ClientTabs() {
         name="requests/index"
         options={{
           title: t("Votre liste"),
-          tabBarIcon: ({ focused }: FocusedParam) => (
-            <TabBarIcon name="liste" focused={focused} />
-          ),
-          tabBarLabel: ({ focused }: FocusedParam) => (
-            <TabBarLabel focused={focused} label={t("Liste")} />
-          ),
+          tabBarIcon: tabIcon("list", "liste"),
+          tabBarLabel: tabLabel("list", t("Liste")),
+          tabBarAccessibilityLabel: t("Liste"),
         }}
       />
 
@@ -469,7 +508,7 @@ function ClientTabs() {
         options={{
           title: t("Vos offres"),
           href: null,
-          header: backHeader,
+          header: backHeaderSingleLine,
         }}
       />
       <Tabs.Screen
@@ -477,7 +516,7 @@ function ClientTabs() {
         options={{
           title: t("Détails"),
           href: null,
-          header: backHeader,
+          header: backHeaderSingleLine,
         }}
       />
 
@@ -489,12 +528,9 @@ function ClientTabs() {
         options={{
           title: t("Mon panier"),
           header: cartHeader,
-          tabBarIcon: ({ focused }: FocusedParam) => (
-            <TabBarIcon name="cart" focused={focused} />
-          ),
-          tabBarLabel: ({ focused }: FocusedParam) => (
-            <TabBarLabel focused={focused} label={t("Panier")} />
-          ),
+          tabBarIcon: tabIcon("cart", "cart"),
+          tabBarLabel: tabLabel("cart", t("Panier")),
+          tabBarAccessibilityLabel: t("Panier"),
           tabBarBadge: itemCount > 0 ? itemCount : undefined,
           tabBarBadgeStyle: TAB_BAR_STYLE.badge,
         }}
@@ -573,12 +609,9 @@ function ClientTabs() {
         }}
         options={{
           title: t("Profil"),
-          tabBarIcon: ({ focused }: FocusedParam) => (
-            <TabBarIcon name="profile" focused={focused} />
-          ),
-          tabBarLabel: ({ focused }: FocusedParam) => (
-            <TabBarLabel focused={focused} label={t("Profil")} />
-          ),
+          tabBarIcon: tabIcon("profile", "profile"),
+          tabBarLabel: tabLabel("profile", t("Profil")),
+          tabBarAccessibilityLabel: t("Profil"),
           headerShown: false,
         }}
       />

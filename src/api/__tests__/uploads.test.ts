@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import { uploadImage, uploadLocalImages } from '../resources/uploads';
+import { uploadAudio, uploadImage, uploadLocalAudio, uploadLocalImages } from '../resources/uploads';
 
 jest.mock('../client', () => ({
   apiClient: { post: jest.fn() },
@@ -94,4 +94,28 @@ it('propagates an upload failure and does not continue', async () => {
   ])).rejects.toBe(failure);
 
   expect(post).toHaveBeenCalledTimes(2);
+});
+
+it.each([
+  ['file:///tmp/offer-note.mp3', 'offer-note.mp3', 'audio/mpeg'],
+  ['file:///tmp/offer-note.M4A', 'offer-note.M4A', 'audio/mp4'],
+  ['content://media/external/audio/42', 'audio.m4a', 'audio/mp4'],
+])('uploads audio %s as %s with %s', async (uri, name, type) => {
+  post.mockResolvedValueOnce({ success: true, data: { path: 'tmp/mobile/7/offer-note.m4a' } });
+
+  await expect(uploadAudio(uri)).resolves.toEqual({ path: 'tmp/mobile/7/offer-note.m4a' });
+
+  expect(post).toHaveBeenCalledWith('/uploads/audio', expect.any(FormData));
+  expect(imagePart(post.mock.calls[0][1] as FormData)).toEqual(['audio', { uri, name, type }]);
+});
+
+it('uploads local audio in order and returns the matching owned paths', async () => {
+  post
+    .mockResolvedValueOnce({ success: true, data: { path: 'tmp/mobile/7/first.m4a' } })
+    .mockResolvedValueOnce({ success: true, data: { path: 'tmp/mobile/7/second.aac' } });
+
+  await expect(uploadLocalAudio(['file:///tmp/first.m4a', 'file:///tmp/second.aac'])).resolves.toEqual([
+    'tmp/mobile/7/first.m4a',
+    'tmp/mobile/7/second.aac',
+  ]);
 });

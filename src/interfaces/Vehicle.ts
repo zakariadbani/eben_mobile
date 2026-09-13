@@ -4,6 +4,14 @@
 
 export type FuelType = 'essence' | 'diesel' | 'hybrid' | 'electric';
 
+/** Compact, server-resolved vehicle identity embedded in marketplace resources. */
+export interface VehicleSummary {
+  brandName: string;
+  modelName: string;
+  year: number;
+  motorisation: string | null;
+}
+
 /** Reference entry for a car manufacturer. Maps to `car_brands` table. */
 export interface CarBrand {
   id: number;

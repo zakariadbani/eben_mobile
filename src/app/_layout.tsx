@@ -16,6 +16,11 @@ import {
 } from "@/constants/routesPermission";
 import { ConfirmationProvider } from "@/context/ConfirmationContext";
 import { getClientReturnTo } from "@/constants/clientReturnTo";
+import {
+  claimWelcomeSplashRedirect,
+  disarmWelcomeSplash,
+  isWelcomeSplashArmed,
+} from "@/helpers/welcomeSplash";
 import { useInAppUpdate } from "@/hooks/useInAppUpdate";
 import UpdateAppModal from "@/components/common/UpdateAppModal";
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -112,7 +117,9 @@ const StackLayout = () => {
       return; // Don't do anything while session is loading
     }
     const currentRoute = segments.join("/"); // Get the current route
-    const phoneVerificationRoute = "(client)/settings/profile/verify-phone";
+    const phoneVerificationRoute = role === 'prestataire'
+      ? '(prestataire)/profile/verify-phone'
+      : '(client)/settings/profile/verify-phone';
     const isRecoveryRoute =
       currentRoute === "(auth)/ForgotPasswordScreen" ||
       currentRoute.startsWith("(auth)/forgot-password/") ||
@@ -120,6 +127,9 @@ const StackLayout = () => {
     // Post-sign-in "EBEN PARTNERS" splash: let it play before the dashboard.
     const isPartnerSplashRoute =
       currentRoute === "(auth)/prestataire/loading" && role === "prestataire";
+    // Post-sign-in "Bienvenue <nom>" client splash: it replaces to returnTo itself.
+    const isClientSplashRoute =
+      currentRoute === "(auth)/loading" && role === "client";
 
     // If there's no session, only intentional preview routes are available.
     if (!session) {
@@ -139,8 +149,27 @@ const StackLayout = () => {
       return;
     }
 
+    // An armed "Bienvenue <prénom>" hand-off only covers the (auth) → splash hop.
+    if (!currentRoute.startsWith("(auth)") && isWelcomeSplashArmed()) {
+      disarmWelcomeSplash();
+    }
+
     if (pendingPhoneChangeVerificationPhone && currentRoute !== phoneVerificationRoute) {
       router.replace(`/${phoneVerificationRoute}` as Href);
+      return;
+    }
+
+    // Client or partner who just signed in interactively (still on the sign-in route):
+    // play the welcome splash first. Only one redirect is issued, by this guard or by
+    // the sign-in screen; until the splash route is active, wait instead of opening the app.
+    if (
+      currentRoute.startsWith("(auth)") &&
+      !isPartnerSplashRoute &&
+      !isClientSplashRoute &&
+      isWelcomeSplashArmed(role)
+    ) {
+      const splash = claimWelcomeSplashRedirect();
+      if (splash) router.replace(splash);
       return;
     }
 
@@ -148,7 +177,8 @@ const StackLayout = () => {
       currentRoute.startsWith("(auth)") &&
       !currentRoute.startsWith("(auth)/register/") &&
       !isRecoveryRoute &&
-      !isPartnerSplashRoute
+      !isPartnerSplashRoute &&
+      !isClientSplashRoute
     ) {
       router.replace(
         role === "prestataire" ? "/(prestataire)/dashboard" : getClientReturnTo(returnTo),

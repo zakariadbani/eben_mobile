@@ -1,10 +1,12 @@
 import React, { useEffect, useRef } from "react";
-import { Animated, Image, StyleSheet, View as RNView } from "react-native";
+import { Animated, Image, StyleSheet, useWindowDimensions, View as RNView } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Text } from "@/components/common/Text";
 import Colors from "@/constants/Colors";
 import { useSession } from "@/context/AuthContext";
+import { getSplashLogoLayout } from "@/helpers/splashLogo";
+import { disarmWelcomeSplash } from "@/helpers/welcomeSplash";
 
 /**
  * Partner (Prestataire) splash.
@@ -13,9 +15,10 @@ import { useSession } from "@/context/AuthContext";
  *        Loading-page_3 (greeting + logotype) and the "EBEN PARTNERS"
  *        variants (203-37541 / 205-35300 / 205-35444 / 252-37966).
  *
- * Reached right after a successful partner sign-in
- * (`prestataire/sign-in.tsx` → replace here → replace to the dashboard), so
- * the Loading-page_3 greeting can show the signed-in user's first name.
+ * Reached right after a successful partner sign-in (`prestataire/sign-in.tsx`
+ * arms `welcomeSplash`, then the root guard or the sign-in screen replaces here
+ * → replace to the dashboard), so the Loading-page_3 greeting can show the
+ * signed-in user's first name.
  *
  * Sequence:
  *   0 ms     → black background + gold diagonal corner (page_1)
@@ -27,22 +30,33 @@ import { useSession } from "@/context/AuthContext";
  * Loading-page_2 export (identical corner bands and logotype).
  */
 const CORNER_ASPECT_RATIO = 1284 / 878;
-const LOGO_ASPECT_RATIO = 614 / 188;
+/** Same greeting position as the client splash: this far above the logotype. */
+const GREETING_GAP = 64;
+/** Figma Loading-page_3 greeting size ("Bienvenue Zak"; the loginSubTitle type is 22). */
+const GREETING_FONT_SIZE = 26;
+/** "PARTNERS" label at the 360 dp Figma size; scaled with the logotype. */
+const PARTNERS_FONT_SIZE = 13;
+const PARTNERS_LETTER_SPACING = 4;
 
 const PartnerLoadingScreen = () => {
   const router = useRouter();
   const { t } = useTranslation();
   const { username } = useSession();
   const { phase } = useLocalSearchParams<{ phase?: string }>();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const logo = getSplashLogoLayout(windowWidth, windowHeight);
   const fixedPhase =
     phase === "1" || phase === "2" || phase === "3" ? phase : undefined;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const greetingOpacity = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    if (fixedPhase) return;
+  // The interactive sign-in that armed this splash has reached it.
+  useEffect(() => { disarmWelcomeSplash(); }, []);
 
-    Animated.sequence([
+  useEffect(() => {
+    if (fixedPhase) return undefined;
+
+    const animation = Animated.sequence([
       Animated.delay(300),
       Animated.timing(logoOpacity, {
         toValue: 1,
@@ -55,9 +69,11 @@ const PartnerLoadingScreen = () => {
         useNativeDriver: true,
       }),
       Animated.delay(600),
-    ]).start(() => {
-      router.replace("/(prestataire)/dashboard");
+    ]);
+    animation.start(({ finished }) => {
+      if (finished) router.replace("/(prestataire)/dashboard");
     });
+    return () => animation.stop();
   }, [fixedPhase, logoOpacity, greetingOpacity, router]);
 
   const logoStyle = fixedPhase
@@ -81,9 +97,13 @@ const PartnerLoadingScreen = () => {
         />
       </RNView>
 
-      <RNView style={styles.centreContent}>
+      {/* Only the logotype is centred; the greeting and "PARTNERS" hang above it
+          (same logotype position as the client splash). */}
+      <RNView style={[styles.centreContent, { height: logo.height, marginTop: logo.offsetTop }]}>
         {firstName ? (
-          <Animated.View style={greetingStyle}>
+          <Animated.View
+            style={[styles.greetingBlock, { bottom: logo.height + GREETING_GAP }, greetingStyle]}
+          >
             <Text
               type="loginSubTitle"
               translate={false}
@@ -95,14 +115,24 @@ const PartnerLoadingScreen = () => {
           </Animated.View>
         ) : null}
 
-        <Animated.View style={[styles.logoBlock, logoStyle]}>
-          {/* Brand wordmark, not copy — stays untranslated */}
-          <Text translate={false} style={styles.partners}>
+        <Animated.View style={[{ width: logo.width, height: logo.height }, logoStyle]}>
+          {/* Brand wordmark, not copy — stays untranslated. Right-aligned on the logotype. */}
+          <Text
+            translate={false}
+            style={[
+              styles.partners,
+              {
+                bottom: logo.height + 2,
+                fontSize: PARTNERS_FONT_SIZE * logo.scale,
+                letterSpacing: PARTNERS_LETTER_SPACING * logo.scale,
+              },
+            ]}
+          >
             PARTNERS
           </Text>
           <Image
             source={require("@/assets/images/others/logo-white.png")}
-            style={styles.logo}
+            style={{ width: logo.width, height: logo.height }}
             resizeMode="contain"
             accessibilityLabel="EBEN"
           />
@@ -134,26 +164,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  greetingBlock: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    paddingHorizontal: 24,
+  },
   greeting: {
     color: Colors.white,
-    marginBottom: 48,
-  },
-  logoBlock: {
-    width: "46%",
+    fontSize: GREETING_FONT_SIZE,
   },
   partners: {
-    alignSelf: "flex-end",
+    position: "absolute",
+    right: 4,
     color: Colors.primary,
     fontFamily: "Roboto",
-    fontSize: 13,
-    letterSpacing: 4,
-    marginBottom: 2,
-    marginRight: 4,
     transform: [{ skewX: "-12deg" }],
-  },
-  logo: {
-    width: "100%",
-    aspectRatio: LOGO_ASPECT_RATIO,
   },
 });
 

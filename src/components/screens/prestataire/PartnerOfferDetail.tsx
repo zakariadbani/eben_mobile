@@ -338,6 +338,7 @@ export default function PartnerOfferDetail({
           reference={isArabic ? offer.reference : null}
           condition={offer.condition}
           quantity={offer.quantity}
+          vehicle={offer.vehicle}
         />
 
         <View style={partnerDetailStyles.details}>

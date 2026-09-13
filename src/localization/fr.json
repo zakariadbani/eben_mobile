@@ -95,7 +95,7 @@
   "partner.waitlist.error.general": "Impossible d'envoyer la demande. Vérifiez les champs et réessayez.",
   "cart.voucher.message": "Bon d'achat de 100 dhs sur cette commande!",
   "cart.voucher.claim": "Réclamer",
-  "cart.voucher.claimed": "Bon réclamé",
+  "cart.voucher.claimed": "Réclamé",
   "Produit introuvable": "Produit introuvable",
   "Retour": "Retour",
   "en stock": "en stock",
@@ -234,13 +234,22 @@
   "offerDetail.sellerRemarks": "Remarques sur la pièce",
 
   "checkout.loadError": "Impossible de charger la commande",
-  "checkout.yourInformation": "1- Vos informations",
+  "checkout.yourInformation": "Vos informations",
   "checkout.retry": "Réessayer",
   "checkout.shippingDetails": "2- Détails d’expédition",
   "checkout.paymentMethod": "3- Mode de paiement",
   "checkout.paymentDetails": "4- Détails du paiement",
   "checkout.billingSame": "Les détails de facturation sont les mêmes que ceux de l’expédition",
   "checkout.placing": "En cours...",
+  "checkout.useNewAddress": "Utiliser une nouvelle adresse",
+  "checkout.neighborhood": "Quartier",
+  "checkout.neighborhoodPlaceholder": "Anfa, Maârif...",
+  "checkout.saveAddress": "Enregistrer cette adresse",
+  "checkout.savingAddress": "Enregistrement...",
+  "checkout.orderDetails": "Détails de la commande",
+  "checkout.offerReference": "Réf. {{reference}}",
+  "checkout.orderItem": "x{{count}} {{title}}{{brand}}",
+  "checkout.itemFallback": "Article n° {{id}}",
   "Paquet": "Paquet",
   "de": "de",
   "Commande effectuée": "Commande effectuée",
@@ -549,7 +558,7 @@
   "partner.fill.successTitleResend": "Offre renvoyée !",
   "partner.fill.successBody": "Votre offre a été soumise avec succès et est en cours de validation.",
   "partner.fill.successBodyResend": "Votre offre a été renvoyée avec succès.",
-  "partner.fill.successCta": "Retour aux offres",
+  "partner.fill.successCta": "Voir l'offre",
   "partner.fill.loadError": "Impossible de charger la demande",
   "partner.fill.notFound": "Demande introuvable",
   "partner.fill.retry": "Réessayer",
@@ -838,12 +847,12 @@
   "home.stockProducts": "Produits disponibles sur stock",
   "home.articleNumber": "N° Article: {{value}}",
   "home.category": "Catégorie: {{value}}",
-  "home.price": "{{value}} Dhs TTC",
+  "home.price": "{{price}} TTC",
   "home.shippingExcluded": "hors frais d’expédition",
   "home.list": "Liste",
   "home.learnMore": "En savoir plus sur EBEN",
   "home.limitedOffers": "OFFRES LIMITÉES d’EBEN",
-  "home.promoTitle": "M3ana EBEN, la ferraille fjibk!",
+  "home.promoTitle": "M3a EBEN, la ferraille fjibk!",
   "home.promoBody": "Les meilleures offres sur les pièces automobiles bla sda3 ras dial La Ferraille",
   "home.promoHighlight": "Tout cela depuis le confort de votre maison !",
   "home.viewDemo": "Voir la demo",
@@ -970,7 +979,8 @@
   "requestFlow.parts": "Pièces demandées",
   "requestFlow.noParts": "Aucune pièce",
   "requestFlow.quantity": "Qté : {{count}}",
-  "requestFlow.totalPieces": "Total : {{count}} pièce(s)",
+  "requestFlow.totalPieces": "Total : {{count}} pièce",
+  "requestFlow.totalPieces_plural": "Total : {{count}} pièces",
   "requestFlow.condition.occasion": "Occasion",
   "requestFlow.condition.en_stock": "Neuf",
   "requestFlow.details": "Détails ajoutés",
@@ -1004,6 +1014,48 @@
   "requestFlow.status.validated": "Validée",
   "requestFlow.status.selected": "Sélectionnée",
   "requestFlow.status.rejected": "Rejetée",
+  "countdown.hoursMinutes": "{{hours}}h {{minutes}}min",
+  "countdown.daysHours": "{{days}}j {{hours}}h",
+  "clientOffers.partWithBrand": "{{brand}} {{part}}",
+  "clientOffers.sections.en_stock": "Nouveau",
+  "clientOffers.sections.occasion": "Occasion",
+  "clientOffers.sortAsc": "Trier par prix croissant",
+  "clientOffers.sortDesc": "Trier par prix décroissant",
+  "clientOffers.filter": "Filtrer",
+  "clientOffers.filterTitle": "Filtres",
+  "clientOffers.filterState": "État",
+  "clientOffers.filterType": "Type",
+  "clientOffers.filterCategory": "Catégorie",
+  "clientOffers.filterProduct": "Produit",
+  "clientOffers.filterReset": "Réinitialiser",
+  "clientOffers.filterApply": "Appliquer",
+  "clientOffers.filterEmpty": "Aucune offre ne correspond à ces filtres",
+  "clientOffers.details": "Détails",
+  "clientOffers.priceTtc": "{{price}} TTC",
+  "clientOffers.priceTitle": "Prix",
+  "clientOffers.add": "Ajoutez",
+  "clientOffers.addA11y": "Ajouter {{part}} au panier",
+  "clientOffers.removeA11y": "Retirer {{part}} du panier",
+  "clientOffers.addToCart": "Ajouter au panier",
+  "clientOffers.removeFromCart": "Retirer du panier",
+  "clientOffers.inCart": "Dans le panier",
+  "clientOffers.inCartCount": "{{count}} dans le panier",
+  "clientOffers.inCartCount_plural": "{{count}} dans le panier",
+  "clientOffers.addedToast": "{{quantity}}x {{part}} ajouté au panier",
+  "clientOffers.removedToast": "{{part}} retiré du panier",
+  "clientOffers.cartError": "Impossible de mettre à jour le panier",
+  "clientOffers.replaceBasketTitle": "Remplacer votre panier ?",
+  "clientOffers.replaceBasketBody": "Votre panier contient {{count}} pièce de la demande {{reference}}. Ajouter cette offre videra votre panier.",
+  "clientOffers.replaceBasketBody_plural": "Votre panier contient {{count}} pièces de la demande {{reference}}. Ajouter cette offre videra votre panier.",
+  "clientOffers.replaceBasketBodyNoRef": "Votre panier contient {{count}} pièce. Ajouter cette offre videra votre panier.",
+  "clientOffers.replaceBasketBodyNoRef_plural": "Votre panier contient {{count}} pièces. Ajouter cette offre videra votre panier.",
+  "clientOffers.replaceBasketConfirm": "Remplacer",
+  "clientOffers.remaining": "{{value}} restantes",
+  "clientOffers.condition": "Condition : {{value}}",
+  "clientOffers.audio": "Note audio",
+  "clientOffers.filterParts": "Filtrer les pièces",
+  "settings.notifications.offersReadyTitle": "Vous avez reçu vos offres",
+  "home.limitedOffersPrefix": "OFFRES LIMITÉES d’",
   "requestFlow.status.expired": "Expirée"
   ,"requestFlow.requestStatus.draft": "Brouillon"
   ,"requestFlow.requestStatus.pending": "En attente"
@@ -1012,21 +1064,39 @@
   ,"requestFlow.requestStatus.ordered": "Commandée"
   ,"requestFlow.requestStatus.expired": "Expirée"
   ,"requestFlow.requestStatus.cancelled": "Annulée"
-  ,"commerce.cart.remainingPartsTitle": "Vous avez encore d'autres produits"
-  ,"commerce.cart.remainingPartsBody": "Vous avez encore d'autres produits que vous n'avez pas ajoutés à votre panier."
-  ,"commerce.cart.remainingPartsOffers": "Vous avez encore des offres de : {{names}}"
+  ,"commerce.cart.remainingPartsTitle": "Vous avez encore d'autres produits que vous n'avez pas ajoutés à votre panier."
+  ,"commerce.cart.remainingPartsOffers": "Vous avez encore des offres de :"
   ,"commerce.cart.continueShopping": "Continuer l'achat"
   ,"commerce.cart.checkoutAnyway": "Aller au paiement"
   ,"commerce.cart.preflightError": "Impossible de vérifier les pièces restantes. Réessayez."
   ,"commerce.cart.checking": "Vérification..."
-  ,"commerce.success.viewOrders": "Afficher mes commandes"
-  ,"commerce.success.confirmation": "Félicitations ! Votre commande a été passée."
+  ,"commerce.cart.remainingPartLabel": "{{part}} ({{brand}})"
+  ,"commerce.cart.remainingPartA11y": "Voir les offres : {{part}}"
+  ,"commerce.cart.expiresIn": "Expirera dans {{value}}"
+  ,"commerce.cart.expired": "Expiré"
+  ,"commerce.cart.brand": "Marque : {{value}}"
+  ,"commerce.cart.reference": "Réf. : {{value}}"
+  ,"commerce.cart.quantity": "Qté : {{count}}"
+  ,"commerce.cart.perUnit": "{{price}} / Unité"
+  ,"commerce.cart.itemFallback": "Article #{{id}}"
+  ,"commerce.cart.removeConfirm": "Retirer cet article du panier ?"
+  ,"commerce.cart.removeA11y": "Retirer {{part}} du panier"
+  ,"commerce.cart.removedToast": "{{part}} retiré du panier"
+  ,"commerce.cart.claimA11y": "Réclamer le bon d'achat"
+  ,"commerce.cart.couponAdded": "Vous venez de bénéficier d'une réduction de {{amount}} sur cette commande."
+  ,"commerce.cart.subtotal": "Sous-total des articles TTC"
+  ,"commerce.cart.discount": "Réduction"
+  ,"commerce.cart.shipping": "Frais de livraison"
+  ,"commerce.cart.tax": "Dont TVA (20%)"
+  ,"commerce.cart.total": "Total"
+  ,"commerce.success.viewOrders": "Afficher ma commande"
+  ,"commerce.success.confirmation": "Félicitations 🎉 ! Votre commande a été passée."
   ,"commerce.success.orderNumber": "Nº Commande : {{reference}}"
   ,"commerce.success.date": "Date : {{date}}"
-  ,"commerce.success.total": "Total : {{value}} Dhs"
+  ,"commerce.success.total": "Total : {{price}}"
   ,"commerce.success.paymentLabel": "Mode de paiement :"
   ,"commerce.success.payment.cod": "Paiement à la livraison"
-  ,"commerce.success.invoice": "Facture indisponible pour le moment"
+  ,"commerce.success.invoice": "Télécharger la facture"
   ,"commerce.success.summary": "Résumé"
   ,"commerce.success.item": "x{{count}} — {{title}}"
   ,"commerce.success.taxIncluded": "TTC"
@@ -1065,6 +1135,7 @@
   ,"settings.retry": "Réessayer"
   ,"settings.notifications": "Notifications"
   ,"settings.logout": "Se déconnecter"
+  ,"settings.logoutConfirm": "Voulez-vous vraiment vous déconnecter ?"
   ,"settings.confirm": "Confirmer"
   ,"settings.modify": "Modifier"
   ,"settings.saving": "Enregistrement..."
@@ -1128,7 +1199,9 @@
   ,"settings.payment.region": "État/province/région : {{value}}"
   ,"settings.notifications.title": "Notifications"
   ,"settings.notifications.details": "Détails"
-  ,"settings.notifications.unread": "{{count}} non lu(s)"
+  ,"settings.notifications.rate": "Noter"
+  ,"settings.notifications.unread": "{{count}} non lu"
+  ,"settings.notifications.unread_plural": "{{count}} non lus"
   ,"settings.notifications.empty": "Vous n’avez pas de notifications"
   ,"settings.notifications.loadError": "Impossible de charger les notifications"
   ,"settings.notifications.mutationError": "Impossible de mettre à jour les notifications"
@@ -1157,17 +1230,17 @@
   ,"settings.orders.discount": "Bon d’achat"
   ,"settings.orders.total": "Total"
   ,"settings.orders.paymentDetails": "Détails du paiement"
-  ,"settings.orders.invoice": "Facture indisponible"
+  ,"settings.orders.invoice": "Facture"
   ,"settings.orders.method": "Méthode : {{method}}"
   ,"settings.orders.step.paid": "Payé"
   ,"settings.orders.step.cod": "Commande confirmée"
   ,"settings.orders.step.paymentPending": "Paiement en attente"
-  ,"settings.orders.step.processing": "Traitement"
-  ,"settings.orders.step.shipped": "Expédition"
+  ,"settings.orders.step.processing": "Traité"
+  ,"settings.orders.step.shipped": "Expéditions"
   ,"settings.orders.step.delivered": "Livré"
   ,"settings.orders.status.pending.label": "En attente"
   ,"settings.orders.status.pending.desc": "Nous attendons le paiement"
-  ,"settings.orders.status.pending.cta": "Payez"
+  ,"settings.orders.status.pending.cta": "Détails"
   ,"settings.orders.status.confirmed.label": "Confirmée"
   ,"settings.orders.status.confirmed.desc": "Votre commande est en cours de traitement"
   ,"settings.orders.status.confirmed.cta": "Suivi de l'ordre"
@@ -1191,7 +1264,37 @@
   ,"settings.orders.paymentMethod.virement": "Virement bancaire"
   ,"settings.orders.paymentMethod.cache_plus": "Cash Plus"
   ,"settings.orders.paymentMethod.balance": "Solde portefeuille"
+  ,"settings.orders.placedOn": "Commandée le {{date}}"
+  ,"settings.orders.empty": "Vous n’avez pas de commandes"
+  ,"settings.orders.filterEmpty": "Aucun résultat pour ce filtre"
+  ,"settings.orders.filterTitle": "Filtres"
+  ,"settings.orders.apply": "Appliquer"
+  ,"settings.orders.reset": "Réinitialiser"
+  ,"settings.orders.close": "Fermer"
+  ,"settings.orders.monthTitle": "Choisir le mois"
+  ,"settings.orders.detailStatus.pendingCod": "Votre commande est confirmée. Vous paierez lors de la livraison."
+  ,"settings.orders.itemStatus.pending": "En attente"
+  ,"settings.orders.itemStatus.confirmed": "Confirmé"
+  ,"settings.orders.itemStatus.preparing": "En préparation"
+  ,"settings.orders.itemStatus.shipped": "Expédié"
+  ,"settings.orders.itemStatus.delivered": "Livré"
+  ,"settings.orders.itemStatus.cancelled": "Annulé"
   ,"settings.archived.loadError": "Impossible de charger les offres archivées"
+  ,"settings.archived.ready": "Ready!"
+  ,"settings.archived.closed": "Fermé"
+  ,"settings.archived.reference": "Ref :"
+  ,"settings.archived.offersReceived": "Vous avez reçu vos offres :"
+  ,"settings.archived.closedDescription": "Cette offre a été fermée"
+  ,"settings.archived.expiresIn": "Exp. dans : {{value}}"
+  ,"settings.archived.date": "Le {{value}}"
+  ,"settings.archived.details": "Détails"
+  ,"settings.archived.empty": "Archive de mes offres vide"
+  ,"settings.archived.filterEmpty": "Aucun résultat pour ce filtre"
+  ,"settings.archived.filters": "Filtres"
+  ,"settings.archived.apply": "Appliquer"
+  ,"settings.archived.reset": "Réinitialiser"
+  ,"settings.archived.close": "Fermer"
+  ,"settings.archived.monthTitle": "Choisir le mois"
   ,"settings.profile.verifyPhoneTitle": "Vérifier le nouveau numéro"
   ,"settings.profile.noPendingPhoneVerification": "Aucun changement de numéro n’est en attente de vérification."
   ,"Accueil": "Accueil"
@@ -1204,7 +1307,7 @@
   ,"Ajouter": "Ajouter"
   ,"Appliquer": "Appliquer"
   ,"Bienvenue à EBEN": "Bienvenue à EBEN"
-  ,"Caisse de sortie": "Paiement"
+  ,"Caisse de sortie": "Caisse de sortie"
   ,"Category": "Catégorie"
   ,"Ce champ est obligatoire": "Ce champ est obligatoire"
   ,"Changer de voiture": "Changer de voiture"
@@ -1266,6 +1369,8 @@
   ,"about.value.boldness": "AUDACE"
   ,"about.contact": "Contactez-nous :"
   ,"about.address": "9 Rue Al Borj, appartement 8, Rabat, Maroc"
+  ,"about.email": "info@eben.ma"
+  ,"about.phone": "+212 6 61 39 39 71"
   ,"auth.register.vehicleAddedTitle": "Voiture ajoutée à votre garage"
   ,"auth.register.vehicleAddedBody": "{{car}} a été ajoutée à votre garage"
   ,"auth.register.completeTitle": "Inscription terminée"
@@ -1349,6 +1454,18 @@
   ,"partner.editProfile.emailInvalid": "Adresse email invalide ou déjà utilisée"
   ,"partner.editProfile.firstNameRequired": "Le prénom est obligatoire"
   ,"partner.editProfile.saveError": "Impossible d'enregistrer la modification. Réessayez."
+  ,"partner.editProfile.phoneInvalid": "Saisissez un numéro mobile marocain valide."
+  ,"partner.editProfile.phoneCurrentPasswordRequired": "Saisissez votre mot de passe actuel pour modifier le numéro."
+  ,"partner.editProfile.newPassword": "Nouveau mot de passe"
+  ,"partner.editProfile.passwordConfirmation": "Confirmer le nouveau mot de passe"
+  ,"partner.editProfile.passwordCurrentRequired": "Saisissez votre mot de passe actuel."
+  ,"partner.editProfile.newPasswordInvalid": "Le nouveau mot de passe doit contenir au moins 8 caractères."
+  ,"partner.editProfile.passwordMismatch": "Les nouveaux mots de passe ne correspondent pas."
+  ,"partner.overview.topProducts": "Vos produits les plus vendus"
+  ,"partner.overview.soldCount": "{{count}} pièce vendue"
+  ,"partner.overview.soldCount_plural": "{{count}} pièces vendues"
+  ,"commerce.cart.premium": "EBEN premium"
+  ,"commerce.cart.premiumError": "Impossible de modifier EBEN premium. Réessayez."
   ,"partner.notifications.menu": "Options pour {{title}}"
   ,"partner.notifications.markRead": "Marquer comme lu"
   ,"partner.notifications.unreadCount_plural": "· {{count}} non lus"
@@ -1365,4 +1482,25 @@
   ,"partner.offerDetail.countdownDaysValue": "{{days}}j {{hours}}h"
   ,"partner.countdown.remainingHours": "{{hours}}h {{minutes}}min restante"
   ,"partner.countdown.remainingDays": "{{days}}j {{hours}}h restante"
+  ,"partner.fill.audioLabel": "Note audio"
+  ,"partner.fill.audioRecord": "Enregistrer"
+  ,"partner.fill.audioRecording": "Enregistrement"
+  ,"partner.fill.audioStop": "Arrêter"
+  ,"partner.fill.audioListen": "Écouter"
+  ,"partner.fill.audioRemove": "Supprimer la note audio"
+  ,"partner.fill.audioPermissionDenied": "Autorisez l'accès au microphone pour enregistrer une note audio."
+  ,"partner.fill.audioError": "Impossible d'enregistrer la note audio. Réessayez."
+  ,"settings.orders.returnedParts": "Pièces retournées"
+  ,"settings.orders.itemStatus.returned": "Retourné"
+  ,"partner.status.payment.unpaid": "Impayé"
+  ,"partner.dashboard.salesLast30d": "Ventes des 30 derniers jours"
+  ,"partner.company.legalForm": "Forme juridique"
+  ,"partner.company.bankName": "Banque"
+  ,"partner.company.bankRib": "RIB"
+  ,"partner.company.bankHolder": "Titulaire"
+  ,"partner.company.group.mecanique": "Mécanique"
+  ,"partner.company.group.carrosserie": "Carrosserie"
+  ,"partner.company.relatedParts": "Pièces associées : {{parts}}"
+  ,"partner.company.sheetGroupLabel": "Groupe"
+  ,"partner.company.sheetPartsLabel": "Pièces"
 }

@@ -12,6 +12,7 @@ import type { PrestataireWallet, Withdrawal } from "@/interfaces/Wallet";
 import type { Notification } from "@/interfaces/Notification";
 import {
   acknowledgePurchaseOrder,
+  changePrestatairePassword,
   confirmWithdrawal,
   declineRequest,
   getOfferShipment,
@@ -41,6 +42,7 @@ import {
   type DashboardPeriod,
   type SubmitOfferPayload,
   type UpdatePrestataireCompanyPayload,
+  type UpdatePrestatairePasswordPayload,
   type UpdatePrestataireProfilePayload,
 } from "../resources/prestataire";
 
@@ -73,7 +75,9 @@ const dashboardResponse = {
     offersActiveCount: 2,
     offersAcceptedCount: 1,
     offersSentCount: 3,
+    missedRequestsCount: 2,
     pendingPayout: 940,
+    comparison: { period: "30d", sales: 940, salesPrev: 800, requestsReceived: 4, requestsReceivedPrev: 3, offersSent: 3, offersSentPrev: 2, accepted: 1, acceptedPrev: 1 },
     recentOffers: [
       {
         offerId: 41,
@@ -115,6 +119,8 @@ const offer: PrestataireOffer = {
   ferrailleurName: null,
   brandName: null,
   brandNameAr: null,
+  vehicle: null,
+  paymentStatus: null,
   shippingEligible: false,
 };
 
@@ -142,6 +148,9 @@ const order: PrestataireOrder = {
       updatedAt: "2026-08-02T10:00:00.000Z",
       categoryTitle: "Freins",
       categoryTitleAr: "الفرامل",
+      images: [],
+      vehicle: null,
+      paymentStatus: "completed",
       purchaseOrder: {
         id: 55,
         reference: "BC-55",
@@ -180,6 +189,7 @@ const company: PrestataireCompany = {
   id: 12,
   userId: 7,
   legalName: "Atlas Pièces",
+  legalForm: null,
   ice: null,
   rc: null,
   taxId: null,
@@ -192,6 +202,8 @@ const company: PrestataireCompany = {
   phone: null,
   email: null,
   specializations: [2, 5],
+  bank: { ibanMasked: null, holder: null, bankName: null },
+  brandGroups: [],
   status: "active",
   createdAt: "2026-08-02T10:00:00.000Z",
   updatedAt: "2026-08-02T10:00:00.000Z",
@@ -322,6 +334,7 @@ it.each<[DashboardPeriod, string]>([
           pendingPayout: 940,
         },
       ],
+      topProducts: [],
     },
   };
   get.mockResolvedValueOnce(response);
@@ -515,6 +528,18 @@ it("submits the owned temporary avatar path through the JSON profile resource", 
   expect(put).toHaveBeenCalledWith("/prestataire/profile", payloadWithAvatar);
 });
 
+it("changes the Prestataire password through the authenticated contract", async () => {
+  const payload: UpdatePrestatairePasswordPayload = {
+    currentPassword: "current-password",
+    password: "new-password-123",
+    passwordConfirmation: "new-password-123",
+  };
+
+  await changePrestatairePassword(payload);
+
+  expect(put).toHaveBeenCalledWith("/prestataire/password", payload);
+});
+
 it.each([
   ["offer history", getPrestataireOffersHistory, "/prestataire/offers/history"],
   ["notifications", getPrestataireNotifications, "/prestataire/notifications"],
@@ -528,7 +553,7 @@ it.each([
   expect(get).toHaveBeenNthCalledWith(2, `${path}?page=2&perPage=${pagination.perPage}`);
 });
 
-it("updates company fields including write-only bank configuration", async () => {
+it("updates company fields with the contracted brand-group write shape", async () => {
   const payload: UpdatePrestataireCompanyPayload = {
     legalName: "Atlas Pièces",
     ice: "001234567890123",
@@ -540,8 +565,7 @@ it("updates company fields including write-only bank configuration", async () =>
     phone: "+212522000000",
     email: "contact@example.com",
     specializations: [2, 5],
-    bankRib: "123456789012345678901234",
-    bankName: "Banque Test",
+    brandGroups: [{ group: "mecanique", brands: [{ id: 2, relatedPartIds: [5] }] }],
   };
 
   await updatePrestataireCompany(payload);

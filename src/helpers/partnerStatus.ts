@@ -50,6 +50,7 @@ const ORDER_BUCKET: Record<PartnerOrderStatus, PartnerStatusBucket> = {
   preparing: "processing",
   ready: "readyToCollect",
   received: "delivered",
+  returned: "returned",
 };
 
 const BUCKET_LABEL_KEY: Record<PartnerStatusBucket, string> = {

@@ -16,10 +16,9 @@ import Icon from "@/components/common/Icon";
 import PartnerRevenueHeroCard from "@/components/screens/prestataire/dashboard/PartnerRevenueHeroCard";
 import PartnerStatCard from "@/components/screens/prestataire/dashboard/PartnerStatCard";
 import PartnerOfferRow, { type PartnerOfferRowItem } from "@/components/screens/prestataire/dashboard/PartnerOfferRow";
-import { formatTrend, NO_TREND, type Trend } from "@/components/screens/prestataire/dashboard/trend";
+import { formatTrend } from "@/components/screens/prestataire/dashboard/trend";
 import PartnerSupportBanner from "@/components/common/PartnerSupportBanner";
 import {
-  getPrestataireDashboardSeries,
   getPrestataireIncomingRequests,
   getPrestataireOffers,
   getPrestataireOrders,
@@ -27,7 +26,7 @@ import {
 } from "@/api/resources/prestataire";
 import { flattenIncoming } from "@/helpers/flattenIncoming";
 import { refreshPartnerUnreadNotifications, setPartnerOpenRequestsCount } from "@/hooks/usePartnerBadges";
-import type { PrestataireDashboardSeriesBucket, PrestataireDashboardStats } from "@/interfaces/PrestataireDashboard";
+import type { PrestataireDashboardStats } from "@/interfaces/PrestataireDashboard";
 import type { PrestataireOffer } from "@/interfaces/Offer";
 import type { PrestataireOrder } from "@/interfaces/Order";
 import type { Request } from "@/interfaces/Request";
@@ -58,19 +57,6 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({ title, count, onPress }) 
     </View>
   );
 };
-
-/**
- * Month-over-month trend from the monthly (`1a`) dashboard series: last bucket
- * (current month) vs the previous one; "—" when there is no baseline.
- */
-function monthOverMonth(
-  buckets: PrestataireDashboardSeriesBucket[] | null,
-  pick: (bucket: PrestataireDashboardSeriesBucket) => number,
-): Trend {
-  const current = buckets?.[buckets.length - 1];
-  const previous = buckets?.[buckets.length - 2];
-  return current && previous ? formatTrend(pick(current), pick(previous)) : NO_TREND;
-}
 
 const offerRow = (offer: PrestataireOffer): PartnerOfferRowItem => ({
   offerId: offer.id,
@@ -110,10 +96,9 @@ const orderRow = (order: PrestataireOrder): PartnerOfferRowItem => {
 };
 
 const Dashboard: React.FC = () => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const router = useRouter();
   const [stats, setStats] = useState<PrestataireDashboardStats | null>(null);
-  const [monthlyBuckets, setMonthlyBuckets] = useState<PrestataireDashboardSeriesBucket[] | null>(null);
   const [incomingRequests, setIncomingRequests] = useState<Request[]>([]);
   const [sentOffers, setSentOffers] = useState<PrestataireOffer[]>([]);
   const [orders, setOrders] = useState<PrestataireOrder[]>([]);
@@ -126,23 +111,12 @@ const Dashboard: React.FC = () => {
   const loadStats = useCallback(async () => {
     try {
       setStatsError(false);
-      const result = await getPrestataireStats();
+      const result = await getPrestataireStats("30d");
       setStats(result.data);
     } catch {
       setStatsError(true);
     } finally {
       setStatsLoading(false);
-    }
-  }, []);
-
-  // Monthly series feeds "Ventes en {mois}" and the month-over-month trends.
-  // It never blocks the dashboard: on failure the tiles show "—".
-  const loadSeries = useCallback(async () => {
-    try {
-      const result = await getPrestataireDashboardSeries("1a");
-      setMonthlyBuckets(result.data.buckets);
-    } catch {
-      setMonthlyBuckets(null);
     }
   }, []);
 
@@ -168,17 +142,16 @@ const Dashboard: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       void loadStats();
-      void loadSeries();
       void loadOffers();
       void refreshPartnerUnreadNotifications();
-    }, [loadOffers, loadSeries, loadStats]),
+    }, [loadOffers, loadStats]),
   );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    void Promise.allSettled([loadStats(), loadSeries(), loadOffers()])
+    void Promise.allSettled([loadStats(), loadOffers()])
       .finally(() => setRefreshing(false));
-  }, [loadOffers, loadSeries, loadStats]);
+  }, [loadOffers, loadStats]);
 
   if (statsLoading) {
     return (
@@ -229,12 +202,10 @@ const Dashboard: React.FC = () => {
     return rows.length ? rows : <Text color={Colors.grayMidDark}>{"partner.dashboard.emptyOffers"}</Text>;
   };
 
-  const currentMonthBucket = monthlyBuckets?.[monthlyBuckets.length - 1] ?? null;
-  const monthLabel = new Date().toLocaleDateString(i18n.language === "ar" ? "ar-MA" : "fr-MA", { month: "long", year: "numeric" });
-  const salesTrend = monthOverMonth(monthlyBuckets, (bucket) => bucket.revenue);
-  const receivedTrend = monthOverMonth(monthlyBuckets, (bucket) => bucket.offersReceived);
-  const acceptedTrend = monthOverMonth(monthlyBuckets, (bucket) => bucket.offersAccepted);
-  const sentTrend = monthOverMonth(monthlyBuckets, (bucket) => bucket.offersSent);
+  const salesTrend = formatTrend(stats.comparison.sales, stats.comparison.salesPrev);
+  const receivedTrend = formatTrend(stats.comparison.requestsReceived, stats.comparison.requestsReceivedPrev);
+  const acceptedTrend = formatTrend(stats.comparison.accepted, stats.comparison.acceptedPrev);
+  const sentTrend = formatTrend(stats.comparison.offersSent, stats.comparison.offersSentPrev);
   const goToOverview = () => go("/(prestataire)/profile/overview");
 
   return (
@@ -277,8 +248,8 @@ const Dashboard: React.FC = () => {
         <SectionHeader title="partner.dashboard.stats30d" onPress={goToOverview} />
         <View flexDirection="row" style={styles.statRow}>
           <PartnerStatCard
-            label={t("partner.dashboard.salesIn", { month: monthLabel })}
-            value={currentMonthBucket ? currentMonthBucket.revenue : null}
+            label={t("partner.dashboard.salesLast30d")}
+            value={stats.comparison.sales}
             isCurrency
             moneyBagIcon
             valueOnTop
@@ -306,8 +277,7 @@ const Dashboard: React.FC = () => {
         </View>
         <View flexDirection="row" gap={12} style={styles.statRow}>
           <PartnerStatCard label="partner.dashboard.acceptedCount" value={stats.offersAcceptedCount} icon="file-check-outline" trend={acceptedTrend.text} trendTone={acceptedTrend.tone} />
-          {/* Missed requests are not exposed by GET /prestataire/dashboard yet: "—" placeholder. */}
-          <PartnerStatCard label="partner.dashboard.missedCount" value={null} icon="file-cancel-outline" trend={null} />
+          <PartnerStatCard label="partner.dashboard.missedCount" value={stats.missedRequestsCount} icon="file-cancel-outline" />
           <PartnerStatCard label="partner.dashboard.sentCount" value={stats.offersSentCount} icon="file-send-outline" trend={sentTrend.text} trendTone={sentTrend.tone} />
         </View>
       </View>

@@ -15,16 +15,18 @@ import { Text } from "@/components/common/Text";
 import View from "@/components/common/View";
 import LanguagePicker from "@/components/common/LanguagePicker";
 import Colors from "@/constants/Colors";
+import { useTranslation } from "react-i18next";
 
 const LanguageScreen: React.FC = () => {
+  const { t } = useTranslation();
   return (
     <Screen edges={['bottom']}>
-      <CustomHeader title={"Langue"} />
+      <CustomHeader title={t("settings.language")} />
 
       <View style={styles.container}>
         {/* Description */}
         <Text type="default" color={Colors.grayMidDark} style={styles.description}>
-          {"Changer votre langue"}
+          {t("partner.language.description")}
         </Text>
 
         {/* Picker card */}
@@ -34,7 +36,7 @@ const LanguageScreen: React.FC = () => {
 
         {/* Hint */}
         <Text type="small" color={Colors.gray} center style={styles.hint}>
-          {"La langue sera appliquée immédiatement."}
+          {t("partner.language.hint")}
         </Text>
       </View>
     </Screen>

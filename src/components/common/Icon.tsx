@@ -1,4 +1,5 @@
 import React from "react";
+import type { StyleProp, TextStyle } from "react-native";
 import {
   MaterialCommunityIcons,
   AntDesign,
@@ -27,6 +28,7 @@ interface IconProps {
   size?: number;
   iconColor?: string;
   type?: IconType;
+  style?: StyleProp<TextStyle>;
 }
 
 // Map the icon types to the corresponding components
@@ -45,10 +47,11 @@ const Icon: React.FC<IconProps> = ({
   size = 40,
   iconColor = Colors.primary,
   type = "FontAwesome5", // Default type
+  style,
 }) => {
   const IconComponent = iconMap[type]; // Get the corresponding icon component
 
-  return <IconComponent name={name} color={iconColor} size={size} />;
+  return <IconComponent name={name} color={iconColor} size={size} style={style} />;
 };
 
 export default Icon;

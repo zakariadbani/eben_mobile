@@ -266,7 +266,7 @@ export default function PrestataireOrderDetailScreen(): React.ReactElement {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <PartnerDetailHero images={linkedOffer?.images ?? []} />
+        <PartnerDetailHero images={item.images} />
 
         {order.items.length > 1 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.partSwitcher}>
@@ -295,6 +295,7 @@ export default function PrestataireOrderDetailScreen(): React.ReactElement {
           reference={order.reference}
           condition={linkedOffer?.condition ?? null}
           quantity={item.quantity}
+          vehicle={item.vehicle}
         />
 
         <View style={partnerDetailStyles.details}>

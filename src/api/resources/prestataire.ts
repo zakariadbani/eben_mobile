@@ -10,6 +10,7 @@ import { apiClient } from '../client';
 import type { Paginated, ApiResponse } from '../types';
 import type {
   DashboardPeriod,
+  DashboardComparisonPeriod,
   PrestataireDashboardSeries,
   PrestataireDashboardStats,
 } from '@/interfaces/PrestataireDashboard';
@@ -31,9 +32,9 @@ import { assertPositiveId } from './validate';
  * GET /prestataire/dashboard
  * Returns KPI stats for the partner home screen (revenue, offer counts, payout).
  */
-export async function getPrestataireStats(): Promise<ApiResponse<PrestataireDashboardStats>> {
+export async function getPrestataireStats(period?: DashboardComparisonPeriod): Promise<ApiResponse<PrestataireDashboardStats>> {
   return apiClient.get<PrestataireDashboardStats>(
-    '/prestataire/dashboard',
+    period ? `/prestataire/dashboard?period=${period}` : '/prestataire/dashboard',
   ) as Promise<ApiResponse<PrestataireDashboardStats>>;
 }
 
@@ -100,6 +101,8 @@ export interface SubmitOfferLinePayload {
   condition: 'en_stock' | 'occasion';
   description: string | null;
   images: string[];
+  /** Owned temporary path returned by POST /uploads/audio. */
+  audio?: string;
 }
 
 export interface SubmitOfferPayload {
@@ -284,6 +287,12 @@ export interface UpdatePrestataireProfilePayload {
   currentPassword?: string;
 }
 
+export interface UpdatePrestatairePasswordPayload {
+  currentPassword: string;
+  password: string;
+  passwordConfirmation: string;
+}
+
 /**
  * GET /prestataire/profile
  * Returns the current prestataire's profile (name, phone, email, avatar,
@@ -318,14 +327,25 @@ export async function updatePrestataireProfile(
   ) as Promise<ApiResponse<PrestataireProfile>>;
 }
 
+/** PUT /prestataire/password — changes the authenticated Prestataire password. */
+export async function changePrestatairePassword(
+  payload: UpdatePrestatairePasswordPayload,
+): Promise<ApiResponse<{ changed: true }>> {
+  return apiClient.put<{ changed: true }>(
+    '/prestataire/password',
+    payload,
+  ) as Promise<ApiResponse<{ changed: true }>>;
+}
+
 // ── Company ───────────────────────────────────────────────────────────────────
 
 export type UpdatePrestataireCompanyPayload = Partial<
-  Omit<PrestataireCompany, 'id' | 'userId' | 'status' | 'createdAt' | 'updatedAt'>
+  Omit<PrestataireCompany, 'id' | 'userId' | 'status' | 'bank' | 'brandGroups' | 'createdAt' | 'updatedAt'>
 > & {
-  /** Write-only bank fields; Laravel never returns them in PrestataireCompany. */
-  bankRib?: string | null;
-  bankName?: string | null;
+  brandGroups?: {
+    group: import('@/interfaces/PrestataireCompany').CompanyBrandGroupKey;
+    brands: { id: number; relatedPartIds: number[] }[];
+  }[];
 };
 
 /**

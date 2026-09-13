@@ -1,8 +1,10 @@
 import React from "react";
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 
-import ClientLayout from "../_layout";
-import { getBasket } from "@/api";
+import ClientLayout, { clientSectionFromPath } from "../_layout";
+import { getBasket, getNotifications } from "@/api";
+import { setClientHasUnreadNotifications } from "@/hooks/useClientUnreadNotifications";
+import type { Notification } from "@/interfaces/Notification";
 import type { Basket } from "@/interfaces/Basket";
 
 // ClientLayout now also mounts RequestDraftProvider (AsyncStorage-backed).
@@ -19,10 +21,18 @@ jest.mock("react-native-safe-area-context", () =>
 );
 
 const mockPush = jest.fn();
-let mockSession: { username: string; role: string } | null = null;
-let mockScreenOptions: Record<string, { header?: unknown; tabBarBadge?: number }> = {};
+let mockSession: { username: string; role: string; user?: { avatar: string | null } } | null = null;
+type TabRenderer = (props: { focused: boolean; color: string }) => React.ReactElement | null;
+let mockScreenOptions: Record<string, {
+  header?: unknown;
+  tabBarBadge?: number;
+  tabBarIcon?: TabRenderer;
+  tabBarLabel?: TabRenderer;
+}> = {};
 let mockTabsOptions: Record<string, unknown> = {};
 let mockLanguage = "fr";
+let mockPathname = "/";
+let mockSearchParams: { from?: string } = {};
 let mockProfileListeners: {
   tabPress: (event: { preventDefault: () => void }) => void;
 };
@@ -41,7 +51,7 @@ jest.mock("expo-router", () => {
   }: {
     name: string;
     listeners?: typeof mockProfileListeners;
-    options?: { header?: unknown; tabBarBadge?: number };
+    options?: { header?: unknown; tabBarBadge?: number; tabBarIcon?: TabRenderer; tabBarLabel?: TabRenderer };
   }) {
     if (name === "settings/index" && listeners) mockProfileListeners = listeners;
     mockScreenOptions[name] = options ?? {};
@@ -52,6 +62,8 @@ jest.mock("expo-router", () => {
     Href: {},
     Tabs,
     useRouter: () => ({ push: mockPush }),
+    usePathname: () => mockPathname,
+    useGlobalSearchParams: () => mockSearchParams,
   };
 });
 
@@ -71,7 +83,7 @@ jest.mock("@/context/AuthContext", () => ({
   }),
 }));
 
-jest.mock("@/api", () => ({ getBasket: jest.fn() }));
+jest.mock("@/api", () => ({ getBasket: jest.fn(), getNotifications: jest.fn() }));
 
 jest.mock("@/components/common/ConfirmModal", () => {
   const ReactRuntime = require("react");
@@ -118,6 +130,7 @@ jest.mock("@/components/common/ConfirmModal", () => {
 });
 
 const mockGetBasket = getBasket as jest.MockedFunction<typeof getBasket>;
+const mockGetNotifications = getNotifications as jest.MockedFunction<typeof getNotifications>;
 
 describe("Client Profile tab", () => {
   beforeEach(() => {
@@ -126,6 +139,8 @@ describe("Client Profile tab", () => {
     mockScreenOptions = {};
     mockTabsOptions = {};
     mockLanguage = "fr";
+    mockPathname = "/";
+    mockSearchParams = {};
   });
 
   it("shows a back header on pushed product screens", () => {
@@ -191,7 +206,7 @@ describe("Client Profile tab", () => {
   it("shows the cart item count as a tab badge for a signed-in client", async () => {
     mockSession = { username: "client", role: "client" };
     const basket: Basket = {
-      id: 1, userId: 5, requestId: null, subtotal: 0, discountAmount: 0, shippingFee: 0, taxAmount: 0, total: 0,
+      id: 1, userId: 5, requestId: null, premium: false, premiumFee: 0, subtotal: 0, discountAmount: 0, shippingFee: 0, taxAmount: 0, total: 0,
       createdAt: "2026-01-01", updatedAt: "2026-01-01",
       items: [{ id: 1, basketId: 1, offerId: 1, categoryId: 1, quantity: 3, unitPrice: 10, createdAt: "2026-01-01", updatedAt: "2026-01-01" }],
     };
@@ -205,7 +220,7 @@ describe("Client Profile tab", () => {
   it("shows no cart tab badge for a signed-in client with an empty basket", async () => {
     mockSession = { username: "client", role: "client" };
     const emptyBasket: Basket = {
-      id: 2, userId: 5, requestId: null, subtotal: 0, discountAmount: 0, shippingFee: 0, taxAmount: 0, total: 0,
+      id: 2, userId: 5, requestId: null, premium: false, premiumFee: 0, subtotal: 0, discountAmount: 0, shippingFee: 0, taxAmount: 0, total: 0,
       createdAt: "2026-01-01", updatedAt: "2026-01-01",
       items: [],
     };
@@ -219,5 +234,57 @@ describe("Client Profile tab", () => {
     });
 
     expect(mockScreenOptions["cart/index"]?.tabBarBadge).toBeUndefined();
+  });
+
+  it("shows the Figma unread dot on the Home header bell once unread notifications load", async () => {
+    mockSession = { username: "zak", role: "client", user: { avatar: null } };
+    setClientHasUnreadNotifications(false);
+    const unread = { id: 1, isRead: false } as Notification;
+    mockGetNotifications.mockResolvedValue({
+      success: true,
+      data: [unread],
+      pagination: { currentPage: 1, lastPage: 1, perPage: 20, total: 1, from: 1, to: 1 },
+    });
+    render(<ClientLayout />);
+
+    const renderHeader = mockScreenOptions["index"]!.header as () => React.ReactElement;
+    const header = render(renderHeader());
+    expect(header.queryByTestId("header-bell-unread")).toBeNull();
+
+    await waitFor(() => expect(header.getByTestId("header-bell-unread")).toBeTruthy());
+    fireEvent.press(header.getByTestId("header-bell"));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: "/(client)/settings/notifications",
+      params: { from: "home" },
+    });
+  });
+
+  it("keeps the Liste tab active on nested request screens with icon-only inactive tabs", () => {
+    mockPathname = "/requests/23/offers/27";
+    render(<ClientLayout />);
+
+    const listIcon = render(mockScreenOptions["requests/index"]!.tabBarIcon!({ focused: false, color: "" })!);
+    expect(listIcon.UNSAFE_root.findAll((node) => node.props.name === "liste_active").length).toBeGreaterThan(0);
+    expect(mockScreenOptions["requests/index"]!.tabBarLabel!({ focused: false, color: "" })).not.toBeNull();
+    // Figma: inactive tabs show their icon only.
+    expect(mockScreenOptions["index"]!.tabBarLabel!({ focused: false, color: "" })).toBeNull();
+    expect(mockScreenOptions["cart/index"]!.tabBarLabel!({ focused: false, color: "" })).toBeNull();
+  });
+});
+
+describe("clientSectionFromPath", () => {
+  it.each([
+    ["/", undefined, "home"],
+    ["/(client)", undefined, "home"],
+    ["/requests/23", undefined, "list"],
+    ["/(client)/requests/23/offers", undefined, "list"],
+    ["/requests/23/offers/27", undefined, "list"],
+    ["/settings/notifications", undefined, "profile"],
+    ["/settings/notifications", "home", "home"],
+    ["/cart", undefined, "cart"],
+    ["/categories/10", undefined, "search"],
+    ["/unknown", undefined, null],
+  ])("maps %s with origin %s to %s", (pathname, from, section) => {
+    expect(clientSectionFromPath(pathname, from)).toBe(section);
   });
 });

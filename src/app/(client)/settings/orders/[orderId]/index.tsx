@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  Image,
   TouchableOpacity,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
@@ -17,12 +18,14 @@ import { useTranslation } from 'react-i18next';
 import Screen from '@/components/common/Screen';
 import View from '@/components/common/View';
 import { Text } from '@/components/common/Text';
+import Icon from '@/components/common/Icon';
 import Colors from '@/constants/Colors';
 import ProgressStepperComponent from '@/components/screens/shared/app/ProgressStepperComponent';
 import { cancelOrder, getOrder } from '@/api/resources/orders';
-import type { Order, OrderItem, OrderStatus } from '@/interfaces/Order';
+import type { Order, OrderItem, OrderItemStatus, OrderStatus } from '@/interfaces/Order';
 import Button from '@/components/common/Button';
 import ConfirmModal from '@/components/common/ConfirmModal';
+import { formatDhs } from '@/helpers/money';
 
 // ── Order status → stepper index ─────────────────────────────────────────────
 
@@ -39,12 +42,29 @@ function stepIndexForStatus(status: OrderStatus): number {
   return map[status] ?? 0;
 }
 
+function detailStatusKey(order: Order): string {
+  if (order.status === 'pending' && order.paymentMethod === 'cod') {
+    return 'settings.orders.detailStatus.pendingCod';
+  }
+  return `settings.orders.status.${order.status}.desc`;
+}
+
 // ── Item row ─────────────────────────────────────────────────────────────────
 
 interface OrderItemRowProps {
   item: OrderItem;
   isAr: boolean;
 }
+
+const ORDER_ITEM_ICONS: Record<OrderItemStatus, string> = {
+  pending: 'clock',
+  confirmed: 'check-circle',
+  preparing: 'package',
+  shipped: 'truck',
+  delivered: 'check-square',
+  returned: 'corner-up-left',
+  cancelled: 'x-circle',
+};
 
 const OrderItemRow: React.FC<OrderItemRowProps> = ({ item, isAr }) => {
   const { t } = useTranslation();
@@ -53,19 +73,100 @@ const OrderItemRow: React.FC<OrderItemRowProps> = ({ item, isAr }) => {
   return (
     <View style={styles.itemRow} flexDirection="row" alignItems="center" gap={12}>
       <View style={styles.itemIconWrapper}>
-        <View style={styles.itemIconCircle} />
+        {item.images?.[0] ? (
+          <Image
+            testID={`order-item-image-${item.id}`}
+            source={{ uri: item.images[0] }}
+            style={styles.itemImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <Icon name={ORDER_ITEM_ICONS[item.status]} type="Feather" size={32} iconColor={Colors.brand} />
+        )}
       </View>
       <View flex gap={2}>
         <Text type="label" semiBold color={Colors.brand} translate={false}>
           {`${item.quantity}x ${title}`}
         </Text>
+        <Text type="small" color={Colors.grayMidDark}>
+          {t(`settings.orders.itemStatus.${item.status}`)}
+        </Text>
       </View>
       <Text type="label" semiBold color={Colors.brand} translate={false}>
-        {item.totalPrice.toLocaleString(isAr ? 'ar-MA' : 'fr-MA', { minimumFractionDigits: 2 })} Dhs
+        {formatDhs(item.totalPrice, isAr ? 'ar' : 'fr')}
       </Text>
     </View>
   );
 };
+
+function OrderSummaryContent({ order, items, isAr }: { order: Order; items: OrderItem[]; isAr: boolean }) {
+  const { t } = useTranslation();
+  const currencyLocale = isAr ? 'ar' : 'fr';
+
+  return (
+    <View style={styles.summarySheet}>
+      <Text type="text" semiBold color={Colors.brand} style={styles.summaryTitle}>
+        {t('settings.orders.summary')}
+      </Text>
+      {items.map((item) => <OrderItemRow key={item.id} item={item} isAr={isAr} />)}
+      {items.length === 0 ? (
+        <Text type="label" color={Colors.gray} center style={styles.emptySummary}>
+          {t('settings.orders.noItems')}
+        </Text>
+      ) : null}
+      <View style={styles.divider} />
+      <View flexDirection="row" style={styles.totalRow}>
+        <Text type="label" color={Colors.grayMidDark} flex>{t('settings.orders.subtotal')}</Text>
+        <Text testID="order-subtotal" type="label" color={Colors.brand} translate={false}>
+          {formatDhs(order.subtotal, currencyLocale)}
+        </Text>
+      </View>
+      <View flexDirection="row" style={styles.totalRow}>
+        <Text type="label" color={Colors.grayMidDark} flex>{t('settings.orders.shipping')}</Text>
+        <Text type="label" color={Colors.brand} translate={false}>
+          {formatDhs(order.shippingFee, currencyLocale)}
+        </Text>
+      </View>
+      {order.premiumFee > 0 ? (
+        <View flexDirection="row" style={styles.totalRow}>
+          <Text type="label" color={Colors.grayMidDark} flex>{t('commerce.cart.premium')}</Text>
+          <Text testID="order-premium" type="label" color={Colors.brand} translate={false}>
+            {formatDhs(order.premiumFee, currencyLocale)}
+          </Text>
+        </View>
+      ) : null}
+      {order.discountAmount > 0 ? (
+        <View flexDirection="row" style={styles.totalRow}>
+          <Text type="label" color={Colors.grayMidDark} flex>{t('settings.orders.discount')}</Text>
+          <Text type="label" color={Colors.red} translate={false}>
+            {`-${formatDhs(order.discountAmount, currencyLocale)}`}
+          </Text>
+        </View>
+      ) : null}
+      {order.returnedAmount > 0 ? (
+        <View flexDirection="row" style={styles.totalRow}>
+          <Text type="label" color={Colors.grayMidDark} flex>{t('settings.orders.returnedParts')}</Text>
+          <Text testID="order-returned-amount" type="label" color={Colors.red} translate={false}>
+            {`-${formatDhs(order.returnedAmount, currencyLocale)}`}
+          </Text>
+        </View>
+      ) : null}
+      <View flexDirection="row" style={styles.totalRow}>
+        <Text type="label" color={Colors.grayMidDark} flex>{t('settings.orders.tax')}</Text>
+        <Text testID="order-tax" type="label" color={Colors.brand} translate={false}>
+          {formatDhs(order.taxAmount, currencyLocale)}
+        </Text>
+      </View>
+      <View style={styles.divider} />
+      <View flexDirection="row" style={styles.totalRow}>
+        <Text type="default" bold color={Colors.brand} flex>{t('settings.orders.total')}</Text>
+        <Text type="default" bold color={Colors.brand} translate={false}>
+          {formatDhs(order.total, currencyLocale)}
+        </Text>
+      </View>
+    </View>
+  );
+}
 
 // ── Screen ───────────────────────────────────────────────────────────────────
 
@@ -174,12 +275,17 @@ const OrderDetailScreen: React.FC = () => {
             onPress={() => setShowSummary((prev) => !prev)}
             style={styles.summaryBtn}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.orders.summary')}
           >
             <Text type="small" color={Colors.brand} translate={false}>
               {t('settings.orders.summary')}
             </Text>
           </TouchableOpacity>
         </View>
+        <Text type="default" style={styles.statusMessage}>
+          {t(detailStatusKey(order))}
+        </Text>
         {cancelError ? <Text accessibilityRole="alert" color={Colors.error} center>{cancelError}</Text> : null}
         {order.status === 'pending' ? <View style={styles.cancelWrap}>
           <Button title={t('settings.orders.cancel')} variant="red" onPress={() => setCancelVisible(true)} />
@@ -192,60 +298,8 @@ const OrderDetailScreen: React.FC = () => {
           </View>
         )}
 
-        {showSummary ? (
-          // ── Summary sheet ──────────────────────────────────────────────────
-          <View style={styles.summarySheet}>
-            <Text type="text" semiBold color={Colors.brand} style={styles.summaryTitle}>
-              {t('settings.orders.summary')}
-            </Text>
-            {items.map((item) => (
-              <OrderItemRow key={item.id} item={item} isAr={isAr} />
-            ))}
-            {items.length === 0 && (
-              <Text type="label" color={Colors.gray} center style={{ marginVertical: 16 }}>
-                {t('settings.orders.noItems')}
-              </Text>
-            )}
-            <View style={styles.divider} />
-            <View flexDirection="row" style={styles.totalRow}>
-              <Text type="label" color={Colors.grayMidDark} flex>{t('settings.orders.subtotal')}</Text>
-              <Text testID="order-subtotal" type="label" color={Colors.brand} translate={false}>{order.subtotal.toLocaleString(isAr ? 'ar-MA' : 'fr-MA', { minimumFractionDigits: 2 })} Dhs</Text>
-            </View>
-            <View flexDirection="row" style={styles.totalRow}>
-              <Text type="label" color={Colors.grayMidDark} flex>
-                {t('settings.orders.shipping')}
-              </Text>
-              <Text type="label" color={Colors.brand} translate={false}>
-                {order.shippingFee.toLocaleString(isAr ? 'ar-MA' : 'fr-MA', { minimumFractionDigits: 2 })} Dhs
-              </Text>
-            </View>
-            {order.discountAmount > 0 && (
-              <View flexDirection="row" style={styles.totalRow}>
-                <Text type="label" color={Colors.grayMidDark} flex>
-                  {t('settings.orders.discount')}
-                </Text>
-                <Text type="label" color={Colors.red} translate={false}>
-                  -{order.discountAmount.toLocaleString(isAr ? 'ar-MA' : 'fr-MA', { minimumFractionDigits: 2 })} Dhs
-                </Text>
-              </View>
-            )}
-            <View flexDirection="row" style={styles.totalRow}>
-              <Text type="label" color={Colors.grayMidDark} flex>{t('settings.orders.tax')}</Text>
-              <Text testID="order-tax" type="label" color={Colors.brand} translate={false}>{order.taxAmount.toLocaleString(isAr ? 'ar-MA' : 'fr-MA', { minimumFractionDigits: 2 })} Dhs</Text>
-            </View>
-            <View style={styles.divider} />
-            <View flexDirection="row" style={styles.totalRow}>
-              <Text type="default" bold color={Colors.brand} flex>
-                {t('settings.orders.total')}
-              </Text>
-              <Text type="default" bold color={Colors.brand} translate={false}>
-                {order.total.toLocaleString(isAr ? 'ar-MA' : 'fr-MA', { minimumFractionDigits: 2 })} Dhs
-              </Text>
-            </View>
-          </View>
-        ) : (
-          // ── Detail view ───────────────────────────────────────────────────
-          <>
+        {/* Detail stays mounted while the Figma summary opens as a sheet. */}
+        <>
             {/* Payment block */}
             <View style={styles.section}>
               <View flexDirection="row" alignItems="center" gap={8} style={styles.sectionHeader}>
@@ -254,7 +308,13 @@ const OrderDetailScreen: React.FC = () => {
                     {t('settings.orders.paymentDetails')}
                   </Text>
                 </View>
-                <TouchableOpacity style={styles.factureBadge} disabled accessibilityRole="button" accessibilityState={{ disabled: true }}>
+                <TouchableOpacity
+                  style={styles.factureBadge}
+                  disabled
+                  accessibilityRole="button"
+                  accessibilityLabel={t('settings.orders.invoice')}
+                  accessibilityState={{ disabled: true }}
+                >
                   <Text type="small" color={Colors.gray}>
                     {t('settings.orders.invoice')}
                   </Text>
@@ -262,9 +322,6 @@ const OrderDetailScreen: React.FC = () => {
               </View>
               <Text type="small" color={Colors.grayMidDark} translate={false}>
                 {t('settings.orders.method', { method: t(`settings.orders.paymentMethod.${order.paymentMethod}`) })}
-              </Text>
-              <Text type="small" color={Colors.grayMidDark} translate={false}>
-                {t('settings.orders.reference', { reference: order.reference })}
               </Text>
             </View>
 
@@ -280,9 +337,11 @@ const OrderDetailScreen: React.FC = () => {
                 {t('settings.orders.noItems')}
               </Text>
             )}
-          </>
-        )}
+        </>
       </ScrollView>
+      <ConfirmModal visible={showSummary} onClose={() => setShowSummary(false)} minHeightRatio={0.58}>
+        <OrderSummaryContent order={order} items={items} isAr={isAr} />
+      </ConfirmModal>
       <ConfirmModal
         visible={cancelVisible}
         onClose={() => setCancelVisible(false)}
@@ -302,6 +361,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 12,
+  },
+  statusMessage: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
   summaryBtn: {
     backgroundColor: Colors.white,
@@ -353,19 +416,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  itemIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  itemImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
     backgroundColor: Colors.backgroundGray,
   },
   summarySheet: {
     backgroundColor: Colors.white,
-    marginHorizontal: 16,
     borderRadius: 12,
-    padding: 20,
+    padding: 12,
     marginTop: 4,
   },
+  emptySummary: { marginVertical: 16 },
   summaryTitle: {
     marginBottom: 16,
   },

@@ -154,7 +154,7 @@ export default function PaymentDetailsScreen() {
 
   return (
     <>
-      <Screen scrollable whatsapp={false}>
+      <Screen scrollable>
         <View style={styles.container}>
           {loading ? <ActivityIndicator size="large" color={Colors.primary} /> : null}
           {error ? <View style={styles.emptySection} alignItems="center" gap={12}>

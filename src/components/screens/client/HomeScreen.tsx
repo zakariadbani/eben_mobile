@@ -4,10 +4,10 @@ import {
   Image,
   ImageBackground,
   ImageSourcePropType,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Href, useFocusEffect, useRouter } from "expo-router";
@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 
 import { getCategories, getCategoryTree, getProducts, getRequests } from "@/api";
 import CustomIcon from "@/components/common/CustomIcon";
+import RtlHorizontalScrollView from "@/components/common/RtlHorizontalScrollView";
 import Screen from "@/components/common/Screen";
 import WishlistHeart from "@/components/common/WishlistHeart";
 import { Text } from "@/components/common/Text";
@@ -24,11 +25,25 @@ import Colors from "@/constants/Colors";
 import { Role, useSession } from "@/context/AuthContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { clientAuthHref } from "@/constants/clientReturnTo";
+import { refreshClientUnreadNotifications } from "@/hooks/useClientUnreadNotifications";
+import { formatDhs, moneyLocale } from "@/helpers/money";
 import type { Category } from "@/interfaces/Category";
 import type { Product } from "@/interfaces/Product";
 import type { RequestSummary } from "@/interfaces/Request";
 
 const promoImage = require("@/assets/img/imagePub.jpeg");
+const ebenLogo = require("@/assets/images/others/logo.png");
+
+/** Stable, language-independent order (the API may sort by localized name). */
+function bySortOrder<T extends { id: number; sortOrder?: number | null; children?: T[] }>(nodes: T[]): T[] {
+  return [...nodes]
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.id - b.id)
+    .map((node) => (node.children ? { ...node, children: bySortOrder(node.children) } : node));
+}
+
+/** Figma Home: two tiles and half of the third visible, inviting a horizontal scroll. */
+const TILE_GAP = 16;
+const VISIBLE_TILES = 2.5;
 const fallbackProductImage = require("@/assets/img/freins.png");
 
 function firstLeaf(categories: Category[]): Category | null {
@@ -53,6 +68,8 @@ const HomeScreen: React.FC = () => {
   const { isWishlisted, toggle } = useWishlist();
   const push = (href: Href) => router.push(href);
   const loadedRef = useRef(false);
+  const { width: windowWidth } = useWindowDimensions();
+  const tileWidth = Math.round((windowWidth - 16 - TILE_GAP * 2) / VISIBLE_TILES);
 
   const requireClient = (href: string) => {
     push(role === Role.CLIENT ? href as Href : clientAuthHref("/(auth)/ClientLoginScreen", href));
@@ -65,8 +82,8 @@ const HomeScreen: React.FC = () => {
         getCategories(),
         getCategoryTree(),
       ]);
-      const roots = categoryResponse.data.filter((category) => category.level === 1);
-      const leaf = firstLeaf(treeResponse.data);
+      const roots = bySortOrder(categoryResponse.data.filter((category) => category.level === 1));
+      const leaf = firstLeaf(bySortOrder(treeResponse.data));
       const [stockResponse, recentResponse, requestResponse] = await Promise.all([
         leaf
           ? getProducts({ categoryId: leaf.id, condition: "en_stock", featured: true, perPage: 6 })
@@ -93,6 +110,7 @@ const HomeScreen: React.FC = () => {
   // creating a request elsewhere) — skipped until the first load completes,
   // and skipped entirely for non-clients.
   useFocusEffect(useCallback(() => {
+    if (role === Role.CLIENT) void refreshClientUnreadNotifications();
     if (!loadedRef.current || role !== Role.CLIENT) return;
     getRequests()
       .then((data) => setRequests(data.data.filter(isActiveRequest).slice(0, 2)))
@@ -129,7 +147,7 @@ const HomeScreen: React.FC = () => {
           pathname: "/(client)/categories/[categoryId]",
           params: { categoryId: String(category.id), condition: "occasion" },
         } as Href)}
-        style={styles.categoryCard}
+        style={[styles.categoryCard, { width: tileWidth, height: Math.round(tileWidth * 0.75) }]}
         accessibilityRole="button"
         accessibilityLabel={isArabic ? category.titleAr : category.title}
       >
@@ -187,7 +205,7 @@ const HomeScreen: React.FC = () => {
         <Text type="label" style={styles.productCategory} numberOfLines={1}>
           {t("home.category", { value: isArabic ? product.categoryNameAr : product.categoryName })}
         </Text>
-        <Text type="defaultTwo" semiBold center style={styles.productTitle} numberOfLines={3} translate={false}>
+        <Text type="defaultTwo" center style={styles.productTitle} numberOfLines={3} translate={false}>
           {isArabic ? product.titleAr : product.title}
         </Text>
       </View>
@@ -201,7 +219,7 @@ const HomeScreen: React.FC = () => {
           {hasPromo ? (
             <View style={styles.promoRow}>
               <Text type="small" style={styles.originalPrice} translate={false}>
-                {`${product.price.toLocaleString("fr-MA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Dhs`}
+                {formatDhs(product.price, moneyLocale(i18n.language))}
               </Text>
               <View style={styles.promoBadge}>
                 <Text type="small" color={Colors.white} translate={false}>
@@ -212,10 +230,7 @@ const HomeScreen: React.FC = () => {
           ) : null}
           <Text type="defaultTwo" semiBold center style={styles.price}>
             {t("home.price", {
-              value: (hasPromo ? promoPrice! : product.price).toLocaleString("fr-MA", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              }),
+              price: formatDhs(hasPromo ? promoPrice! : product.price, moneyLocale(i18n.language)),
             })}
           </Text>
           <Text type="small" center style={styles.shipping}>home.shippingExcluded</Text>
@@ -227,17 +242,34 @@ const HomeScreen: React.FC = () => {
 
   const productSlider = (products: Product[], recent = false) => (
     products.length === 0 ? <EmptyListComponent title={t("wishlist.empty")} /> : (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.horizontalContent, isArabic && styles.rowReverse]}>
+      <RtlHorizontalScrollView
+        rtl={isArabic}
+        showsHorizontalScrollIndicator={false}
+        // Trailing inset on the reading END: the reversed Arabic row starts flush
+        // with the right container inset, like the French row on the left.
+        contentContainerStyle={[styles.horizontalContent, isArabic ? styles.endInsetRtl : styles.endInsetLtr]}
+        testID={recent ? "home-recent-products" : "home-stock-products"}
+      >
         {products.map((product) => productCard(product, recent))}
-      </ScrollView>
+      </RtlHorizontalScrollView>
     )
   );
 
   const promo = (limited = false) => (
     <View style={styles.promoSection}>
-      <Text type="titleSection" style={styles.promoHeading}>
-        {limited ? "home.limitedOffers" : "home.learnMore"}
-      </Text>
+      {limited ? (
+        <View
+          style={[styles.limitedHeading, isArabic && styles.rowReverse]}
+          accessible
+          accessibilityRole="header"
+          accessibilityLabel={t("home.limitedOffers")}
+        >
+          <Text type="titleSection" style={styles.limitedHeadingText}>home.limitedOffersPrefix</Text>
+          <Image source={ebenLogo} style={styles.limitedLogo} resizeMode="contain" />
+        </View>
+      ) : (
+        <Text type="titleSection" style={styles.promoHeading}>home.learnMore</Text>
+      )}
       <ImageBackground source={promoImage} style={styles.promoCard} imageStyle={styles.promoImage}>
         <LinearGradient
           colors={isArabic ? ["rgba(0,0,0,0.1)", "rgba(0,0,0,0.95)"] : ["rgba(0,0,0,0.95)", "rgba(0,0,0,0.1)"]}
@@ -283,13 +315,20 @@ const HomeScreen: React.FC = () => {
   }
 
   return (
-    <Screen scrollable whatsapp={false} padding={false}>
+    <Screen scrollable padding={false}>
       <View style={styles.container}>
         <View style={styles.categoriesSection}>
           {sectionTitle("home.searchQuestion", "/(client)/categories")}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.horizontalContent, isArabic && styles.rowReverse]}>
+          {/* Same tiles in the same order in both languages: Arabic starts from the right edge. */}
+          <RtlHorizontalScrollView
+            rtl={isArabic}
+            showsHorizontalScrollIndicator={false}
+            style={styles.bleed}
+            contentContainerStyle={[styles.horizontalContent, styles.bleedContent]}
+            testID="home-categories"
+          >
             {categories.map(categoryCard)}
-          </ScrollView>
+          </RtlHorizontalScrollView>
         </View>
 
         <View style={styles.requestsSection}>
@@ -334,9 +373,13 @@ const styles = StyleSheet.create({
   sectionTitle: { color: Colors.brand, fontSize: 25, lineHeight: 32, maxWidth: 245 },
   seeAll: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8 },
   seeAllText: { color: Colors.grayMidDark, fontSize: 16 },
-  horizontalContent: { flexDirection: "row", gap: 16, paddingRight: 16 },
+  horizontalContent: { flexDirection: "row", gap: 16 },
+  endInsetLtr: { paddingRight: 16 },
+  endInsetRtl: { paddingLeft: 16 },
   categoriesSection: { marginBottom: 38 },
-  categoryCard: { width: 124, height: 93, borderRadius: 9, backgroundColor: Colors.backgroundGray, alignItems: "center", justifyContent: "center", paddingHorizontal: 8 },
+  bleed: { marginHorizontal: -16 },
+  bleedContent: { paddingHorizontal: 16 },
+  categoryCard: { borderRadius: 9, backgroundColor: Colors.backgroundGray, alignItems: "center", justifyContent: "center", paddingHorizontal: 8 },
   categoryImage: { width: 60, height: 57 },
   categoryTitle: { fontSize: 13, lineHeight: 18, color: Colors.brand },
   uppercase: { textTransform: "uppercase" },
@@ -361,6 +404,9 @@ const styles = StyleSheet.create({
   listButton: { marginTop: "auto", minHeight: 25, borderRadius: 3, backgroundColor: Colors.primary, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
   promoSection: { marginBottom: 40 },
   promoHeading: { fontSize: 25, lineHeight: 32, marginBottom: 14 },
+  limitedHeading: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 14 },
+  limitedHeadingText: { fontSize: 25, lineHeight: 32 },
+  limitedLogo: { width: 62, height: 22 },
   promoCard: { height: 240, borderRadius: 6, overflow: "hidden", justifyContent: "center" },
   promoImage: { borderRadius: 6 },
   promoCopy: { width: "58%", marginHorizontal: 16 },

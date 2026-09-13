@@ -9,8 +9,14 @@ interface WhatsappBtnProps {
   onPress?: () => void;
 }
 
+/**
+ * Green WhatsApp FAB, bottom-right in French and mirrored to bottom-left in
+ * Arabic so it sits over the (empty) end side of right-aligned RTL rows
+ * instead of their labels.
+ */
 const WhatsappBtn: React.FC<WhatsappBtnProps> = ({ style, onPress }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === "ar";
   const WhatsappBtnEvent = () => {
     void Linking.openURL("https://wa.me/212600000000");
   };
@@ -22,7 +28,7 @@ const WhatsappBtn: React.FC<WhatsappBtnProps> = ({ style, onPress }) => {
       iconType="custom"
       rightIcon="whatsapp"
       accessibilityLabel={t('accessibility.whatsapp')}
-      style={StyleSheet.flatten([styles.button, style])}
+      style={StyleSheet.flatten([styles.button, isArabic && styles.buttonRtl, style])}
       iconColor={Colors.brand} // Use provided iconColor or default
       onPress={onPress || WhatsappBtnEvent} // Use custom onPress if provided
     />
@@ -41,6 +47,10 @@ const styles = StyleSheet.create({
     zIndex: 9,
     right: 16,
     bottom: 16,
+  },
+  buttonRtl: {
+    right: undefined,
+    left: 16,
   },
 });
 

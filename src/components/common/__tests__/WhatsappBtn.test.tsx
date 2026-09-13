@@ -14,4 +14,16 @@ describe('WhatsappBtn', () => {
 
     expect(screen.getByRole('button', { name: i18n.t('accessibility.whatsapp') })).toBeTruthy();
   });
+
+  it('mirrors to the bottom-left in Arabic and stays bottom-right in French', async () => {
+    const arabic = render(<WhatsappBtn />);
+    expect(arabic.getByRole('button').props.style).toEqual(expect.objectContaining({ left: 16, bottom: 16 }));
+    expect(arabic.getByRole('button').props.style.right).toBeUndefined();
+    arabic.unmount();
+
+    await i18n.changeLanguage('fr');
+    const french = render(<WhatsappBtn />);
+    expect(french.getByRole('button').props.style).toEqual(expect.objectContaining({ right: 16, bottom: 16 }));
+    expect(french.getByRole('button').props.style.left).toBeUndefined();
+  });
 });

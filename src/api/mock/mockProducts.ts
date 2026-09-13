@@ -342,6 +342,8 @@ export const mockBasket: Basket = {
   id: 1,
   userId: 1,
   requestId: null,
+  premium: false,
+  premiumFee: 0,
   subtotal: 2996.3,
   discountAmount: 0,
   shippingFee: 0,

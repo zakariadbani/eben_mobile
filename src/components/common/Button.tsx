@@ -46,6 +46,8 @@ interface ButtonProps
     | string; // Add prop to specify the icon type
 
   sizeIcon?: number;
+  /** Arabic: flip the standard left/right icons horizontally (directional glyphs such as "log-in"). */
+  mirrorIconsInRtl?: boolean;
   styleTitle?: TextStyle;
   style?: StyleProp<ViewStyle>;
   styleContainer?: ViewStyle;
@@ -84,6 +86,7 @@ export const Button: React.FC<ButtonProps> = ({
   iconType = "standard", // Default to custom icon
   iconTypeName = "FontAwesome5", // Default icon type
   sizeIcon = 25,
+  mirrorIconsInRtl = false,
   styleTitle,
   style,
   styleContainer,
@@ -105,8 +108,9 @@ export const Button: React.FC<ButtonProps> = ({
   ...touchableProps
 }) => {
   const router = useRouter(); // Get the router instance
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const translatedTitle = title ? t(title) : undefined;
+  const iconStyle = mirrorIconsInRtl && i18n.language === "ar" ? styles.iconMirrored : undefined;
 
   // Function to handle navigation if navigateTo prop is provided
   const handlePress = () => {
@@ -177,6 +181,7 @@ export const Button: React.FC<ButtonProps> = ({
                 size={sizeIcon}
                 type={iconTypeName}
                 iconColor={iconColor ? iconColor : textColorFinal}
+                style={iconStyle}
               /> // Use iconTypeName prop
             ))}
           {/* Render children if provided, otherwise render title */}
@@ -205,6 +210,7 @@ export const Button: React.FC<ButtonProps> = ({
                 size={sizeIcon}
                 type={iconTypeName}
                 iconColor={iconColor ? iconColor : textColorFinal}
+                style={iconStyle}
               /> // Use iconTypeName prop
             ))}
         </View>
@@ -229,6 +235,9 @@ const styles = StyleSheet.create({
   },
   text: {
     marginHorizontal: 8,
+  },
+  iconMirrored: {
+    transform: [{ scaleX: -1 }],
   },
 });
 

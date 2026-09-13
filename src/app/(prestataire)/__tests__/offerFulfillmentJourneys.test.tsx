@@ -1,10 +1,10 @@
 import React from "react";
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
-import { Alert, ScrollView, StyleSheet } from "react-native";
+import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet } from "react-native";
 
 import i18n from "@/localization/i18n";
 import { ApiClientError } from "@/api/types";
-import { uploadLocalImages } from "@/api/resources/uploads";
+import { uploadLocalAudio, uploadLocalImages } from "@/api/resources/uploads";
 import {
   declineRequest,
   getOfferShipment,
@@ -170,7 +170,19 @@ jest.mock("@/components/common/AudioPlayer", () => {
   const { View } = require("react-native");
   return function MockAudioPlayer() { return React.createElement(View, { testID: "audio-player" }); };
 });
-jest.mock("@/api/resources/uploads", () => ({ uploadLocalImages: jest.fn() }));
+jest.mock("@/components/common/AudioRecorderInput", () => {
+  const React = require("react");
+  const { Text, View } = require("react-native");
+  return function MockAudioRecorderInput({ onChange }: { onChange: (uri: string | null) => void }) {
+    return React.createElement(View, {
+      accessible: true,
+      accessibilityRole: "button",
+      accessibilityLabel: "record-offer-audio",
+      onPress: () => onChange("file:///offer-note.m4a"),
+    }, React.createElement(Text, null, "record-offer-audio"));
+  };
+});
+jest.mock("@/api/resources/uploads", () => ({ uploadLocalImages: jest.fn(), uploadLocalAudio: jest.fn() }));
 jest.mock("@/api/resources/prestataire", () => ({
   declineRequest: jest.fn(),
   getOfferShipment: jest.fn(),
@@ -183,6 +195,7 @@ jest.mock("@/api/resources/prestataire", () => ({
 }));
 
 const mockUploadLocalImages = uploadLocalImages as jest.MockedFunction<typeof uploadLocalImages>;
+const mockUploadLocalAudio = uploadLocalAudio as jest.MockedFunction<typeof uploadLocalAudio>;
 const mockDeclineRequest = declineRequest as jest.MockedFunction<typeof declineRequest>;
 const mockGetOfferShipment = getOfferShipment as jest.MockedFunction<typeof getOfferShipment>;
 const mockGetIncoming = getPrestataireIncomingRequests as jest.MockedFunction<typeof getPrestataireIncomingRequests>;
@@ -212,6 +225,7 @@ const incomingRequest = {
     { id: 9, requestId: 33, categoryId: 32, quantity: 2, condition: "en_stock", notes: null, createdAt: "2026-08-01", updatedAt: "2026-08-01", categoryTitle: "Disques" },
   ],
   images: ["https://cdn.example/request.jpg"],
+  vehicle: { brandName: "BMW", modelName: "X5 (E53)", motorisation: "4.8 Essence", year: 2004 },
 } satisfies Request;
 const offer = {
   id: 401,
@@ -236,6 +250,8 @@ const offer = {
   ferrailleurName: "Garage",
   brandName: null,
   brandNameAr: null,
+  vehicle: { brandName: "BMW", modelName: "X5 (E53)", motorisation: "4.8 Essence", year: 2004 },
+  paymentStatus: "completed",
   shippingEligible: true,
 } satisfies PrestataireOffer;
 const shipment = {
@@ -264,6 +280,7 @@ beforeEach(async () => {
   mockGetOffers.mockResolvedValue({ success: true, data: [offer], pagination });
   mockGetOfferShipment.mockResolvedValue({ success: true, data: null });
   mockUploadLocalImages.mockImplementation(async (uris) => uris.map((uri) => `tmp/mobile/14/${uri.split("/").pop()}`));
+  mockUploadLocalAudio.mockImplementation(async (uris) => uris.map((uri) => `tmp/mobile/14/${uri.split("/").pop()}`));
   mockSubmitOffer.mockResolvedValue({ success: true, data: { success: true, offerId: 402 } });
   mockDeclineRequest.mockResolvedValue({ success: true, data: { success: true, requestId: 33 } });
   mockResendOffer.mockResolvedValue({ success: true, data: { success: true, offerId: 401 } });
@@ -287,7 +304,7 @@ it("shows only the requested part in the header when opened with itemId, with a 
   expect(screen.queryByText("Plaquettes")).toBeNull();
   expect(screen.queryByText(i18n.t("requestList.brand", { value: "RIDEX" }))).toBeNull();
   expect(screen.getAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"))).toHaveLength(1);
-  expect(screen.getByText(i18n.t("partner.ship.vehicleFallback"))).toBeTruthy();
+  expect(screen.getByText("BMW X5 (E53) 4.8 Essence 2004")).toBeTruthy();
 });
 
 it("falls back to the default header when itemId does not match any request line", async () => {
@@ -339,6 +356,16 @@ it("adds a second offer line for the same part and removes it again", async () =
   expect(screen.getByRole("button", { name: i18n.t("partner.fill.offerLabel", { count: 1 }) }).props.accessibilityState).toEqual({ expanded: true });
   expect(screen.queryByRole("button", { name: i18n.t("partner.fill.removeOffer", { count: 1 }) })).toBeNull();
   expect(screen.queryByText(i18n.t("partner.fill.offerLabel", { count: 2 }))).toBeNull();
+});
+
+it("avoids the keyboard once so the action bar returns flush above the tab bar", async () => {
+  const screen = render(<OfferFillScreen />);
+  expect(await screen.findAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"))).toHaveLength(1);
+
+  const avoiders = screen.UNSAFE_getAllByType(KeyboardAvoidingView);
+  expect(avoiders).toHaveLength(1);
+  expect(avoiders[0]!.props.keyboardVerticalOffset).toBe(0);
+  expect(screen.getByRole("button", { name: i18n.t("partner.fill.ctaSend") })).toBeTruthy();
 });
 
 it("labels the client's request note with the general note key", async () => {
@@ -457,6 +484,28 @@ it("uploads multi-line local images in order, submits raw prices only, and retri
   expect(mockUploadLocalImages).toHaveBeenCalledTimes(1);
 });
 
+it("uploads an optional voice note and sends its owned path on the matching offer line", async () => {
+  mockNextImageUris = ["file:///a.jpg"];
+  const screen = render(<OfferFillScreen />);
+  await screen.findByRole("button", { name: i18n.t("requestFlow.addImage") });
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("requestFlow.addImage") }));
+  fireEvent.press(screen.getByRole("button", { name: "record-offer-audio" }));
+  fireEvent.changeText(screen.getByPlaceholderText(i18n.t("partner.fill.pricePlaceholder")), "250");
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.ctaSend") }));
+
+  await waitFor(() => expect(mockUploadLocalAudio).toHaveBeenCalledWith(["file:///offer-note.m4a"]));
+  expect(mockSubmitOffer).toHaveBeenCalledWith(33, {
+    lines: [{
+      requestItemId: 8,
+      priceFerrailleur: 250,
+      condition: "occasion",
+      description: null,
+      images: ["tmp/mobile/14/a.jpg"],
+      audio: "tmp/mobile/14/offer-note.m4a",
+    }],
+  });
+});
+
 it("declines with the selected reason and comment once", async () => {
   mockParams = { offerId: "33", state: "decline" };
   const pending = deferred<Awaited<ReturnType<typeof declineRequest>>>();
@@ -498,7 +547,7 @@ it("resends the existing backend offer once without uploading its public URLs", 
   expect(mockUploadLocalImages).not.toHaveBeenCalled();
   pending.resolve({ success: true, data: { success: true, offerId: 401 } });
   expect(await screen.findByText(i18n.t("partner.fill.successTitleResend"))).toBeTruthy();
-  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.successCta") }));
+  fireEvent.press(screen.getByRole("button", { name: "Voir l'offre" }));
   expect(mockReplace).toHaveBeenCalledWith("/(prestataire)/offers/401?sent=1");
 });
 
@@ -552,7 +601,7 @@ it("shows the canonical part name once and the full description only under the r
   expect(screen.getAllByText("Ligne info\nLigne détail\nLigne remarque")).toHaveLength(1);
   expect(screen.queryByText("Ligne info")).toBeNull();
   expect(screen.getByText(i18n.t("partner.offerDetail.remarks"))).toBeTruthy();
-  expect(screen.getByText(i18n.t("partner.ship.vehicleFallback"))).toBeTruthy();
+  expect(screen.getByText("BMW X5 (E53) 4.8 Essence 2004")).toBeTruthy();
   expect(screen.getByText(`250 ${i18n.t("partner.offerDetail.priceTtc")}`)).toBeTruthy();
   // Figma removed the brand line, the FR reference chip, the date line and the admin note box.
   expect(screen.queryByText(i18n.t("requestList.brand", { value: "Bosch" }))).toBeNull();

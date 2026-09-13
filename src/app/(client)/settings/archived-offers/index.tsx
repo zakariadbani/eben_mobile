@@ -28,7 +28,7 @@ import { getRequests } from '@/api/resources/requests';
 import Button from '@/components/common/Button';
 import type { RequestSummary, RequestStatus } from '@/interfaces/Request';
 
-const ARCHIVED_REQUEST_STATUSES = new Set<RequestStatus>(['ordered', 'expired', 'cancelled']);
+const ARCHIVED_REQUEST_STATUSES = new Set<RequestStatus>(['offers_received', 'ordered', 'expired', 'cancelled']);
 
 // ── Status display config ────────────────────────────────────────────────────
 
@@ -39,7 +39,7 @@ function getStatusConfig(
   switch (status) {
     case 'offers_received':
       return {
-        label: t('Ready!'),
+        label: t('settings.archived.ready'),
         color: Colors.greenDark,
         background: Colors.green + '33',
         isReady: true,
@@ -49,7 +49,7 @@ function getStatusConfig(
     case 'cancelled':
     case 'ordered':
       return {
-        label: t('Fermé'),
+        label: t('settings.archived.closed'),
         color: Colors.white,
         background: Colors.grayMidDark,
         isReady: false,
@@ -209,47 +209,49 @@ const ArchivedOfferCard: React.FC<ArchivedOfferCardProps> = ({ request, onPress 
         <View flex gap={4}>
           <View flexDirection="row" alignItems="center" gap={6} style={isAr ? styles.rowRtl : undefined}>
             <Text type="small" color={Colors.gray} translate={false}>
-              {isAr ? 'المرجع:' : 'Ref:'}
+              {t('settings.archived.reference')}
             </Text>
             <Text type="small" semiBold color={Colors.brand} translate={false}>
               {request.reference}
             </Text>
             {cfg.isReady && (
               <Text type="small" semiBold color={Colors.greenDark} translate={false}>
-                {t('Ready!')}
+                {t('settings.archived.ready')}
               </Text>
             )}
           </View>
 
           {cfg.isReady ? (
             <Text type="small" color={Colors.gray}>
-              {isAr ? 'لقد تلقيت عروضك:' : 'Vous avez reçu vos offres:'}
+              {t('settings.archived.offersReceived')}
             </Text>
           ) : (
             <Text type="small" color={Colors.gray}>
-              {t('Cette offre a été fermée')}
+              {t('settings.archived.closedDescription')}
             </Text>
           )}
 
           {request.expiresDisplay != null && (
             <Text type="label" semiBold color={Colors.brand} translate={false}>
-              {`${isAr ? 'تنتهي خلال:' : 'Exp dans:'} ${request.expiresDisplay}`}
+              {t('settings.archived.expiresIn', { value: request.expiresDisplay })}
             </Text>
           )}
 
           {/* Date — Figma shows "Le 12/11/2022" */}
           <Text type="small" color={Colors.gray} translate={false}>
-            {`${isAr ? '' : 'Le '}${new Date(request.createdAt).toLocaleDateString(
-              isAr ? 'ar-MA' : 'fr-MA',
-              { day: '2-digit', month: '2-digit', year: 'numeric' },
-            )}`}
+            {t('settings.archived.date', {
+              value: new Date(request.createdAt).toLocaleDateString(
+                isAr ? 'ar-MA' : 'fr-MA',
+                { day: '2-digit', month: '2-digit', year: 'numeric' },
+              ),
+            })}
           </Text>
         </View>
 
         {/* Trailing */}
         {cfg.isReady ? (
           <Button
-            title="Vérifier les prix"
+            title={t('home.checkPrices')}
             variant="primary"
             rightIcon={isAr ? "arrow-left" : "arrow-right"}
             iconType="standard"
@@ -262,7 +264,7 @@ const ArchivedOfferCard: React.FC<ArchivedOfferCardProps> = ({ request, onPress 
         ) : cfg.isClosed ? (
           <TouchableOpacity onPress={onPress} style={[styles.detailsBtn, isAr && styles.rowRtl]} activeOpacity={0.8}>
             <Text type="small" semiBold color={Colors.grayMidDark} translate={false}>
-              {t('Détails')}
+              {t('settings.archived.details')}
             </Text>
             <Icon name={isAr ? "arrow-left" : "arrow-right"} size={12} iconColor={Colors.grayMidDark} type="Feather" />
           </TouchableOpacity>
@@ -430,8 +432,8 @@ const ArchivedOffersScreen: React.FC = () => {
           <EmptyListComponent
             title={
               requests.length === 0
-                ? (isAr ? 'أرشيف العروض فارغ' : 'Archive de mes offres vide')
-                : (isAr ? 'لا توجد نتائج لهذا الفلتر' : 'Aucun résultat pour ce filtre')
+                ? t('settings.archived.empty')
+                : t('settings.archived.filterEmpty')
             }
             styleContainer={{ marginTop: 60 }}
           />
@@ -443,18 +445,18 @@ const ArchivedOffersScreen: React.FC = () => {
         visible={filterVisible}
         onClose={() => setFilterVisible(false)}
         primaryButton={{
-          title: isAr ? 'تطبيق' : 'Appliquer',
+          title: t('settings.archived.apply'),
           onPress: applyFilter,
           variant: 'primary',
         }}
         secondaryButton={{
-          title: isAr ? 'إعادة تعيين' : 'Réinitialiser',
+          title: t('settings.archived.reset'),
           onPress: resetFilter,
           bordless: true,
         }}
       >
         <Text type="headerTitle" semiBold color={Colors.brand}>
-          {"Filters"}
+          {t('settings.archived.filters')}
         </Text>
         {availableStatuses.map((status) => {
           const checked = pendingStatuses.has(status);
@@ -483,13 +485,13 @@ const ArchivedOffersScreen: React.FC = () => {
         visible={monthPickerVisible}
         onClose={() => setMonthPickerVisible(false)}
         primaryButton={{
-          title: isAr ? 'إغلاق' : 'Fermer',
+          title: t('settings.archived.close'),
           onPress: () => setMonthPickerVisible(false),
           bordless: true,
         }}
       >
         <Text type="headerTitle" semiBold color={Colors.brand} translate={false}>
-          {isAr ? 'اختر الشهر' : 'Choisir le mois'}
+          {t('settings.archived.monthTitle')}
         </Text>
         {availableMonths.map((key) => {
           const label = formatMonthLabel(key, locale);

@@ -1,46 +1,43 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, ScrollView, StyleSheet } from "react-native";
-import { Href, useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View as RNView } from "react-native";
+import { Href, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/core";
 import { useTranslation } from "react-i18next";
 import Screen from "@/components/common/Screen";
 import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
 import Button from "@/components/common/Button";
-import Icon from "@/components/common/Icon";
+import CustomIcon from "@/components/common/CustomIcon";
 import CountdownRing from "@/components/common/CountdownRing";
 import ProgressStepperComponent from "@/components/screens/shared/app/ProgressStepperComponent";
 import RequestPartCard from "@/components/screens/client/requests/RequestPartCard";
 import RequestSummaryCard, { isActiveRequest } from "@/components/screens/client/requests/RequestSummaryCard";
+import ExpiryWarning from "@/components/screens/client/offers/ExpiryWarning";
+import OffersFilterSheet, {
+  EMPTY_OFFER_FILTERS,
+  filtersActive,
+  type OfferFilters,
+  type OfferSourceType,
+} from "@/components/screens/client/offers/OffersFilterSheet";
+import { CONDITION_ORDER, OPEN_REQUEST_STATUSES, positiveId, requestStep } from "@/components/screens/client/offers/offerFormat";
 import Colors from "@/constants/Colors";
+import { useCart } from "@/context/CartContext";
 import { getRequest, getOffers, getRequests } from "@/api/resources/requests";
 import { getCategoryTree } from "@/api/resources/categories";
 import { buildCategoryLookup, resolveImageSource, type CategoryLookupEntry } from "@/helpers/categoryLookup";
 import { useCountdown } from "@/helpers/countdown";
-import type { Request, RequestItem, RequestStatus, RequestSummary } from "@/interfaces/Request";
+import { useClientCountdownFormat } from "@/hooks/useClientCountdownFormat";
+import type { ClientOfferItem } from "@/interfaces/Offer";
+import type { Request, RequestItem, RequestSummary } from "@/interfaces/Request";
 
-function positiveId(value: string | undefined): number | null {
-  if (!value || !/^\d+$/.test(value)) return null;
-  const id = Number(value);
-  return Number.isSafeInteger(id) && id > 0 ? id : null;
-}
-
-// Maps a request's backend status to the client-facing 4-step progress
-// stepper. null = terminal/no-progress statuses that don't show a stepper.
-const REQUEST_STEP: Record<RequestStatus, number | null> = {
-  draft: 0,
-  pending: 0,
-  offers_received: 1,
-  validated: 2,
-  ordered: 3,
-  expired: null,
-  cancelled: null,
-};
+/** The client's order window after the first admin validation (backend: expires_at = now + 24 h). */
+const ORDER_WINDOW_MS = 24 * 3_600_000;
 
 interface EnrichedItem {
   item: RequestItem;
   title: string;
   categoryLabel: string | null;
+  familyLabel: string | null;
   brandLabel: string | null;
   image: ReturnType<typeof resolveImageSource>;
   conditionLabel: string;
@@ -53,50 +50,63 @@ export default function RequestDetailScreen() {
   const navigation = useNavigation();
   const params = useLocalSearchParams<{ requestId?: string }>();
   const requestId = positiveId(params.requestId);
+  const { basket } = useCart();
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [request, setRequest] = useState<Request | null>(null);
   const [lookup, setLookup] = useState<Map<number, CategoryLookupEntry>>(new Map());
-  const [offersByItem, setOffersByItem] = useState<Map<number, number>>(new Map());
+  const [offers, setOffers] = useState<ClientOfferItem[]>([]);
   const [otherRequests, setOtherRequests] = useState<RequestSummary[]>([]);
-  const countdown = useCountdown(request?.expiresAt ?? null, t("Expiré"));
+  const [filters, setFilters] = useState<OfferFilters>(EMPTY_OFFER_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const countdownFormat = useClientCountdownFormat();
+  const countdown = useCountdown(request?.expiresAt ?? null, t("Expiré"), 60_000, countdownFormat);
+  const loadedRequestId = useRef<number | null>(null);
+  const loadToken = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     if (requestId === null) { setState("error"); return; }
-    setState("loading");
+    const token = ++loadToken.current;
+    if (!silent) setState("loading");
     try {
       const response = await getRequest(requestId);
       const data = response.data;
-      setRequest(data);
-
       const categoryPromise = getCategoryTree().catch(() => null);
-      if (data.offersCount > 0) {
+      // A validated request keeps its offers even when every one of them is
+      // already in the basket (offersCount may only count available offers).
+      if (data.offersCount > 0 || data.status === "validated" || data.status === "ordered") {
         const [categoryResponse, offersResponse] = await Promise.all([
           categoryPromise,
           getOffers(requestId).catch(() => null),
         ]);
+        if (token !== loadToken.current) return;
         setLookup(categoryResponse ? buildCategoryLookup(categoryResponse.data) : new Map());
-        const counts = new Map<number, number>();
-        for (const offer of offersResponse?.data ?? []) {
-          counts.set(offer.requestItemId, (counts.get(offer.requestItemId) ?? 0) + 1);
-        }
-        setOffersByItem(counts);
+        setOffers(offersResponse?.data ?? []);
         setOtherRequests([]);
       } else {
         const [categoryResponse, requestsResponse] = await Promise.all([
           categoryPromise,
           getRequests().catch(() => null),
         ]);
+        if (token !== loadToken.current) return;
         setLookup(categoryResponse ? buildCategoryLookup(categoryResponse.data) : new Map());
-        setOffersByItem(new Map());
+        setOffers([]);
         setOtherRequests((requestsResponse?.data ?? []).filter(isActiveRequest).filter((r) => r.id !== data.id));
       }
+      setRequest(data);
       setState("ready");
     } catch {
-      setState("error");
+      if (token === loadToken.current && !silent) setState("error");
     }
   }, [requestId]);
 
-  useEffect(() => { void load(); }, [load]);
+  // Reload on every focus so offer counts, stepper and "Dans le panier" follow
+  // basket changes made on the offers screens (silent after the first load).
+  useFocusEffect(useCallback(() => {
+    const silent = loadedRequestId.current === requestId;
+    loadedRequestId.current = requestId;
+    void load(silent);
+  }, [load, requestId]));
+
   useEffect(() => {
     if (request) navigation.setOptions({ title: t("requestFlow.detailTitle", { reference: request.reference }) });
   }, [navigation, request, t]);
@@ -114,33 +124,63 @@ export default function RequestDetailScreen() {
     );
   }
 
-  const hasOffers = request.offersCount > 0;
+  // Per-part "X2" counts follow the same rule as `Request.offersCount`: validated + selected.
+  const offersByItem = new Map<number, number>();
+  for (const offer of offers) {
+    if (offer.status !== "validated" && offer.status !== "selected") continue;
+    offersByItem.set(offer.requestItemId, (offersByItem.get(offer.requestItemId) ?? 0) + 1);
+  }
+  const hasOffers = request.offersCount > 0 || offers.length > 0;
+  const deadlinePassed = request.expiresAt != null && Date.parse(request.expiresAt) <= Date.now();
   const isExpired = request.status === "expired"
-    || (request.expiresAt != null
-      && Date.parse(request.expiresAt) <= Date.now()
-      && !["validated", "ordered", "cancelled"].includes(request.status));
-  const step = REQUEST_STEP[request.status];
-  // ponytail: ring only while the 24h offer window applies (pending/offers_received);
-  // once an offer is accepted (validated) the deadline moves to the basket
+    || (deadlinePassed && !["validated", "ordered", "cancelled"].includes(request.status));
+  const step = requestStep(request, basket);
+  // Figma "Restant" ring while the request is open: the 24 h offer wait, then
+  // the 24 h order window once offers are validated.
   const showCountdownRing = !isExpired
+    && !deadlinePassed
     && request.expiresAt != null
-    && (request.status === "pending" || request.status === "offers_received");
+    && OPEN_REQUEST_STATUSES.includes(request.status);
+  const ringStartsAt = request.status === "validated" && request.expiresAt
+    ? new Date(Date.parse(request.expiresAt) - ORDER_WINDOW_MS).toISOString()
+    : request.createdAt;
+
+  // Offers of each part already in the basket (several offers of one part may
+  // sit there together): basket lines, plus offers the server reports `selected`.
+  const basketLines = basket?.requestId == null || basket.requestId === request.id ? basket?.items ?? [] : [];
+  const basketOffersByItem = new Map<number, Set<number>>();
+  const noteInBasket = (partId: number | null | undefined, offerId: number) => {
+    if (partId == null) return;
+    const ids = basketOffersByItem.get(partId) ?? new Set<number>();
+    ids.add(offerId);
+    basketOffersByItem.set(partId, ids);
+  };
+  for (const line of basketLines) {
+    noteInBasket(line.requestItemId ?? offers.find((offer) => offer.id === line.offerId)?.requestItemId, line.offerId);
+  }
+  for (const offer of offers) if (offer.status === "selected") noteInBasket(offer.requestItemId, offer.id);
 
   const enrichedItems: EnrichedItem[] = (request.items ?? []).map((item) => {
     const info = lookup.get(item.categoryId);
     const title = (isArabic ? item.categoryTitleAr ?? item.categoryTitle : item.categoryTitle) ?? "";
     const categoryLabel = (isArabic ? info?.categoryTitleAr : info?.categoryTitle) ?? null;
+    const familyLabel = item.categoryFamily
+      ? (isArabic ? item.categoryFamily.titleAr || item.categoryFamily.title : item.categoryFamily.title)
+      : categoryLabel;
     const brandLabel = (isArabic ? (item.brandNameAr || item.brandName) : item.brandName) ?? null;
     const image = resolveImageSource(item.categoryImage ?? info?.image);
     const conditionLabel = t(`requestFlow.condition.${item.condition}`);
-    return { item, title, categoryLabel, brandLabel, image, conditionLabel };
+    return { item, title, categoryLabel, familyLabel, brandLabel, image, conditionLabel };
   });
+  const availableConditions = CONDITION_ORDER.filter((condition) => enrichedItems.some(({ item }) => item.condition === condition));
+  const availableTypes: OfferSourceType[] = enrichedItems.length > 0 ? ["category"] : [];
+  const filteredItems = enrichedItems.filter(({ item }) => filters.conditions.length === 0 || filters.conditions.includes(item.condition));
 
   const groups: { title: string; entries: EnrichedItem[] }[] = [];
   if (hasOffers) {
     const groupIndex = new Map<string, number>();
-    for (const entry of enrichedItems) {
-      const key = entry.categoryLabel ?? "";
+    for (const entry of filteredItems) {
+      const key = entry.familyLabel ?? "";
       let index = groupIndex.get(key);
       if (index === undefined) {
         index = groups.length;
@@ -152,7 +192,7 @@ export default function RequestDetailScreen() {
   }
 
   return (
-    <Screen whatsapp={false}>
+    <Screen whatsapp={!isExpired}>
       <ScrollView contentContainerStyle={styles.content}>
         {isExpired ? (
           <Text type="label" color={Colors.error} style={styles.status}>
@@ -171,22 +211,28 @@ export default function RequestDetailScreen() {
           <View alignItems="center" style={styles.ringSection}>
             <CountdownRing
               expiresAt={request.expiresAt}
-              startsAt={request.createdAt}
+              startsAt={ringStartsAt}
               label={countdown}
               caption={t("Restant")}
             />
-            {hasOffers ? (
-              <View flexDirection="row" gap={8} alignItems="flex-start" style={styles.warningRow}>
-                <Icon name="alert-triangle" type="Feather" size={20} iconColor={Colors.error} />
-                <Text color={Colors.error} flex>
-                  Veuillez remplir votre commande avant le délai d'expiration
-                </Text>
-              </View>
-            ) : null}
           </View>
         ) : null}
+        {showCountdownRing && hasOffers ? <ExpiryWarning style={styles.warningRow} /> : null}
 
-        <Text type="titleSection" color={Colors.brand} style={styles.sectionHeading}>requestFlow.parts</Text>
+        <RNView style={[styles.headingRow, isArabic && styles.rowRtl]}>
+          <Text type="titleSection" color={Colors.brand} style={[styles.sectionHeading, styles.headingText]}>requestFlow.parts</Text>
+          {hasOffers && enrichedItems.length > 0 ? (
+            <TouchableOpacity
+              onPress={() => setFilterOpen(true)}
+              style={styles.filterButton}
+              accessibilityRole="button"
+              accessibilityLabel={t("clientOffers.filterParts")}
+              accessibilityState={{ selected: filtersActive(filters) }}
+            >
+              <CustomIcon name="filter" size={24} tintColor={filtersActive(filters) ? Colors.orange : Colors.brand} />
+            </TouchableOpacity>
+          ) : null}
+        </RNView>
         {enrichedItems.length === 0 ? <Text color={Colors.gray}>requestFlow.noParts</Text> : null}
 
         {!hasOffers ? enrichedItems.map(({ item, title, categoryLabel, brandLabel, image, conditionLabel }) => (
@@ -213,7 +259,8 @@ export default function RequestDetailScreen() {
                 image={image}
                 quantity={item.quantity}
                 conditionLabel={conditionLabel}
-                offersCount={offersByItem.get(item.id) ?? 0}
+                offersCount={item.offersCount ?? offersByItem.get(item.id) ?? 0}
+                basketCount={basketOffersByItem.get(item.id)?.size ?? 0}
                 onOffers={() => router.push({
                   pathname: "/(client)/requests/[requestId]/offers",
                   params: { requestId: String(request.id), itemId: String(item.id) },
@@ -277,19 +324,31 @@ export default function RequestDetailScreen() {
           />
         </View>
       ) : null}
+      <OffersFilterSheet
+        visible={filterOpen}
+        value={filters}
+        availableConditions={availableConditions}
+        availableTypes={availableTypes}
+        onClose={() => setFilterOpen(false)}
+        onApply={(next) => { setFilters(next); setFilterOpen(false); }}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   centered: { justifyContent: "center", alignItems: "center" },
-  content: { padding: 16, paddingBottom: 40 },
+  content: { padding: 16, paddingBottom: 96 },
+  rowRtl: { flexDirection: "row-reverse" },
   status: { marginTop: 6 },
+  headingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  headingText: { flex: 1 },
+  filterButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginTop: 8 },
   sectionHeading: { fontSize: 25, lineHeight: 32, marginTop: 20, marginBottom: 12 },
   groupTitle: { marginTop: 8, marginBottom: 8 },
   notesBlock: { marginBottom: 12 },
   attachedImage: { width: 128, height: 85, borderRadius: 4 },
   ringSection: { marginVertical: 20 },
-  warningRow: { marginTop: 12, paddingHorizontal: 12 },
+  warningRow: { marginBottom: 4, paddingHorizontal: 4 },
   sticky: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 16, backgroundColor: Colors.white },
 });

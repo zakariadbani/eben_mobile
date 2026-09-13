@@ -6,7 +6,7 @@
  */
 
 /**
- * BasketItem — one selected offer line in the basket.
+ * BasketItem — one line in the basket: a selected offer or a stock product.
  *
  * `unitPrice` is a snapshot of offer.priceClient at the time the item was added.
  * `categoryId` is denormalised from the offer's request item for display (A-5).
@@ -26,6 +26,18 @@ export interface BasketItem {
   categoryTitle?: string;
   categoryTitleAr?: string;
   categoryImage?: ReturnType<typeof require> | string | null;
+  /**
+   * Offer lines: the request item (part) the offer answers; null for product lines.
+   * Optional only for servers that predate the field — treat undefined as unknown.
+   */
+  requestItemId?: number | null;
+  /** Offer lines: part brand of the request item (e.g. "Bosch"); null when none / product lines. */
+  brandName?: string | null;
+  brandNameAr?: string | null;
+  /** Offer lines: offer reference (e.g. "OFF-TNWJWHLB"); null for product lines. */
+  offerReference?: string | null;
+  /** Offer lines: ISO deadline of the source request; null for product lines. */
+  expiresAt?: string | null;
 }
 
 /** Basket — the active cart for a user. */
@@ -34,6 +46,9 @@ export interface Basket {
   userId: number;
   /** Source request the basket was built from; null for a standalone basket. */
   requestId: number | null;
+  premium: boolean;
+  /** Server-owned Premium fee; zero when Premium is disabled. */
+  premiumFee: number;
   /** Server-owned item subtotal. Never recompute on-device. */
   subtotal: number;
   /** Server-owned voucher discount. Never recompute on-device. */

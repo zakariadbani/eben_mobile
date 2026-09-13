@@ -128,6 +128,7 @@ const allowedRoutes: Record<AllowedRole, string[]> = {
     "(prestataire)/profile/language",
     "(prestataire)/profile/about",
     "(prestataire)/profile/legal",
+    "(prestataire)/profile/verify-phone",
 
     // Legacy stub screen kept from original scaffold
     "(prestataire)/settings",
@@ -164,7 +165,6 @@ const allowedRoutes: Record<AllowedRole, string[]> = {
 
     // Partner (Prestataire) onboarding + sign-in
     "(auth)/prestataire/loading",
-    "(auth)/prestataire/waitlist",
     "(auth)/prestataire/welcome",
     "(auth)/prestataire/sign-in",
     "(auth)/prestataire/forgot-password/index",

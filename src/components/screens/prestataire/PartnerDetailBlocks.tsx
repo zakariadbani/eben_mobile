@@ -24,6 +24,8 @@ import Colors from "@/constants/Colors";
 import { offerStatusLabelKey, statusColor, statusIcon } from "@/helpers/partnerStatus";
 import type { PrestataireOffer } from "@/interfaces/Offer";
 import type { PartCondition } from "@/interfaces/Request";
+import type { VehicleSummary } from "@/interfaces/Vehicle";
+import { vehicleSummaryLabel } from "@/helpers/vehicleSummary";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -143,7 +145,8 @@ export interface PartnerPartBlockProps {
   reference?: string | null;
   condition?: PartCondition | null;
   quantity?: number | null;
-  /** Yellow-bordered vehicle chip (vehicle text is not exposed by the API yet). */
+  /** Server-resolved vehicle identity; null keeps the localized compatibility fallback. */
+  vehicle?: VehicleSummary | null;
   showVehicle?: boolean;
 }
 
@@ -152,6 +155,7 @@ export function PartnerPartBlock({
   reference,
   condition,
   quantity,
+  vehicle,
   showVehicle = true,
 }: PartnerPartBlockProps): React.ReactElement {
   const { t } = useTranslation();
@@ -181,7 +185,9 @@ export function PartnerPartBlock({
       {showVehicle ? (
         <View style={styles.vehicleCard} flexDirection="row" alignItems="center" gap={12}>
           <Icon name="car-side" type="MaterialCommunityIcons" size={31} iconColor={Colors.brand} />
-          <Text type="label" flex translate={false}>{t("partner.ship.vehicleFallback")}</Text>
+          <Text type="label" flex translate={false}>
+            {vehicleSummaryLabel(vehicle) ?? t("partner.ship.vehicleFallback")}
+          </Text>
         </View>
       ) : null}
     </View>

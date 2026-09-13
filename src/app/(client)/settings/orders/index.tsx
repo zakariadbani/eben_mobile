@@ -166,16 +166,12 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onPress }) => {
 
           {/* Date — green per Figma */}
           <Text type="small" color={Colors.greenDark} translate={false}>
-            {dateStr}
+            {t('settings.orders.placedOn', { date: dateStr })}
           </Text>
 
           {/* Status badge + CTA row */}
           <View flexDirection="row" alignItems="center" justifyContent="space-between" style={isAr ? styles.rowRtl : undefined}>
-            <View style={[styles.statusBadge, { backgroundColor: cfg.background }]}>
-              <Text type="small" color={cfg.color} translate={false}>
-                {t(cfg.labelKey)}
-              </Text>
-            </View>
+            <View />
             {/* Yellow CTA button bottom-right */}
             <TouchableOpacity onPress={onPress} style={styles.ctaBtn} activeOpacity={0.8}>
               <Text type="small" semiBold color={Colors.brand} translate={false}>
@@ -221,7 +217,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     <TouchableOpacity
       onPress={onMonthPress}
       activeOpacity={0.75}
-      style={styles.monthBtn}
+      style={[styles.monthBtn, isAr && styles.rowRtl]}
       accessibilityRole="button"
       accessibilityLabel={monthLabel}
     >
@@ -434,8 +430,8 @@ const OrdersListScreen: React.FC = () => {
           <EmptyListComponent
             title={
               orders.length === 0
-                ? (isAr ? 'لا توجد طلبات' : 'Vous n\'avez pas de commandes')
-                : (isAr ? 'لا توجد نتائج لهذا الفلتر' : 'Aucun résultat pour ce filtre')
+                ? t('settings.orders.empty')
+                : t('settings.orders.filterEmpty')
             }
             styleContainer={{ marginTop: 60 }}
           />
@@ -447,18 +443,18 @@ const OrdersListScreen: React.FC = () => {
         visible={filterVisible}
         onClose={() => setFilterVisible(false)}
         primaryButton={{
-          title: isAr ? 'تطبيق' : 'Appliquer',
+          title: t('settings.orders.apply'),
           onPress: applyFilter,
           variant: 'primary',
         }}
         secondaryButton={{
-          title: isAr ? 'إعادة تعيين' : 'Réinitialiser',
+          title: t('settings.orders.reset'),
           onPress: resetFilter,
           bordless: true,
         }}
       >
         <Text type="headerTitle" semiBold color={Colors.brand} translate={false}>
-          {isAr ? 'الفلاتر' : 'Filters'}
+          {t('settings.orders.filterTitle')}
         </Text>
         {availableStatuses.map((status) => {
           const cfg = ORDER_STATUS_CONFIG[status];
@@ -495,13 +491,13 @@ const OrdersListScreen: React.FC = () => {
         visible={monthPickerVisible}
         onClose={() => setMonthPickerVisible(false)}
         primaryButton={{
-          title: isAr ? 'إغلاق' : 'Fermer',
+          title: t('settings.orders.close'),
           onPress: () => setMonthPickerVisible(false),
           bordless: true,
         }}
       >
         <Text type="headerTitle" semiBold color={Colors.brand} translate={false}>
-          {isAr ? 'اختر الشهر' : 'Choisir le mois'}
+          {t('settings.orders.monthTitle')}
         </Text>
         {availableMonths.map((key) => {
           const label = formatMonthLabel(key, locale);

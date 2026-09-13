@@ -1,6 +1,6 @@
 import React from "react";
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
-import { StyleSheet } from "react-native";
+import { ScrollView, StyleSheet } from "react-native";
 import {
   AuthRoleMismatchError,
   Role,
@@ -11,12 +11,19 @@ import ForgotPasswordScreen from "../ForgotPasswordScreen";
 import ForgotPasswordVerificationScreen from "../forgot-password/verification";
 import ForgotPasswordNewPasswordScreen from "../forgot-password/new-password";
 import PrestataireSignInScreen from "../prestataire/sign-in";
+import PartnerLoadingScreen from "../prestataire/loading";
 import PartnerForgotPasswordScreen from "../prestataire/forgot-password";
 import PartnerForgotPasswordVerificationScreen from "../prestataire/forgot-password/verification";
 import PartnerForgotPasswordNewPasswordScreen from "../prestataire/forgot-password/new-password";
 import PartnerForgotPasswordSuccessScreen from "../prestataire/forgot-password/success";
 import PartnerWaitlistScreen from "../prestataire/waitlist";
 import PartnerWelcomeScreen from "../prestataire/welcome";
+import {
+  armWelcomeSplash,
+  claimWelcomeSplashRedirect,
+  disarmWelcomeSplash,
+  isWelcomeSplashArmed,
+} from "@/helpers/welcomeSplash";
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
@@ -152,6 +159,7 @@ it("localizes the native recovery submit accessibility label", async () => {
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  disarmWelcomeSplash();
   await i18n.changeLanguage("fr");
   mockLogin.mockResolvedValue(Role.PRESTATAIRE);
   mockStartPasswordReset.mockResolvedValue(undefined);
@@ -186,6 +194,8 @@ it("awaits Prestataire login and navigates only after a successful role match", 
     ),
   );
   expect(mockReplace).not.toHaveBeenCalled();
+  // Armed before login() resolves: the root guard sees the session first.
+  expect(isWelcomeSplashArmed(Role.PRESTATAIRE)).toBe(true);
   expect(
     screen.getByRole("button", {
       name: i18n.t("auth.login.submitting"),
@@ -195,6 +205,71 @@ it("awaits Prestataire login and navigates only after a successful role match", 
   await act(async () => resolveLogin(Role.PRESTATAIRE));
   await waitFor(() =>
     expect(mockReplace).toHaveBeenCalledWith("/(auth)/prestataire/loading"),
+  );
+  expect(mockReplace).toHaveBeenCalledTimes(1);
+});
+
+it("leaves the partner splash redirect to the root guard when it already issued it", async () => {
+  let resolveLogin: (role: Role) => void = () => undefined;
+  mockLogin.mockReturnValueOnce(
+    new Promise((resolve) => {
+      resolveLogin = resolve;
+    }),
+  );
+  const screen = render(<PrestataireSignInScreen />);
+
+  fireEvent.changeText(
+    screen.getByPlaceholderText(i18n.t("auth.fields.phonePlaceholder")),
+    "0600000101",
+  );
+  fireEvent.changeText(screen.getByPlaceholderText("......"), "password123");
+  fireEvent.press(
+    screen.getByRole("button", { name: i18n.t("auth.login.submit") }),
+  );
+  await waitFor(() => expect(mockLogin).toHaveBeenCalled());
+
+  // The session appeared: the root layout guard claims the splash redirect first.
+  expect(claimWelcomeSplashRedirect()).toBe("/(auth)/prestataire/loading");
+  await act(async () => resolveLogin(Role.PRESTATAIRE));
+
+  expect(mockReplace).not.toHaveBeenCalled();
+  expect(isWelcomeSplashArmed(Role.PRESTATAIRE)).toBe(true);
+});
+
+it("clears the partner splash hand-off when the splash mounts and opens the dashboard after it", () => {
+  jest.useFakeTimers();
+  try {
+    armWelcomeSplash(Role.PRESTATAIRE);
+    mockedUseSession.mockReturnValue({
+      ...sessionValue(),
+      session: { token: "token" },
+      role: Role.PRESTATAIRE,
+      username: "Karim Benali",
+    } as unknown as ReturnType<typeof useSession>);
+
+    const screen = render(<PartnerLoadingScreen />);
+
+    expect(isWelcomeSplashArmed()).toBe(false);
+    expect(screen.getByText("PARTNERS")).toBeTruthy();
+    expect(screen.getByText(i18n.t("Bienvenue {{name}}", { name: "Karim" }))).toBeTruthy();
+    expect(mockReplace).not.toHaveBeenCalled();
+    act(() => {
+      jest.advanceTimersByTime(3000);
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith("/(prestataire)/dashboard");
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it("lets the first Se connecter tap submit while the keyboard is open", () => {
+  const screen = render(<PrestataireSignInScreen />);
+
+  const scrollViews = screen.UNSAFE_getAllByType(ScrollView);
+  expect(scrollViews.length).toBeGreaterThan(0);
+  scrollViews.forEach((scrollView) =>
+    expect(scrollView.props.keyboardShouldPersistTaps).toBe("handled"),
   );
 });
 
@@ -228,6 +303,8 @@ it("shows typed Prestataire role mismatch and generic login errors", async () =>
   );
   expect(await generic.findByText(i18n.t("auth.error.generic"))).toBeTruthy();
   expect(mockReplace).not.toHaveBeenCalled();
+  // A failed sign-in never leaves a splash hand-off behind.
+  expect(isWelcomeSplashArmed()).toBe(false);
 });
 
 

@@ -94,9 +94,9 @@
   "partner.waitlist.error.companyName": "تحقق من اسم الشركة",
   "partner.waitlist.error.acceptedTerms": "يجب قبول الشروط",
   "partner.waitlist.error.general": "تعذر إرسال الطلب. تحقق من الحقول وحاول مرة أخرى.",
-  "cart.voucher.message": "قسيمة شراء بقيمة 100 درهم لهذا الطلب!",
-  "cart.voucher.claim": "استبدال",
-  "cart.voucher.claimed": "تم الاستبدال",
+  "cart.voucher.message": "قسيمة شراء بقيمة 100 دم لهذا الطلب!",
+  "cart.voucher.claim": "المطالبة",
+  "cart.voucher.claimed": "تمت المطالبة",
   "Continuer": "متابعة",
   "Phone": "رقم الهاتف",
   "Saisissez votre numéro de téléphone que vous avez utilisée pour vous inscrire sur EBEN.": "أدخل رقم الهاتف الذي استخدمته للتسجيل في EBEN.",
@@ -223,8 +223,8 @@
   "Votre commentaire": "تعليقك",
   "Vos images jointes": "صورك المرفقة",
   "Mon panier": "عربة التسوق",
-  "Bon d'achat de 100 dhs sur cette commande!": "قسيمة شراء بقيمة 100 درهم على هذا الطلب!",
-  "Réclamer": "استرداد",
+  "Bon d'achat de 100 dhs sur cette commande!": "قسيمة شراء بقيمة 100 دم على هذا الطلب!",
+  "Réclamer": "المطالبة",
   "State :": "الحالة :",
   "Occasion": "مستعمل",
   "Qty": "الكمية",
@@ -332,7 +332,7 @@
   "État/province/région": "الولاية/المقاطعة/المنطقة",
   "State : Occasion": "الحالة : مستعمل",
   "Qty: 1": "الكمية: 1",
-  "2,999 dhs": "2,999 درهم",
+  "2,999 dhs": "2,999 دم",
   "Type de compte": "نوع الحساب",
   "Choisissez votre voiture": "اختر سيارتك",
   "Choisissez cette voiture": "اختر هذه السيارة",
@@ -511,13 +511,22 @@
   "Sous-catégorie": "الفئة الفرعية",
   "Pièce": "القطعة",
   "checkout.loadError": "تعذر تحميل الطلب",
-  "checkout.yourInformation": "1- معلوماتك",
+  "checkout.yourInformation": "معلوماتك",
   "checkout.retry": "إعادة المحاولة",
   "checkout.shippingDetails": "2- تفاصيل الشحن",
   "checkout.paymentMethod": "3- طريقة الدفع",
   "checkout.paymentDetails": "4- تفاصيل الدفع",
   "checkout.billingSame": "بيانات الفوترة مطابقة لبيانات الشحن",
   "checkout.placing": "جارٍ الإرسال...",
+  "checkout.useNewAddress": "استخدام عنوان جديد",
+  "checkout.neighborhood": "الحي",
+  "checkout.neighborhoodPlaceholder": "أنفا، المعاريف...",
+  "checkout.saveAddress": "حفظ هذا العنوان",
+  "checkout.savingAddress": "جارٍ الحفظ...",
+  "checkout.orderDetails": "تفاصيل الطلب",
+  "checkout.offerReference": "المرجع {{reference}}",
+  "checkout.orderItem": "x{{count}} {{title}}{{brand}}",
+  "checkout.itemFallback": "القطعة رقم {{id}}",
   "Paquet": "طرد",
   "de": "من",
   "Commande effectuée": "تم إتمام الطلب",
@@ -790,7 +799,7 @@
   "partner.fill.successTitleResend": "تمت إعادة إرسال العرض!",
   "partner.fill.successBody": "تم تقديم عرضك بنجاح وهو قيد المراجعة.",
   "partner.fill.successBodyResend": "تمت إعادة إرسال عرضك بنجاح.",
-  "partner.fill.successCta": "العودة إلى العروض",
+  "partner.fill.successCta": "عرض العرض",
   "partner.fill.loadError": "تعذر تحميل الطلب",
   "partner.fill.notFound": "الطلب غير موجود",
   "partner.fill.retry": "إعادة المحاولة",
@@ -1065,9 +1074,9 @@
   "home.details": "التفاصيل",
   "home.orderNotice": "بمجرد تلقيك للعروض للقائمة، لديك 24 ساعة لإكمال طلبك.",
   "home.stockProducts": "المنتجات المتوفرة في المخزون",
-  "home.articleNumber": "رقم القطعة: {{value}}",
+  "home.articleNumber": "رقم القطعة: \u2066{{value}}\u2069",
   "home.category": "الفئة: {{value}}",
-  "home.price": "{{value}} درهم شامل الضرائب",
+  "home.price": "{{price}} شامل الضرائب",
   "home.shippingExcluded": "باستثناء رسوم الشحن",
   "home.list": "القائمة",
   "home.learnMore": "اعرف المزيد عن إيبن",
@@ -1148,7 +1157,11 @@
   "requestList.category": "الفئة : {{value}}",
   "requestList.brand": "العلامة التجارية : {{value}}",
   "requestFlow.detailTitle": "قائمتك - {{reference}}",
-  "requestFlow.offersCount": "X{{count}}",
+  "requestFlow.offersCount": "{{count}} عرض",
+  "requestFlow.offersCount_1": "عرض واحد",
+  "requestFlow.offersCount_2": "عرضان",
+  "requestFlow.offersCount_3": "{{count}} عروض",
+  "requestFlow.offersCount_4": "{{count}} عرضًا",
   "requestFlow.noOffer": "لا يوجد عرض",
   "requestFlow.resend": "إعادة الإرسال",
   "guestAuth.title": "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644",
@@ -1197,7 +1210,11 @@
   "requestFlow.parts": "\u0627\u0644\u0642\u0637\u0639 \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u0629",
   "requestFlow.noParts": "\u0644\u0627 \u062a\u0648\u062c\u062f \u0642\u0637\u0639",
   "requestFlow.quantity": "\u0627\u0644\u0643\u0645\u064a\u0629: {{count}}",
-  "requestFlow.totalPieces": "\u0627\u0644\u0645\u062c\u0645\u0648\u0639 : {{count}} \u0642\u0637\u0639\u0629",
+  "requestFlow.totalPieces": "المجموع : {{count}} قطعة",
+  "requestFlow.totalPieces_1": "المجموع : قطعة واحدة",
+  "requestFlow.totalPieces_2": "المجموع : قطعتان",
+  "requestFlow.totalPieces_3": "المجموع : {{count}} قطع",
+  "requestFlow.totalPieces_4": "المجموع : {{count}} قطعة",
   "requestFlow.condition.occasion": "\u0645\u0633\u062a\u0639\u0645\u0644",
   "requestFlow.condition.en_stock": "\u062c\u062f\u064a\u062f",
   "requestFlow.details": "\u0627\u0644\u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u0645\u0636\u0627\u0641\u0629",
@@ -1227,6 +1244,56 @@
   "requestFlow.status.validated": "\u0645\u0635\u0627\u062f\u0642 \u0639\u0644\u064a\u0647",
   "requestFlow.status.selected": "\u0645\u062d\u062f\u062f",
   "requestFlow.status.rejected": "\u0645\u0631\u0641\u0648\u0636",
+  "countdown.hoursMinutes": "{{hours}} س {{minutes}} د",
+  "countdown.daysHours": "{{days}} يوم {{hours}} س",
+  "clientOffers.partWithBrand": "{{part}} {{brand}}",
+  "clientOffers.sections.en_stock": "جديد",
+  "clientOffers.sections.occasion": "مستعمل",
+  "clientOffers.sortAsc": "ترتيب حسب السعر تصاعدياً",
+  "clientOffers.sortDesc": "ترتيب حسب السعر تنازلياً",
+  "clientOffers.filter": "تصفية",
+  "clientOffers.filterTitle": "عوامل التصفية",
+  "clientOffers.filterState": "الحالة",
+  "clientOffers.filterType": "النوع",
+  "clientOffers.filterCategory": "الفئة",
+  "clientOffers.filterProduct": "المنتج",
+  "clientOffers.filterReset": "إعادة ضبط",
+  "clientOffers.filterApply": "تطبيق",
+  "clientOffers.filterEmpty": "لا توجد عروض مطابقة لهذه الفلاتر",
+  "clientOffers.details": "التفاصيل",
+  "clientOffers.priceTtc": "{{price}} شامل الضرائب",
+  "clientOffers.priceTitle": "السعر",
+  "clientOffers.add": "أضف",
+  "clientOffers.addA11y": "أضف {{part}} إلى السلة",
+  "clientOffers.removeA11y": "أزل {{part}} من السلة",
+  "clientOffers.addToCart": "أضف إلى السلة",
+  "clientOffers.removeFromCart": "إزالة من السلة",
+  "clientOffers.inCart": "في السلة",
+  "clientOffers.inCartCount": "{{count}} في السلة",
+  "clientOffers.inCartCount_2": "اثنان في السلة",
+  "clientOffers.inCartCount_3": "{{count}} في السلة",
+  "clientOffers.inCartCount_4": "{{count}} في السلة",
+  "clientOffers.addedToast": "تمت إضافة {{quantity}}x {{part}} إلى السلة",
+  "clientOffers.removedToast": "تمت إزالة {{part}} من السلة",
+  "clientOffers.cartError": "تعذر تحديث السلة",
+  "clientOffers.replaceBasketTitle": "استبدال سلتك؟",
+  "clientOffers.replaceBasketBody": "تحتوي سلتك على {{count}} قطعة من الطلب {{reference}}. إضافة هذا العرض ستُفرغ سلتك.",
+  "clientOffers.replaceBasketBody_1": "تحتوي سلتك على قطعة واحدة من الطلب {{reference}}. إضافة هذا العرض ستُفرغ سلتك.",
+  "clientOffers.replaceBasketBody_2": "تحتوي سلتك على قطعتين من الطلب {{reference}}. إضافة هذا العرض ستُفرغ سلتك.",
+  "clientOffers.replaceBasketBody_3": "تحتوي سلتك على {{count}} قطع من الطلب {{reference}}. إضافة هذا العرض ستُفرغ سلتك.",
+  "clientOffers.replaceBasketBody_4": "تحتوي سلتك على {{count}} قطعة من الطلب {{reference}}. إضافة هذا العرض ستُفرغ سلتك.",
+  "clientOffers.replaceBasketBodyNoRef": "تحتوي سلتك على {{count}} قطعة. إضافة هذا العرض ستُفرغ سلتك.",
+  "clientOffers.replaceBasketBodyNoRef_1": "تحتوي سلتك على قطعة واحدة. إضافة هذا العرض ستُفرغ سلتك.",
+  "clientOffers.replaceBasketBodyNoRef_2": "تحتوي سلتك على قطعتين. إضافة هذا العرض ستُفرغ سلتك.",
+  "clientOffers.replaceBasketBodyNoRef_3": "تحتوي سلتك على {{count}} قطع. إضافة هذا العرض ستُفرغ سلتك.",
+  "clientOffers.replaceBasketBodyNoRef_4": "تحتوي سلتك على {{count}} قطعة. إضافة هذا العرض ستُفرغ سلتك.",
+  "clientOffers.replaceBasketConfirm": "استبدال",
+  "clientOffers.remaining": "{{value}} متبقية",
+  "clientOffers.condition": "الحالة: {{value}}",
+  "clientOffers.audio": "ملاحظة صوتية",
+  "clientOffers.filterParts": "تصفية القطع",
+  "settings.notifications.offersReadyTitle": "لقد تلقيت عروضك",
+  "home.limitedOffersPrefix": "عروض محدودة من",
   "requestFlow.status.expired": "\u0645\u0646\u062a\u0647\u064a"
   ,"requestFlow.requestStatus.draft": "\u0645\u0633\u0648\u062f\u0629"
   ,"requestFlow.requestStatus.pending": "\u0642\u064a\u062f \u0627\u0644\u0627\u0646\u062a\u0638\u0627\u0631"
@@ -1235,21 +1302,39 @@
   ,"requestFlow.requestStatus.ordered": "\u062a\u0645 \u0627\u0644\u0637\u0644\u0628"
   ,"requestFlow.requestStatus.expired": "\u0645\u0646\u062a\u0647\u064a"
   ,"requestFlow.requestStatus.cancelled": "\u0645\u0644\u063a\u0649"
-  ,"commerce.cart.remainingPartsTitle": "لا تزال لديك منتجات أخرى"
-  ,"commerce.cart.remainingPartsBody": "لا تزال لديك منتجات أخرى لم تضفها إلى سلتك."
-  ,"commerce.cart.remainingPartsOffers": "لا تزال لديك عروض لـ: {{names}}"
+  ,"commerce.cart.remainingPartsTitle": "لا تزال لديك منتجات أخرى لم تضفها إلى سلتك."
+  ,"commerce.cart.remainingPartsOffers": "لا تزال لديك عروض لـ:"
   ,"commerce.cart.continueShopping": "متابعة التسوق"
   ,"commerce.cart.checkoutAnyway": "الانتقال إلى الدفع"
   ,"commerce.cart.preflightError": "تعذر التحقق من القطع المتبقية. حاول مجددًا."
   ,"commerce.cart.checking": "جارٍ التحقق..."
-  ,"commerce.success.viewOrders": "\u0639\u0631\u0636 \u0637\u0644\u0628\u0627\u062a\u064a"
-  ,"commerce.success.confirmation": "\u062a\u0647\u0627\u0646\u064a\u0646\u0627! \u062a\u0645 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628\u0643 \u0628\u0646\u062c\u0627\u062d."
+  ,"commerce.cart.remainingPartLabel": "{{part}} ({{brand}})"
+  ,"commerce.cart.remainingPartA11y": "عرض العروض: {{part}}"
+  ,"commerce.cart.expiresIn": "تنتهي خلال {{value}}"
+  ,"commerce.cart.expired": "منتهي"
+  ,"commerce.cart.brand": "العلامة التجارية : {{value}}"
+  ,"commerce.cart.reference": "المرجع: {{value}}"
+  ,"commerce.cart.quantity": "الكمية: {{count}}"
+  ,"commerce.cart.perUnit": "{{price}} / الوحدة"
+  ,"commerce.cart.itemFallback": "منتج #{{id}}"
+  ,"commerce.cart.removeConfirm": "إزالة هذا المنتج من السلة؟"
+  ,"commerce.cart.removeA11y": "إزالة {{part}} من السلة"
+  ,"commerce.cart.removedToast": "تمت إزالة {{part}} من السلة"
+  ,"commerce.cart.claimA11y": "المطالبة بقسيمة الشراء"
+  ,"commerce.cart.couponAdded": "لقد استفدت من تخفيض بقيمة {{amount}} على هذا الطلب."
+  ,"commerce.cart.subtotal": "المجموع الفرعي شامل الضرائب"
+  ,"commerce.cart.discount": "خصم"
+  ,"commerce.cart.shipping": "رسوم التوصيل"
+  ,"commerce.cart.tax": "منها الضريبة على القيمة المضافة (20%)"
+  ,"commerce.cart.total": "الإجمالي"
+  ,"commerce.success.viewOrders": "\u0639\u0631\u0636 \u0637\u0644\u0628\u064a"
+  ,"commerce.success.confirmation": "\u062a\u0647\u0627\u0646\u064a\u0646\u0627 \ud83c\udf89! \u062a\u0645 \u062a\u0642\u062f\u064a\u0645 \u0637\u0644\u0628\u0643 \u0628\u0646\u062c\u0627\u062d."
   ,"commerce.success.orderNumber": "\u0631\u0642\u0645 \u0627\u0644\u0637\u0644\u0628: {{reference}}"
   ,"commerce.success.date": "\u0627\u0644\u062a\u0627\u0631\u064a\u062e: {{date}}"
-  ,"commerce.success.total": "\u0627\u0644\u0645\u062c\u0645\u0648\u0639: {{value}} \u062f\u0631\u0647\u0645"
+  ,"commerce.success.total": "\u0627\u0644\u0645\u062c\u0645\u0648\u0639: {{price}}"
   ,"commerce.success.paymentLabel": "\u0637\u0631\u064a\u0642\u0629 \u0627\u0644\u062f\u0641\u0639:"
   ,"commerce.success.payment.cod": "\u0627\u0644\u062f\u0641\u0639 \u0639\u0646\u062f \u0627\u0644\u0627\u0633\u062a\u0644\u0627\u0645"
-  ,"commerce.success.invoice": "\u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629 \u063a\u064a\u0631 \u0645\u062a\u0627\u062d\u0629 \u062d\u0627\u0644\u064a\u0627\u064b"
+  ,"commerce.success.invoice": "\u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629"
   ,"commerce.success.summary": "\u0627\u0644\u0645\u0644\u062e\u0635"
   ,"commerce.success.item": "x{{count}} — {{title}}"
   ,"commerce.success.taxIncluded": "\u0634\u0627\u0645\u0644 \u0627\u0644\u0636\u0631\u064a\u0628\u0629"
@@ -1288,6 +1373,7 @@
   ,"settings.retry": "\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629"
   ,"settings.notifications": "\u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a"
   ,"settings.logout": "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c"
+  ,"settings.logoutConfirm": "هل تريد حقًا تسجيل الخروج؟"
   ,"settings.confirm": "\u062a\u0623\u0643\u064a\u062f"
   ,"settings.modify": "\u062a\u0639\u062f\u064a\u0644"
   ,"settings.saving": "\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0641\u0638..."
@@ -1351,6 +1437,7 @@
   ,"settings.payment.region": "\u0627\u0644\u062c\u0647\u0629: {{value}}"
   ,"settings.notifications.title": "\u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a"
   ,"settings.notifications.details": "\u0627\u0644\u062a\u0641\u0627\u0635\u064a\u0644"
+  ,"settings.notifications.rate": "\u0642\u064a\u0651\u0645"
   ,"settings.notifications.unread": "{{count}} \u063a\u064a\u0631 \u0645\u0642\u0631\u0648\u0621"
   ,"settings.notifications.empty": "\u0644\u064a\u0633 \u0644\u062f\u064a\u0643 \u0625\u0634\u0639\u0627\u0631\u0627\u062a"
   ,"settings.notifications.loadError": "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a"
@@ -1380,7 +1467,7 @@
   ,"settings.orders.discount": "\u0627\u0644\u062a\u062e\u0641\u064a\u0636"
   ,"settings.orders.total": "\u0627\u0644\u0645\u062c\u0645\u0648\u0639"
   ,"settings.orders.paymentDetails": "\u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u062f\u0641\u0639"
-  ,"settings.orders.invoice": "\u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629 \u063a\u064a\u0631 \u0645\u062a\u0627\u062d\u0629"
+  ,"settings.orders.invoice": "\u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629"
   ,"settings.orders.method": "\u0627\u0644\u0637\u0631\u064a\u0642\u0629: {{method}}"
   ,"settings.orders.step.paid": "\u0645\u062f\u0641\u0648\u0639"
   ,"settings.orders.step.cod": "\u0627\u0644\u062f\u0641\u0639 \u0639\u0646\u062f \u0627\u0644\u062a\u0633\u0644\u064a\u0645"
@@ -1390,7 +1477,7 @@
   ,"settings.orders.step.delivered": "\u062a\u0645 \u0627\u0644\u062a\u0633\u0644\u064a\u0645"
   ,"settings.orders.status.pending.label": "\u0642\u064a\u062f \u0627\u0644\u0627\u0646\u062a\u0638\u0627\u0631"
   ,"settings.orders.status.pending.desc": "\u0646\u062d\u0646 \u0628\u0627\u0646\u062a\u0638\u0627\u0631 \u0627\u0644\u062f\u0641\u0639"
-  ,"settings.orders.status.pending.cta": "\u0627\u062f\u0641\u0639"
+  ,"settings.orders.status.pending.cta": "\u0627\u0644\u062a\u0641\u0627\u0635\u064a\u0644"
   ,"settings.orders.status.confirmed.label": "\u0645\u0624\u0643\u062f\u0629"
   ,"settings.orders.status.confirmed.desc": "\u0637\u0644\u0628\u0643 \u0642\u064a\u062f \u0627\u0644\u0645\u0639\u0627\u0644\u062c\u0629"
   ,"settings.orders.status.confirmed.cta": "\u062a\u062a\u0628\u0639 \u0627\u0644\u0637\u0644\u0628"
@@ -1414,7 +1501,37 @@
   ,"settings.orders.paymentMethod.virement": "\u062a\u062d\u0648\u064a\u0644 \u0628\u0646\u0643\u064a"
   ,"settings.orders.paymentMethod.cache_plus": "\u0643\u0627\u0634 \u0628\u0644\u0633"
   ,"settings.orders.paymentMethod.balance": "\u0631\u0635\u064a\u062f \u0627\u0644\u0645\u062d\u0641\u0638\u0629"
+  ,"settings.orders.placedOn": "\u062a\u0645 \u0627\u0644\u0637\u0644\u0628 \u0641\u064a {{date}}"
+  ,"settings.orders.empty": "\u0644\u0627 \u062a\u0648\u062c\u062f \u0644\u062f\u064a\u0643 \u0637\u0644\u0628\u0627\u062a"
+  ,"settings.orders.filterEmpty": "\u0644\u0627 \u062a\u0648\u062c\u062f \u0646\u062a\u0627\u0626\u062c \u0644\u0647\u0630\u0627 \u0627\u0644\u0641\u0644\u062a\u0631"
+  ,"settings.orders.filterTitle": "\u0627\u0644\u0641\u0644\u0627\u062a\u0631"
+  ,"settings.orders.apply": "\u062a\u0637\u0628\u064a\u0642"
+  ,"settings.orders.reset": "\u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646"
+  ,"settings.orders.close": "\u0625\u063a\u0644\u0627\u0642"
+  ,"settings.orders.monthTitle": "\u0627\u062e\u062a\u064a\u0627\u0631 \u0627\u0644\u0634\u0647\u0631"
+  ,"settings.orders.detailStatus.pendingCod": "\u062a\u0645 \u062a\u0623\u0643\u064a\u062f \u0637\u0644\u0628\u0643. \u0633\u062a\u062f\u0641\u0639 \u0639\u0646\u062f \u0627\u0644\u062a\u0633\u0644\u064a\u0645."
+  ,"settings.orders.itemStatus.pending": "\u0642\u064a\u062f \u0627\u0644\u0627\u0646\u062a\u0638\u0627\u0631"
+  ,"settings.orders.itemStatus.confirmed": "\u0645\u0624\u0643\u062f"
+  ,"settings.orders.itemStatus.preparing": "\u0642\u064a\u062f \u0627\u0644\u062a\u062d\u0636\u064a\u0631"
+  ,"settings.orders.itemStatus.shipped": "\u062a\u0645 \u0627\u0644\u0634\u062d\u0646"
+  ,"settings.orders.itemStatus.delivered": "\u062a\u0645 \u0627\u0644\u062a\u0633\u0644\u064a\u0645"
+  ,"settings.orders.itemStatus.cancelled": "\u0645\u0644\u063a\u0649"
   ,"settings.archived.loadError": "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0639\u0631\u0648\u0636 \u0627\u0644\u0645\u0624\u0631\u0634\u0641\u0629"
+  ,"settings.archived.ready": "\u062c\u0627\u0647\u0632!"
+  ,"settings.archived.closed": "\u0645\u063a\u0644\u0642"
+  ,"settings.archived.reference": "\u0627\u0644\u0645\u0631\u062c\u0639:"
+  ,"settings.archived.offersReceived": "\u0644\u0642\u062f \u062a\u0644\u0642\u064a\u062a \u0639\u0631\u0648\u0636\u0643:"
+  ,"settings.archived.closedDescription": "\u062a\u0645 \u0625\u063a\u0644\u0627\u0642 \u0647\u0630\u0627 \u0627\u0644\u0639\u0631\u0636"
+  ,"settings.archived.expiresIn": "\u064a\u0646\u062a\u0647\u064a \u062e\u0644\u0627\u0644: {{value}}"
+  ,"settings.archived.date": "{{value}}"
+  ,"settings.archived.details": "\u0627\u0644\u062a\u0641\u0627\u0635\u064a\u0644"
+  ,"settings.archived.empty": "\u0623\u0631\u0634\u064a\u0641 \u0627\u0644\u0639\u0631\u0648\u0636 \u0641\u0627\u0631\u063a"
+  ,"settings.archived.filterEmpty": "\u0644\u0627 \u062a\u0648\u062c\u062f \u0646\u062a\u0627\u0626\u062c \u0644\u0647\u0630\u0627 \u0627\u0644\u0641\u0644\u062a\u0631"
+  ,"settings.archived.filters": "\u0627\u0644\u0641\u0644\u0627\u062a\u0631"
+  ,"settings.archived.apply": "\u062a\u0637\u0628\u064a\u0642"
+  ,"settings.archived.reset": "\u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646"
+  ,"settings.archived.close": "\u0625\u063a\u0644\u0627\u0642"
+  ,"settings.archived.monthTitle": "\u0627\u062e\u062a\u0631 \u0627\u0644\u0634\u0647\u0631"
   ,"settings.profile.verifyPhoneTitle": "\u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u062c\u062f\u064a\u062f"
   ,"settings.profile.noPendingPhoneVerification": "\u0644\u0627 \u064a\u0648\u062c\u062f \u062a\u063a\u064a\u064a\u0631 \u0644\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062a\u0641 \u0628\u0627\u0646\u062a\u0638\u0627\u0631 \u0627\u0644\u062a\u062d\u0642\u0642."
   ,"Acheter": "شراء"
@@ -1435,6 +1552,8 @@
   ,"about.value.boldness": "الجرأة"
   ,"about.contact": "اتصل بنا:"
   ,"about.address": "9 شارع البرج، الشقة 8، الرباط، المغرب"
+  ,"about.email": "info@eben.ma"
+  ,"about.phone": "+212 6 61 39 39 71"
   ,"auth.register.vehicleAddedTitle": "تمت إضافة السيارة إلى مرأبك"
   ,"auth.register.vehicleAddedBody": "تمت إضافة {{car}} إلى مرأبك"
   ,"auth.register.completeTitle": "اكتمل التسجيل"
@@ -1509,6 +1628,18 @@
   ,"partner.editProfile.emailInvalid": "البريد الإلكتروني غير صالح أو مستخدم بالفعل"
   ,"partner.editProfile.firstNameRequired": "الاسم الشخصي مطلوب"
   ,"partner.editProfile.saveError": "تعذر حفظ التعديل. حاول مرة أخرى."
+  ,"partner.editProfile.phoneInvalid": "أدخل رقم هاتف مغربي صالحًا."
+  ,"partner.editProfile.phoneCurrentPasswordRequired": "أدخل كلمة المرور الحالية لتغيير رقم الهاتف."
+  ,"partner.editProfile.newPassword": "كلمة المرور الجديدة"
+  ,"partner.editProfile.passwordConfirmation": "تأكيد كلمة المرور الجديدة"
+  ,"partner.editProfile.passwordCurrentRequired": "أدخل كلمة المرور الحالية."
+  ,"partner.editProfile.newPasswordInvalid": "يجب أن تتكون كلمة المرور الجديدة من 8 أحرف على الأقل."
+  ,"partner.editProfile.passwordMismatch": "كلمتا المرور الجديدتان غير متطابقتين."
+  ,"partner.overview.topProducts": "منتجاتك الأكثر مبيعًا"
+  ,"partner.overview.soldCount": "تم بيع {{count}} قطعة"
+  ,"partner.overview.soldCount_plural": "تم بيع {{count}} قطعة"
+  ,"commerce.cart.premium": "إيبن بريميوم"
+  ,"commerce.cart.premiumError": "تعذر تعديل إيبن بريميوم. حاول مرة أخرى."
   ,"partner.notifications.menu": "خيارات {{title}}"
   ,"partner.notifications.markRead": "تعليم كمقروء"
   ,"partner.notifications.timeMinutes": "منذ {{count}} دقيقة"
@@ -1531,4 +1662,25 @@
   ,"partner.offerDetail.countdownDaysValue": "{{days}} يوم و {{hours}} ساعة"
   ,"partner.countdown.remainingHours": "{{hours}} س {{minutes}} دقيقة متبقية"
   ,"partner.countdown.remainingDays": "{{days}} يوم و {{hours}} ساعة متبقية"
+  ,"partner.fill.audioLabel": "ملاحظة صوتية"
+  ,"partner.fill.audioRecord": "تسجيل"
+  ,"partner.fill.audioRecording": "جارٍ التسجيل"
+  ,"partner.fill.audioStop": "إيقاف"
+  ,"partner.fill.audioListen": "استماع"
+  ,"partner.fill.audioRemove": "حذف الملاحظة الصوتية"
+  ,"partner.fill.audioPermissionDenied": "اسمح بالوصول إلى الميكروفون لتسجيل ملاحظة صوتية."
+  ,"partner.fill.audioError": "تعذر تسجيل الملاحظة الصوتية. حاول مرة أخرى."
+  ,"settings.orders.returnedParts": "القطع المرجعة"
+  ,"settings.orders.itemStatus.returned": "مرجع"
+  ,"partner.status.payment.unpaid": "غير مدفوع"
+  ,"partner.dashboard.salesLast30d": "مبيعات آخر 30 يومًا"
+  ,"partner.company.legalForm": "الشكل القانوني"
+  ,"partner.company.bankName": "البنك"
+  ,"partner.company.bankRib": "RIB"
+  ,"partner.company.bankHolder": "صاحب الحساب"
+  ,"partner.company.group.mecanique": "ميكانيك"
+  ,"partner.company.group.carrosserie": "هيكل السيارة"
+  ,"partner.company.relatedParts": "القطع المرتبطة: {{parts}}"
+  ,"partner.company.sheetGroupLabel": "المجموعة"
+  ,"partner.company.sheetPartsLabel": "القطع"
 }

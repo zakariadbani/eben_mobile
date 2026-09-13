@@ -234,6 +234,7 @@ export default function PrestataireLayout() {
       {/* Profile sub-screens (drill-down only) */}
       <Tabs.Screen name="profile/overview" options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="profile/edit" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="profile/verify-phone" options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="profile/company" options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="profile/wallet/index" options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="profile/wallet/withdraw" options={{ href: null, headerShown: false }} />

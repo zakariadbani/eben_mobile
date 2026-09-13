@@ -15,6 +15,8 @@ export interface HeaderBellProps {
   color?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  /** Defaults to the partner notifications title. */
+  accessibilityLabel?: string;
 }
 
 /**
@@ -28,6 +30,7 @@ const HeaderBell: React.FC<HeaderBellProps> = ({
   color = Colors.brand,
   style,
   testID = "header-bell",
+  accessibilityLabel,
 }) => {
   const router = useRouter();
   const { t } = useTranslation();
@@ -38,7 +41,7 @@ const HeaderBell: React.FC<HeaderBellProps> = ({
       style={[styles.button, style]}
       onPress={handlePress}
       accessibilityRole="button"
-      accessibilityLabel={t("partner.notifications.title")}
+      accessibilityLabel={accessibilityLabel ?? t("partner.notifications.title")}
       accessibilityState={{ selected: hasUnread }}
       testID={testID}
     >

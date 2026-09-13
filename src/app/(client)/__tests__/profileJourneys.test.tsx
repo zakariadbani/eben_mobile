@@ -1,5 +1,5 @@
 import React from 'react';
-import { TextInput as NativeTextInput } from 'react-native';
+import { Image as NativeImage, TextInput as NativeTextInput } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import i18n from '@/localization/i18n';
 import { apiClient } from '@/api/client';
@@ -174,7 +174,12 @@ it('cancels an owned pending order only after confirmation and renders the retur
     id: 81, reference: 'ORD-81', userId: 5, addressId: 9, couponId: null,
     subtotal: 100, discountAmount: 0, shippingFee: 10, taxAmount: 20, total: 130,
     status: 'pending', paymentMethod: 'cod', paymentStatus: 'pending', notes: null,
-    confirmedBy: null, confirmedAt: null, createdAt: '2026-01-01', updatedAt: '2026-01-01', items: [],
+    confirmedBy: null, confirmedAt: null, createdAt: '2026-01-01', updatedAt: '2026-01-01',
+    items: [{
+      id: 1, orderId: 81, offerId: 40, categoryId: 12, quantity: 2, unitPrice: 50,
+      totalPrice: 100, status: 'preparing', createdAt: '2026-01-01', updatedAt: '2026-01-01',
+      categoryTitle: 'Plaquettes', categoryTitleAr: 'وسادات',
+    }],
   } as const;
   mockGet.mockResolvedValueOnce({ success: true, data: pendingOrder });
   mockPost.mockResolvedValueOnce({ success: true, data: { ...pendingOrder, status: 'cancelled' as const } });
@@ -205,13 +210,56 @@ it('renders order status copy through the shared i18n namespace in French and Ar
   } as const;
   mockGet.mockResolvedValueOnce({ success: true, data: [deliveredOrder], pagination });
   const screen = render(<OrdersListScreen />);
-  expect(await screen.findByText(i18n.t('settings.orders.status.delivered.label'))).toBeTruthy();
+  expect(await screen.findByText(i18n.t('settings.orders.status.delivered.desc'))).toBeTruthy();
   screen.unmount();
 
   await i18n.changeLanguage('ar');
   mockGet.mockResolvedValueOnce({ success: true, data: [deliveredOrder], pagination });
   const arabicScreen = render(<OrdersListScreen />);
-  expect(await arabicScreen.findByText(i18n.t('settings.orders.status.delivered.label'))).toBeTruthy();
+  expect(await arabicScreen.findByText(i18n.t('settings.orders.status.delivered.desc'))).toBeTruthy();
+});
+
+it('opens a localized order filter sheet and labels creation dates truthfully', async () => {
+  const deliveredOrder = {
+    id: 91, reference: 'ORD-91', userId: 5, addressId: 9, couponId: null,
+    subtotal: 100, discountAmount: 0, shippingFee: 10, taxAmount: 20, total: 130,
+    status: 'delivered', paymentMethod: 'cod', paymentStatus: 'completed', notes: null,
+    confirmedBy: null, confirmedAt: null, createdAt: '2026-01-01', updatedAt: '2026-01-01', items: [],
+  } as const;
+  mockGet.mockResolvedValueOnce({ success: true, data: [deliveredOrder], pagination });
+  const screen = render(<OrdersListScreen />);
+
+  expect(await screen.findByText(i18n.t('settings.orders.placedOn', { date: '01 janvier 2026' }))).toBeTruthy();
+  fireEvent.press(screen.getByRole('button', { name: i18n.t('partner.offers.filter.title') }));
+  expect(screen.getByText(i18n.t('settings.orders.filterTitle'))).toBeTruthy();
+  expect(screen.getByRole('button', { name: i18n.t('settings.orders.apply') })).toBeTruthy();
+  expect(screen.getByRole('button', { name: i18n.t('settings.orders.reset') })).toBeTruthy();
+});
+
+it('opens the order summary as a sheet without replacing the supported detail', async () => {
+  mockParams = { orderId: '81' };
+  const pendingOrder = {
+    id: 81, reference: 'ORD-81', userId: 5, addressId: 9, couponId: null,
+    subtotal: 100, discountAmount: 0, shippingFee: 10, taxAmount: 20, total: 130,
+    status: 'pending', paymentMethod: 'cod', paymentStatus: 'pending', notes: null,
+    confirmedBy: null, confirmedAt: null, createdAt: '2026-01-01', updatedAt: '2026-01-01',
+    items: [{
+      id: 1, orderId: 81, offerId: 40, categoryId: 12, quantity: 2, unitPrice: 50,
+      totalPrice: 100, status: 'preparing', createdAt: '2026-01-01', updatedAt: '2026-01-01',
+      categoryTitle: 'Plaquettes', categoryTitleAr: 'وسادات',
+    }],
+  } as const;
+  mockGet.mockResolvedValueOnce({ success: true, data: pendingOrder });
+  const screen = render(<OrderDetailScreen />);
+
+  const summary = await screen.findByText(i18n.t('settings.orders.summary'));
+  expect(screen.getByText(i18n.t('settings.orders.detailStatus.pendingCod'))).toBeTruthy();
+  expect(screen.getByText(i18n.t('settings.orders.itemStatus.preparing'))).toBeTruthy();
+  expect(screen.getAllByText(i18n.t('settings.orders.reference', { reference: 'ORD-81' }))).toHaveLength(1);
+  expect(screen.getByRole('button', { name: 'Facture' }).props.accessibilityState.disabled).toBe(true);
+  fireEvent.press(summary);
+  expect(screen.getByText(i18n.t('settings.orders.paymentDetails'))).toBeTruthy();
+  expect(screen.getAllByText(i18n.t('settings.orders.summary')).length).toBeGreaterThan(1);
 });
 
 it('keeps the settings.orders.* namespace in parity between French and Arabic', () => {
@@ -229,6 +277,33 @@ it('renders the Arabic settings journey from canonical profile data and localize
   expect(screen.getByRole('button', { name: i18n.t('settings.orders') })).toBeTruthy();
   expect(screen.getAllByRole('button', { name: i18n.t('settings.notifications') }).length).toBeGreaterThan(0);
   expect(screen.queryByText('Hey')).toBeNull();
+});
+
+it('shows the unread dot on the Profil header bell like the Home bell', async () => {
+  const screen = render(<SettingsScreen />);
+  expect(await screen.findByTestId('header-bell-unread')).toBeTruthy();
+  fireEvent.press(screen.getByTestId('header-bell'));
+  expect(mockPush).toHaveBeenCalledWith('/(client)/settings/notifications');
+});
+
+it('asks for confirmation before logging out', async () => {
+  const screen = render(<SettingsScreen />);
+  await screen.findByText(i18n.t('settings.greeting', { name: 'Profile Name' }));
+
+  fireEvent.press(screen.getByRole('button', { name: i18n.t('settings.logout') }));
+  expect(mockLogOut).not.toHaveBeenCalled();
+  expect(screen.getByText(i18n.t('settings.logoutConfirm'))).toBeTruthy();
+
+  fireEvent.press(screen.getByRole('button', { name: i18n.t('Annuler') }));
+  expect(screen.queryByText(i18n.t('settings.logoutConfirm'))).toBeNull();
+  expect(mockLogOut).not.toHaveBeenCalled();
+
+  fireEvent.press(screen.getByRole('button', { name: i18n.t('settings.logout') }));
+  const [, confirm] = screen.getAllByRole('button', { name: i18n.t('settings.logout') });
+  fireEvent.press(confirm);
+
+  await waitFor(() => expect(mockLogOut).toHaveBeenCalledTimes(1));
+  expect(mockReplace).toHaveBeenCalledWith('/(auth)');
 });
 
 it('edits profile identity with current password, uploads an owned avatar path, and opens password recovery', async () => {
@@ -296,6 +371,19 @@ it('reconciles address default changes from returned server records', async () =
   expect(mockPost).toHaveBeenCalledWith('/addresses/10/default', {});
 });
 
+it('renders both Figma illustrations when the address book is empty', async () => {
+  mockGet.mockImplementation((path: string) => {
+    if (path === '/addresses') return Promise.resolve({ success: true, data: [], pagination: { ...pagination, total: 0, from: null, to: null } });
+    return Promise.reject(new Error(`Unexpected GET ${path}`));
+  });
+
+  const screen = render(<AddressesScreen />);
+
+  expect(await screen.findByRole('button', { name: i18n.t('addresses.addNew') })).toBeTruthy();
+  expect(screen.UNSAFE_getAllByType(NativeImage)).toHaveLength(2);
+  expect(screen.queryByText(i18n.t('addresses.empty'))).toBeNull();
+});
+
 it('persists push notification preferences once and waits for the returned envelope', async () => {
   let resolvePreference: ((value: unknown) => void) | undefined;
   mockPut.mockImplementationOnce(() => new Promise((resolve) => { resolvePreference = resolve; }));
@@ -349,7 +437,7 @@ it('awaits notification and wishlist mutation envelopes before reconciling the c
   const markRead = await notificationScreen.findByLabelText(i18n.t('Marquer comme lu'));
   fireEvent.press(markRead);
   await waitFor(() => expect(mockPost).toHaveBeenCalledWith('/notifications/31/read', {}));
-  expect(notificationScreen.queryByLabelText(i18n.t('Marquer comme lu'))).toBeNull();
+  await waitFor(() => expect(notificationScreen.queryByLabelText(i18n.t('Marquer comme lu'))).toBeNull());
   notificationScreen.unmount();
 
   mockDel.mockResolvedValueOnce({ success: true, data: { id: 51 } });
@@ -408,6 +496,69 @@ it('opens a notification target even after marking the row read', async () => {
 
   await waitFor(() => expect(mockPost).toHaveBeenCalledWith('/notifications/31/read', {}));
   expect(mockPush).toHaveBeenCalledWith('/(client)/settings/orders/44');
+});
+
+it.each([
+  ['fr', 'offers_ready'],
+  ['ar', 'offers_ready'],
+  ['fr', 'list_sent'],
+  ['ar', 'list_sent'],
+] as const)('shows an offers-ready notification with the Figma "Vérifier les prix" CTA to the request in %s (type %s)', async (language, type) => {
+  await i18n.changeLanguage(language);
+  // `offers_ready` is the current type; older rows are `list_sent` + `kind: 'offers_ready'`.
+  const offersReady: Notification = {
+    ...notification,
+    id: 32,
+    type,
+    title: '',
+    titleAr: null,
+    message: 'Les offres de la liste REQ-23 sont prêtes.',
+    messageAr: null,
+    data: { requestId: 23, requestReference: 'REQ-23', kind: 'offers_ready' },
+    createdAt: new Date(Date.now() - 5 * 3_600_000).toISOString(),
+  };
+  mockGet.mockImplementation((path: string) => {
+    if (path === '/notifications') return Promise.resolve({ success: true, data: [offersReady], pagination });
+    return Promise.reject(new Error(`Unexpected GET ${path}`));
+  });
+  mockPost.mockResolvedValueOnce({ success: true, data: { ...offersReady, isRead: true, readAt: '2026-01-02' } });
+  const screen = render(<NotificationsScreen />);
+
+  expect(await screen.findByText(i18n.t('partner.notifications.timeHours', { count: 5 }))).toBeTruthy();
+  expect(screen.getByTestId('notification-unread-dot')).toBeTruthy();
+  expect(screen.getByRole('button', { name: i18n.t('settings.notifications.offersReadyTitle') })).toBeTruthy();
+  expect(screen.queryByLabelText(i18n.t('Marquer comme lu'))).toBeNull();
+  fireEvent.press(screen.getByRole('button', { name: i18n.t('home.checkPrices') }));
+
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith('/notifications/32/read', {}));
+  await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/(client)/requests/23'));
+  await waitFor(() => expect(screen.queryByTestId('notification-unread-dot')).toBeNull());
+});
+
+it.each([
+  ['fr', 'Noter'],
+  ['ar', 'قيّم'],
+] as const)('opens the product review form from a review notification in %s', async (language, actionLabel) => {
+  await i18n.changeLanguage(language);
+  const reviewNotification: Notification = {
+    ...notification,
+    id: 33,
+    type: 'review',
+    title: 'Laisser un avis',
+    titleAr: 'اترك تقييمًا',
+    data: { productId: 70 },
+  };
+  mockGet.mockImplementation((path: string) => {
+    if (path === '/notifications') return Promise.resolve({ success: true, data: [reviewNotification], pagination });
+    return Promise.reject(new Error(`Unexpected GET ${path}`));
+  });
+  mockPost.mockResolvedValueOnce({ success: true, data: { ...reviewNotification, isRead: true, readAt: '2026-01-02' } });
+  const screen = render(<NotificationsScreen />);
+
+  fireEvent.press(await screen.findByRole('button', { name: actionLabel }));
+
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith('/notifications/33/read', {}));
+  expect(mockPush).toHaveBeenCalledWith('/(client)/products/70/review');
 });
 
 it('loads typed read-only payment methods and addresses without exposing an edit CTA', async () => {

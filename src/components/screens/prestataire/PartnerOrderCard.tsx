@@ -28,11 +28,12 @@ export default function PartnerOrderCard({ order, item, onPress }: PartnerOrderC
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === "ar";
   const status = item.purchaseOrder.status;
-  const color = statusColor(status);
-  const icon = statusIcon(status);
+  const unpaid = status !== "returned" && (item.paymentStatus === "pending" || item.paymentStatus === "failed");
+  const color = unpaid ? Colors.red : statusColor(status);
+  const icon = unpaid ? { name: "alert-circle", type: "Feather" as const } : statusIcon(status);
   const title = (isArabic ? item.categoryTitleAr ?? item.categoryTitle : item.categoryTitle)
     ?? t("partner.offers.unknownPart");
-  const statusLabel = t(orderStatusLabelKey(status));
+  const statusLabel = t(unpaid ? "partner.status.payment.unpaid" : orderStatusLabelKey(status));
 
   return (
     <TouchableOpacity
@@ -43,8 +44,11 @@ export default function PartnerOrderCard({ order, item, onPress }: PartnerOrderC
       accessibilityLabel={`${t("partner.orders.details")} ${order.reference}`}
     >
       <View flexDirection="row" alignItems="center" gap={12}>
-        {/* Order lines do not expose a part image yet — generic part artwork. */}
-        <Image source={require("@/assets/img/freins.png")} style={styles.image} resizeMode="contain" />
+        <Image
+          source={item.images[0] ? { uri: item.images[0] } : require("@/assets/img/freins.png")}
+          style={styles.image}
+          resizeMode="contain"
+        />
         <View flex style={styles.content} gap={2}>
           <Text type="label" color={Colors.gray} translate={false} numberOfLines={1}>
             {`${t("partner.offers.card.ref")} ${order.reference}`}

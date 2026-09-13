@@ -58,3 +58,10 @@ export interface PartBrand {
   status: boolean;
   sortOrder: number;
 }
+
+/** Server-resolved level-1 ancestor used to group marketplace lines. */
+export interface CategoryFamily {
+  id: number;
+  title: string;
+  titleAr: string;
+}

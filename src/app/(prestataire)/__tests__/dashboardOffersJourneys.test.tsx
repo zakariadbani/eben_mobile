@@ -73,7 +73,19 @@ const stats = {
   offersActiveCount: 103,
   offersAcceptedCount: 104,
   offersSentCount: 105,
+  missedRequestsCount: 107,
   pendingPayout: 106,
+  comparison: {
+    period: '30d' as const,
+    sales: 101,
+    salesPrev: 101,
+    requestsReceived: 102,
+    requestsReceivedPrev: 102,
+    offersSent: 105,
+    offersSentPrev: 105,
+    accepted: 104,
+    acceptedPrev: 104,
+  },
   recentOffers: [],
 };
 
@@ -100,6 +112,9 @@ const series = (period: "1j" | "7j" | "1m" | "6m" | "1a" | "max", offset = 0) =>
         offersSent: 602 + offset,
         pendingPayout: 702 + offset,
       },
+    ],
+    topProducts: [
+      { title: 'Plaquettes live', titleAr: 'وسادات مباشرة', image: 'https://cdn.example/top.jpg', soldCount: 12 },
     ],
   },
 });
@@ -282,6 +297,8 @@ const sentOffer = {
   ferrailleurName: "Ferrailleur live",
   brandName: null,
   brandNameAr: null,
+  vehicle: null,
+  paymentStatus: null,
 };
 
 const activeOffer = { ...sentOffer, id: 902, reference: "OFF-902", status: "validated" as const, categoryTitle: "Active offer live" };
@@ -407,6 +424,14 @@ it("renders every overview metric from the current server series and requests a 
   expect(mockGetStats).not.toHaveBeenCalled();
 });
 
+it("renders the server-ranked top products in the selected overview period", async () => {
+  const screen = render(<OverviewScreen />);
+
+  expect(await screen.findByText(i18n.t('partner.overview.topProducts'))).toBeTruthy();
+  expect(screen.getByText('Plaquettes live')).toBeTruthy();
+  expect(screen.getByText(i18n.t('partner.overview.soldCount', { count: 12 }))).toBeTruthy();
+});
+
 it("keeps the overview usable when the series fails and retries the series", async () => {
   mockGetSeries.mockRejectedValueOnce(new Error("series offline"));
   const screen = render(<OverviewScreen />);
@@ -453,7 +478,7 @@ it("keeps dashboard stats visible when its offer feed fails and refreshes both r
   expect(mockGetOffers).toHaveBeenCalledTimes(2);
   expect(mockGetOrders).toHaveBeenCalledTimes(2);
   expect(mockGetIncoming).toHaveBeenCalledTimes(2);
-  expect(mockGetSeries).toHaveBeenCalledWith("1a");
+  expect(mockGetSeries).not.toHaveBeenCalled();
 });
 
 it("does not present shared offer sections as empty while their feed is still loading", async () => {
@@ -488,17 +513,16 @@ it("sources dashboard open, sent, and shipment rows from their canonical live fe
   expect(screen.queryByText("+13%")).toBeNull();
 });
 
-it("derives the monthly sales tile and trends from the monthly series and shows placeholders for missing data", async () => {
-  mockGetSeries.mockResolvedValue({
-    success: true,
-    data: {
-      period: "1a",
-      buckets: [
-        { label: "Aug", revenue: 1000, offersReceived: 100, offersActive: 1, offersAccepted: 50, offersSent: 80, pendingPayout: 0 },
-        { label: "Sep", revenue: 1350, offersReceived: 113, offersActive: 1, offersAccepted: 40, offersSent: 80, pendingPayout: 0 },
-      ],
+it("renders dashboard sales and trends from the server comparison", async () => {
+  mockGetStats.mockResolvedValueOnce({ success: true, data: {
+    ...stats,
+    comparison: {
+      period: '30d', sales: 1350, salesPrev: 1000,
+      requestsReceived: 113, requestsReceivedPrev: 100,
+      accepted: 40, acceptedPrev: 50,
+      offersSent: 80, offersSentPrev: 80,
     },
-  });
+  } });
   const screen = render(<Dashboard />);
 
   const sales = `${(1350).toLocaleString("fr-MA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Dhs`;
@@ -508,17 +532,17 @@ it("derives the monthly sales tile and trends from the monthly series and shows 
   expect(screen.getByText("-20%")).toBeTruthy();
   expect(screen.getByText("+0%")).toBeTruthy();
   expect(screen.getByText(i18n.t("partner.dashboard.missedCount"))).toBeTruthy();
-  expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(2);
-  expect(mockGetSeries).toHaveBeenCalledWith("1a");
+  expect(mockGetStats).toHaveBeenCalledWith('30d');
+  expect(mockGetSeries).not.toHaveBeenCalled();
 });
 
-it("keeps the stat tiles on placeholders when the monthly series fails", async () => {
+it("does not depend on the overview series for dashboard stat tiles", async () => {
   mockGetSeries.mockRejectedValue(new Error("series offline"));
   const screen = render(<Dashboard />);
 
-  expect(await screen.findByText("Plaquettes live")).toBeTruthy();
+  expect((await screen.findAllByText("Plaquettes live")).length).toBeGreaterThanOrEqual(1);
   expect(screen.getByText("102")).toBeTruthy();
-  expect(screen.queryByText(/%$/)).toBeNull();
+  expect(mockGetSeries).not.toHaveBeenCalled();
 });
 
 it("routes every dashboard see-all link and tile action to its Figma target", async () => {
@@ -566,12 +590,12 @@ it("searches the fetched incoming list locally, retries, refreshes, and opens th
   const screen = render(<PrestataireSearchScreen />);
 
   fireEvent.press(await screen.findByText(i18n.t("partner.offers.retry")));
-  expect(await screen.findByText("Plaquettes live")).toBeTruthy();
+  expect((await screen.findAllByText("Plaquettes live")).length).toBeGreaterThanOrEqual(1);
   expect(mockGetIncoming).toHaveBeenCalledTimes(2);
 
   fireEvent.changeText(screen.getByPlaceholderText(i18n.t("partner.search.placeholder")), "REQ-502");
   expect(screen.queryByText("Plaquettes live")).toBeNull();
-  expect(screen.getByText("Transmission live")).toBeTruthy();
+  expect(screen.getAllByText("Transmission live").length).toBeGreaterThanOrEqual(1);
   expect(mockGetIncoming).toHaveBeenCalledTimes(2);
 
   fireEvent.press(screen.getByText(i18n.t("partner.offers.card.details")));
@@ -593,7 +617,7 @@ it("renders one incoming card per item with its brand and filters by brand text 
 
   expect(await screen.findByText(i18n.t("requestList.brand", { value: "RIDEX live" }))).toBeTruthy();
   expect(screen.getByText(i18n.t("requestList.brand", { value: "Brembo live" }))).toBeTruthy();
-  expect(screen.getAllByText("Disque live")).toHaveLength(2);
+  expect(screen.getAllByText("Disque live")).toHaveLength(3);
 
   fireEvent.changeText(screen.getByPlaceholderText(i18n.t("partner.search.placeholder")), "Brembo live");
   expect(screen.queryByText(i18n.t("requestList.brand", { value: "RIDEX live" }))).toBeNull();
@@ -622,7 +646,7 @@ it("shows one open-offer row per incoming item with its brand on the dashboard",
   mockGetIncoming.mockResolvedValue({ success: true, data: [requestA], pagination });
   const screen = render(<Dashboard />);
 
-  expect(await screen.findAllByText("Disque live")).toHaveLength(2);
+  expect((await screen.findAllByText("Disque live")).length).toBeGreaterThanOrEqual(2);
   expect(screen.getByText(i18n.t("requestList.brand", { value: "RIDEX live" }))).toBeTruthy();
   expect(screen.getByText(i18n.t("requestList.brand", { value: "Brembo live" }))).toBeTruthy();
 });
@@ -789,8 +813,8 @@ it("renders live incoming-request titles in Arabic", async () => {
   await i18n.changeLanguage("ar");
   const screen = render(<PrestataireSearchScreen />);
 
-  expect(await screen.findByText("Plaquettes live AR")).toBeTruthy();
-  expect(screen.getByText("Transmission live AR")).toBeTruthy();
+  expect((await screen.findAllByText("Plaquettes live AR")).length).toBeGreaterThanOrEqual(1);
+  expect(screen.getAllByText("Transmission live AR").length).toBeGreaterThanOrEqual(1);
 });
 
 it("does not infer a shipped transition from free-text offer notes", async () => {
@@ -901,7 +925,7 @@ it("shows long incoming deadlines in days and hours", async () => {
 
 it("leaves the Chercher and Liste tab roots for the Accueil tab without popping tab history", async () => {
   const search = render(<PrestataireSearchScreen />);
-  await search.findByText("Plaquettes live");
+  await search.findAllByText("Plaquettes live");
   fireEvent.press(search.getByRole("button", { name: i18n.t("partner.offers.back") }));
   expect(mockNavigate).toHaveBeenCalledWith("/(prestataire)/dashboard");
   search.unmount();
@@ -913,4 +937,3 @@ it("leaves the Chercher and Liste tab roots for the Accueil tab without popping 
   expect(mockNavigate).toHaveBeenLastCalledWith("/(prestataire)/dashboard");
   expect(mockBack).not.toHaveBeenCalled();
 });
-

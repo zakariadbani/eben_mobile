@@ -7,22 +7,19 @@ import Screen from '@/components/common/Screen';
 import View from '@/components/common/View';
 import { Text } from '@/components/common/Text';
 import Button from '@/components/common/Button';
+import Icon from '@/components/common/Icon';
 import ClientCheckoutForm from '@/components/screens/client/checkout/ClientCheckoutForm';
 import Colors from '@/constants/Colors';
 import { ApiClientError } from '@/api/client';
 import { getBasket } from '@/api/resources/basket';
-import { getAddresses } from '@/api/resources/addresses';
+import { addAddress, getAddresses } from '@/api/resources/addresses';
 import { placeOrder } from '@/api/resources/orders';
-import { getProfile } from '@/api/resources/users';
 import { useCart } from '@/context/CartContext';
 import type { Basket } from '@/interfaces/Basket';
 import type { Address } from '@/interfaces/Address';
+import type { AddAddressPayload } from '@/api/resources/addresses';
 import type { PaymentMethodType } from '@/interfaces/Order';
-import type { ClientProfile } from '@/interfaces/User';
-
-function formatPrice(value: number): string {
-  return `${value.toLocaleString('fr-MA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Dhs`;
-}
+import { formatDhs, moneyLocale } from '@/helpers/money';
 
 function requestMessage(error: unknown, fallback: string): string {
   if (!(error instanceof ApiClientError)) return fallback;
@@ -31,12 +28,11 @@ function requestMessage(error: unknown, fallback: string): string {
 }
 
 export default function CheckoutScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const { refresh: refreshCart } = useCart();
   const [basket, setBasket] = useState<Basket | null>(null);
   const [addresses, setAddresses] = useState<Address[]>([]);
-  const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -54,12 +50,9 @@ export default function CheckoutScreen() {
       setLoading(true);
       setLoadError(null);
       try {
-        const [basketRes, addressRes, profileRes] = await Promise.all([
-          getBasket(), getAddresses(), getProfile(),
-        ]);
+        const [basketRes, addressRes] = await Promise.all([getBasket(), getAddresses()]);
         if (cancelled) return;
         setBasket(basketRes.data);
-        setProfile(profileRes.data);
         const selected = addressRes.data.find((address) => address.isDefault) ?? addressRes.data[0];
         setAddresses(selected
           ? [selected, ...addressRes.data.filter((address) => address.id !== selected.id)]
@@ -87,9 +80,11 @@ export default function CheckoutScreen() {
     setSelectedPaymentMethod('cod');
   }, [t]);
 
-  const handleAddAddress = useCallback(() => {
-    router.push('/(client)/settings/addresses' as Href);
-  }, [router]);
+  const handleCreateAddress = useCallback(async (payload: AddAddressPayload) => {
+    const response = await addAddress(payload);
+    setAddresses((current) => [response.data, ...current.filter((address) => address.id !== response.data.id)]);
+    setSelectedAddressId(response.data.id);
+  }, []);
 
   const handleEditProfile = useCallback(() => {
     router.push('/(client)/settings/profile' as Href);
@@ -142,32 +137,49 @@ export default function CheckoutScreen() {
       <Screen scrollable whatsapp={false}>
         <View style={styles.infoHeader}>
           <View flexDirection="row" alignItems="center" gap={10}>
+            <Icon name="check-circle" type="Feather" size={22} iconColor={Colors.greenDark} />
             <Text type="text" bold style={styles.infoTitle}>{t('checkout.yourInformation')}</Text>
             <View style={styles.flex1} />
             <Button title={t('settings.modify')} isLink variant="brand" onPress={handleEditProfile} fit />
           </View>
-          {profile ? (
-            <View style={styles.infoSummary} gap={4}>
-              <Text type="label" semiBold translate={false}>{profile.name}</Text>
-              <Text type="small" color={Colors.grayMidDark} translate={false}>{profile.phone}</Text>
-              {profile.email ? (
-                <Text type="small" color={Colors.grayMidDark} translate={false}>{profile.email}</Text>
-              ) : null}
-            </View>
-          ) : null}
         </View>
         <ClientCheckoutForm
           addresses={addresses}
           selectedAddressId={selectedAddressId}
           onSelectAddress={setSelectedAddressId}
-          onAddAddress={handleAddAddress}
+          onSelectNewAddress={() => setSelectedAddressId(null)}
+          onCreateAddress={handleCreateAddress}
           selectedPaymentMethod={selectedPaymentMethod}
           onSelectPaymentMethod={handlePaymentMethod}
         />
-        {addresses.length === 0 ? (
-          <View style={styles.notice} gap={8}>
-            <Text accessibilityRole="alert">{t('addresses.empty')}</Text>
-            <Button title={t('Ajouter une adresse')} onPress={handleAddAddress} variant="brand" />
+        {hasItems ? (
+          <View style={styles.orderDetails} gap={12}>
+            <Text type="text" bold style={styles.infoTitle}>{t('checkout.orderDetails')}</Text>
+            {basket?.items?.map((item) => {
+              const localizedCategory = i18n.language === 'ar'
+                ? (item.categoryTitleAr ?? item.categoryTitle)
+                : item.categoryTitle;
+              const localizedBrand = i18n.language === 'ar'
+                ? (item.brandNameAr ?? item.brandName)
+                : item.brandName;
+              const title = localizedCategory ?? t('checkout.itemFallback', { id: item.categoryId });
+              return (
+                <View key={item.id} style={styles.orderLine} gap={4}>
+                  {item.offerReference ? (
+                    <Text type="small" color={Colors.grayMidDark} translate={false}>
+                      {t('checkout.offerReference', { reference: item.offerReference })}
+                    </Text>
+                  ) : null}
+                  <Text type="label" translate={false}>
+                    {t('checkout.orderItem', {
+                      count: item.quantity,
+                      title,
+                      brand: localizedBrand ? ` · ${localizedBrand}` : '',
+                    })}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         ) : null}
         {!hasItems ? <Text accessibilityRole="alert" center style={styles.notice}>{t('Votre panier est vide')}</Text> : null}
@@ -176,15 +188,23 @@ export default function CheckoutScreen() {
       </Screen>
 
       <View style={styles.ctaBar} gap={6}>
-        <SummaryRow label="Sous-total des articles TTC" value={basket?.subtotal ?? 0} testID="checkout-subtotal" />
-        <SummaryRow label="Réduction" value={basket?.discountAmount ?? 0} testID="checkout-discount" negative />
-        <SummaryRow label="Frais de livraison" value={basket?.shippingFee ?? 0} testID="checkout-shipping" />
-        <SummaryRow label="TVA 20%" value={basket?.taxAmount ?? 0} testID="checkout-tax" />
+        <SummaryRow label={t('commerce.cart.subtotal')} value={basket?.subtotal ?? 0} testID="checkout-subtotal" />
+        {(basket?.discountAmount ?? 0) > 0 ? (
+          <SummaryRow label={t('commerce.cart.discount')} value={basket?.discountAmount ?? 0} testID="checkout-discount" negative />
+        ) : null}
+        <SummaryRow label={t('commerce.cart.shipping')} value={basket?.shippingFee ?? 0} testID="checkout-shipping" />
+        {(basket?.premiumFee ?? 0) > 0 ? (
+          <SummaryRow label={t('commerce.cart.premium')} value={basket?.premiumFee ?? 0} testID="checkout-premium" />
+        ) : null}
+        <SummaryRow label={t('commerce.cart.tax')} value={basket?.taxAmount ?? 0} testID="checkout-tax" />
         <View style={styles.divider} />
-        <SummaryRow label="Total" value={basket?.total ?? 0} testID="checkout-total" total />
+        <SummaryRow label={t('commerce.cart.total')} value={basket?.total ?? 0} testID="checkout-total" total />
         <Button
           title={placing ? t('checkout.placing', 'En cours...') : t('Effectuer mon achat')}
           variant="primary"
+          rightIcon="check-circle"
+          iconTypeName="Feather"
+          sizeIcon={20}
           onPress={() => { void handlePlaceOrder(); }}
           style={canSubmit ? undefined : styles.disabledBtn}
           disabled={!canSubmit}
@@ -197,10 +217,11 @@ export default function CheckoutScreen() {
 function SummaryRow({ label, value, testID, negative = false, total = false }: {
   label: string; value: number; testID: string; negative?: boolean; total?: boolean;
 }) {
+  const { i18n } = useTranslation();
   return <View flexDirection="row" style={styles.spaceBetween}>
     <Text type={total ? 'headerTitle' : 'defaultTwo'}>{label}</Text>
     <Text testID={testID} type={total ? 'headerTitle' : 'defaultTwo'} translate={false}>
-      {negative && value > 0 ? '−' : ''}{formatPrice(value)}
+      {negative && value > 0 ? '−' : ''}{formatDhs(value, moneyLocale(i18n.language))}
     </Text>
   </View>;
 }
@@ -210,9 +231,10 @@ const styles = StyleSheet.create({
   centered: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   infoHeader: { paddingHorizontal: 16, paddingVertical: 24, borderBottomWidth: 1, borderBottomColor: Colors.backgroundGray },
   infoTitle: { fontSize: 26, lineHeight: 34 },
-  infoSummary: { marginTop: 12 },
   flex1: { flex: 1 },
   notice: { marginHorizontal: 16, marginTop: 14 },
+  orderDetails: { paddingHorizontal: 16, paddingVertical: 24, borderBottomWidth: 1, borderBottomColor: Colors.backgroundGray },
+  orderLine: { paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
   ctaBar: { backgroundColor: Colors.white, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: Colors.backgroundGray },
   spaceBetween: { justifyContent: 'space-between' },
   divider: { height: 1, backgroundColor: Colors.light, marginVertical: 2 },

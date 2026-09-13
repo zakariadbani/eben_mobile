@@ -11,6 +11,11 @@ import Colors from "@/constants/Colors";
 import { normalizeMoroccanPhone } from "@/helpers/phoneHelper";
 import { getLoginErrorKey } from "@/helpers/loginErrorKey";
 import {
+  armWelcomeSplash,
+  claimWelcomeSplashRedirect,
+  disarmWelcomeSplash,
+} from "@/helpers/welcomeSplash";
+import {
   Role,
   useSession,
 } from "@/context/AuthContext";
@@ -24,7 +29,9 @@ interface LoginFormValues {
 /**
  * Partner sign-in — Figma Sign in (FR 205-35457 / AR 205-35734).
  * A successful login goes through the "EBEN PARTNERS" splash
- * (`prestataire/loading`), which then replaces to the dashboard.
+ * (`prestataire/loading`), which then replaces to the dashboard. The splash
+ * hand-off (`welcomeSplash`) is armed before `login()` so the root guard, which
+ * sees the session first, routes to the splash instead of the dashboard.
  */
 const PrestataireSignInScreen = () => {
   const router = useRouter();
@@ -37,16 +44,22 @@ const PrestataireSignInScreen = () => {
     _helpers: FormikHelpers<LoginFormValues>,
   ) => {
     setError(null);
+    armWelcomeSplash(Role.PRESTATAIRE);
     try {
       const role = await login(
         normalizeMoroccanPhone(values.phone),
         values.password,
         Role.PRESTATAIRE,
       );
-      if (role === Role.PRESTATAIRE) {
-        router.replace("/(auth)/prestataire/loading");
+      if (role !== Role.PRESTATAIRE) {
+        disarmWelcomeSplash();
+        return;
       }
+      // Null when the root guard already issued the redirect.
+      const splash = claimWelcomeSplashRedirect();
+      if (splash) router.replace(splash);
     } catch (loginError) {
+      disarmWelcomeSplash();
       setError(t(getLoginErrorKey(loginError, "auth.prestataire.login.roleMismatch")));
     }
   };

@@ -51,7 +51,7 @@ const ClientAuthenticationOptionsScreen = () => {
           <View style={styles.buttonsContainer} flexDirection="row">
             <View style={styles.button}>
               <Button
-                color={"white"}
+                color={Colors.secondary}
                 onPress={() => router.push(clientAuthHref("/(auth)/ClientLoginScreen", destination))}
                 title={"Connectez-vous"}
               />

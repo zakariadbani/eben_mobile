@@ -13,6 +13,11 @@ import { clientAuthHref, getClientReturnTo } from '@/constants/clientReturnTo';
 import { normalizeMoroccanPhone } from "@/helpers/phoneHelper";
 import { getLoginErrorKey } from "@/helpers/loginErrorKey";
 import {
+  armWelcomeSplash,
+  claimWelcomeSplashRedirect,
+  disarmWelcomeSplash,
+} from "@/helpers/welcomeSplash";
+import {
   Role,
   useSession,
 } from "@/context/AuthContext";
@@ -27,7 +32,7 @@ const ClientLoginScreen = () => {
   const router = useRouter();
   const { login } = useSession();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (
@@ -35,14 +40,26 @@ const ClientLoginScreen = () => {
     _helpers: FormikHelpers<LoginFormValues>,
   ) => {
     setError(null);
+    const destination = getClientReturnTo(returnTo);
+    // Figma Loading-page_3: "Bienvenue <prénom>" splash, which then opens returnTo.
+    // Armed before login(): the session appears before the call resolves and the
+    // root guard must route this client to the splash, not straight to returnTo.
+    armWelcomeSplash(Role.CLIENT, destination);
     try {
       const role = await login(
         normalizeMoroccanPhone(values.phone),
         values.password,
         Role.CLIENT,
       );
-      if (role === Role.CLIENT) router.replace(getClientReturnTo(returnTo));
+      if (role !== Role.CLIENT) {
+        disarmWelcomeSplash();
+        return;
+      }
+      // Null when the root guard already issued the redirect.
+      const splash = claimWelcomeSplashRedirect();
+      if (splash) router.replace(splash);
     } catch (loginError) {
+      disarmWelcomeSplash();
       setError(t(getLoginErrorKey(loginError, "auth.login.roleMismatch")));
     }
   };
@@ -54,7 +71,7 @@ const ClientLoginScreen = () => {
           style={styles.logo}
           source={require("@/assets/images/others/logo.png")}
         />
-        <Text style={styles.title} type="headerTitle">
+        <Text style={[styles.title, i18n.language !== "ar" && styles.titleLatin]} type="headerTitle">
           auth.login.title
         </Text>
         <Text style={styles.subTitle}>auth.login.subtitle</Text>
@@ -69,7 +86,7 @@ const ClientLoginScreen = () => {
         </View>
 
         <View style={styles.signUpRow} flexDirection="row">
-          <Text>auth.login.noAccount</Text>
+          <Text type="defaultTwo" style={styles.noAccount}>auth.login.noAccount</Text>
           <Button
             outline
             variant="primary"
@@ -80,7 +97,7 @@ const ClientLoginScreen = () => {
               )
             }
           >
-            <Text style={styles.signUpLinkText}>auth.login.signUp</Text>
+            <Text type="defaultTwo" style={styles.signUpLinkText}>auth.login.signUp</Text>
           </Button>
         </View>
       </View>
@@ -103,8 +120,11 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 22,
   },
-  title: { fontSize: 22, marginBottom: 8 },
-  subTitle: { marginBottom: 32 },
+  // Figma Sign-in 42-18695: medium condensed dark-grey title, Roboto subtitle.
+  title: { fontSize: 22, marginBottom: 8, color: Colors.grayDark },
+  titleLatin: { fontFamily: "BarlowCondensedMedium" },
+  subTitle: { marginBottom: 32, color: Colors.grayDark },
+  noAccount: { fontSize: 18, color: Colors.grayDark },
   error: {
     color: Colors.errorInbackgroundBrand,
     marginBottom: 12,
@@ -121,7 +141,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     paddingHorizontal: 4,
   },
-  signUpLinkText: { color: Colors.orange },
+  signUpLinkText: { color: Colors.orange, fontSize: 18 },
 });
 
 export default ClientLoginScreen;

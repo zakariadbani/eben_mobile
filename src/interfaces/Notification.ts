@@ -15,6 +15,7 @@ export type NotificationType =
   | 'delivered'
   | 'list_sent'
   | 'list_received'
+  | 'offers_ready'
   | 'payment'
   | 'message'
   | 'return'
@@ -22,6 +23,14 @@ export type NotificationType =
   | 'subscription'
   | 'review'
   | 'account_update';
+
+/**
+ * `data.kind` values refining a notification type. "Vous avez reçu vos offres"
+ * (admin validates the first offers of a request) is now its own
+ * `offers_ready` type with `data: { requestId, requestReference, kind: 'offers_ready' }`;
+ * older rows carry the same `kind` on a `list_sent` type and must keep working.
+ */
+export type NotificationKind = 'offers_ready';
 
 export interface Notification {
   id: number;

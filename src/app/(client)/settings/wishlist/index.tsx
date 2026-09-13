@@ -33,6 +33,7 @@ import Button from "@/components/common/Button";
 import { getWishlist, removeWishlistItem } from "@/api";
 import type { WishlistItem } from "@/interfaces/Wishlist";
 import Colors from "@/constants/Colors";
+import { formatDhs, moneyLocale } from "@/helpers/money";
 
 // ─── Card ────────────────────────────────────────────────────────────────────
 
@@ -41,9 +42,6 @@ interface WishlistCardProps {
   onPress: () => void;
   onRemove: () => void;
 }
-
-const formatDhs = (value: number) =>
-  `${value.toLocaleString("fr-MA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Dhs`;
 
 /** Displayed title: product title when present, else the category title. Shared with the search filter. */
 const getDisplayTitle = (item: WishlistItem, isArabic: boolean): string => {
@@ -105,12 +103,12 @@ const WishlistCard: React.FC<WishlistCardProps> = ({ item, onPress, onRemove }) 
           )}
           {hasPromo && (
             <Text type="labelTwo" color={Colors.gray} translate={false} style={styles.oldPrice}>
-              {formatDhs(item.price!)}
+              {formatDhs(item.price!, moneyLocale(i18n.language))}
             </Text>
           )}
           {item.price != null && (
             <Text type="labelTwo" semiBold color={Colors.brand} size={15} translate={false}>
-              {formatDhs(hasPromo ? item.promoPrice! : item.price)}
+              {formatDhs(hasPromo ? item.promoPrice! : item.price, moneyLocale(i18n.language))}
             </Text>
           )}
         </View>

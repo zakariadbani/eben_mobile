@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
 import Colors from "@/constants/Colors";
+import { formatDhs, moneyLocale } from "@/helpers/money";
 import Button from "@/components/common/Button";
 
 // Helper: merge ViewStyle objects (Button.style expects ViewStyle, not StyleProp<ViewStyle>)
@@ -160,8 +161,9 @@ const ItemSubCategoryComponent: React.FC<ItemSubCategoryComponentProps> = ({
             </Text>
           )}
           {showPrice && item.price != null && (
-            <Text type="label" semiBold color={Colors.brand}>
-              {`${item.price} dhs`}
+            <Text type="label" semiBold color={Colors.brand} translate={false}>
+              {/* Lowercase French currency like the Figma offer rows ("2,999 dhs"). */}
+              {formatDhs(item.price, moneyLocale(i18n.language)).toLowerCase()}
             </Text>
           )}
         </View>
