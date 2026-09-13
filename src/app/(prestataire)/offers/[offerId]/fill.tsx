@@ -13,10 +13,11 @@
  *        - Condition (en_stock | occasion) picker
  *        - Prix/pièce (priceFerrailleur — their net price; server derives ×1.06 / ×0.94)
  *        - Commentaire (optional free-text)
- *   3. "Envoyer l'offre" → submitOffer → success state.
+ *   3. "Envoyer" (enabled once every line has a price and a photo) → submitOffer → success state.
  *   4. "Refuser" → ConfirmModal bottom sheet (reason + comment) → declineRequest.
  *   5. Resend flow (query param ?mode=resend&existingOfferId=NNN):
- *        shows previous offer lines pre-filled; "Ajouter à mes offres" → resendOffer.
+ *        Figma 356-24597 — a bottom sheet over a dimmed "Offres ouvertes - Détails"
+ *        screen showing the previous offer; tick it, then "Ajouter à mes offres" → resendOffer.
  *
  * Rules:
  *   - TypeScript strict — no `any`
@@ -31,14 +32,16 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput as RNTextInput,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Screen } from '@/components/common/Screen';
 import View from '@/components/common/View';
@@ -64,6 +67,7 @@ import {
 import { uploadLocalImages } from '@/api/resources/uploads';
 import { ApiClientError } from '@/api/types';
 import { useCountdown } from '@/helpers/countdown';
+import { remainingColor, remainingLabel } from '@/components/screens/prestataire/dashboard/remaining';
 import type { Request, RequestItem } from '@/interfaces/Request';
 import type { PrestataireOffer } from '@/interfaces/Offer';
 
@@ -85,6 +89,13 @@ type OfferLineField = 'priceFerrailleur' | 'condition' | 'description' | 'images
 type OfferLineErrors = Record<number, Partial<Record<OfferLineField, string>>>;
 
 const isLocalImage = (uri: string): boolean => /^(file|content):\/\//i.test(uri);
+
+/** Client-side readiness of one offer line: a positive price and at least one local photo. */
+const isLineReady = (line: OfferLine): boolean => {
+  const price = Number(line.priceFerrailleur);
+  return Number.isFinite(price) && price > 0
+    && line.images.length > 0 && line.images.every(isLocalImage);
+};
 
 function mapOfferLineErrors(errors: Record<string, string[]>): OfferLineErrors {
   const mapped: OfferLineErrors = {};
@@ -157,8 +168,16 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   const [declineComment, setDeclineComment] = useState('');
   const [declining, setDeclining] = useState(false);
 
-  // Resend state
+  // Resend state — the old offer must be ticked before "Ajouter à mes offres" (Figma).
   const [resendingOffer, setResendingOffer] = useState(false);
+  const [resendSelected, setResendSelected] = useState(false);
+  // Tab screens stay mounted after `router.back()`, so the resend sheet (an RN
+  // Modal) is only shown while this route is focused.
+  const [isFocused, setIsFocused] = useState(false);
+  useFocusEffect(useCallback(() => {
+    setIsFocused(true);
+    return () => setIsFocused(false);
+  }, []));
 
   // Countdown ticker — refreshed every second via the shared helper.
   const countdownLabel = useCountdown(request?.expiresAt ?? null, t('partner.offer.statusExpired'), 1000);
@@ -175,6 +194,14 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
     ? (isArabic ? headerItem.brandNameAr ?? headerItem.brandName : headerItem.brandName)
     : null;
   const isExpired = countdownLabel === t('partner.offer.statusExpired');
+  // Figma: "0h 30min restante" / "0 س 30 دقيقة متبقية", in days from 24 h ("27j 12h restante")
+  // — same label as the list cards (re-rendered every second by useCountdown).
+  const timerText = !countdownDisplay || isExpired || !request?.expiresAt
+    ? countdownDisplay
+    : remainingLabel(request.expiresAt, isArabic);
+  // Same thresholds as the list cards: red < 1h, amber ≤ 1h30, green beyond.
+  const timerColor = isExpired ? Colors.grayMidDark : remainingColor(request?.expiresAt ?? null);
+  const canSubmit = offerLines.length > 0 && offerLines.every(isLineReady);
 
   useEffect(() => {
     if (state === 'decline') setDeclineVisible(true);
@@ -272,26 +299,46 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
     });
   };
 
+  /** Expands the lines that carry errors so every message is visible. */
+  const expandLinesWithErrors = (errors: OfferLineErrors) => {
+    const keys = Object.keys(errors)
+      .map((index) => offerLines[Number(index)]?.key)
+      .filter((key): key is number => key !== undefined);
+    if (keys.length === 0) return;
+    setCollapsedLineKeys((prev) => {
+      const next = { ...prev };
+      keys.forEach((key) => { delete next[key]; });
+      return next;
+    });
+  };
+
   const addLine = () => {
     const template = offerLines[0];
     if (!template) return;
+    const key = nextLineKeyRef.current++;
     setOfferLines((prev) => [...prev, {
-      key: nextLineKeyRef.current++,
+      key,
       requestItemId: template.requestItemId,
       priceFerrailleur: '',
       condition: template.condition,
       description: '',
       images: [],
     }]);
+    // Focus the new offer: previous lines fold, the added one opens.
+    setCollapsedLineKeys(Object.fromEntries(offerLines.map((line) => [line.key, true])));
   };
 
   const removeLine = (index: number) => {
     const removed = offerLines[index];
     if (!removed || offerLines.length <= 1) return;
+    const remaining = offerLines.filter((_, i) => i !== index);
     setOfferLines((prev) => prev.filter((_, i) => i !== index));
     setCollapsedLineKeys((prev) => {
       const next = { ...prev };
       delete next[removed.key];
+      // Never leave the form with every offer folded: reopen the last one.
+      const last = remaining[remaining.length - 1];
+      if (last && remaining.every((line) => next[line.key] === true)) delete next[last.key];
       return next;
     });
     // Errors are indexed by position (mirrors the API's lines.<index>.<field>),
@@ -329,6 +376,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
     });
     if (Object.keys(validationErrors).length > 0) {
       setLineErrors(validationErrors);
+      expandLinesWithErrors(validationErrors);
       return;
     }
 
@@ -365,6 +413,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
       if (error instanceof ApiClientError && error.status === 422) {
         const mapped = mapOfferLineErrors(error.errors);
         setLineErrors(mapped);
+        expandLinesWithErrors(mapped);
         if (Object.keys(mapped).length === 0) setSubmitError(error.message);
       } else {
         // Surface the backend's own message (e.g. a condition-mismatch rule
@@ -407,7 +456,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
   // ── Resend ─────────────────────────────────────────────────────────────────
 
   const handleResend = async () => {
-    if (!hasValidExistingOfferId || mutationLock.current) return;
+    if (!hasValidExistingOfferId || !resendSelected || mutationLock.current) return;
     mutationLock.current = true;
     setResendingOffer(true);
     try {
@@ -429,8 +478,8 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
 
   if (submitDone) {
     return (
-      <Screen whatsapp={false} scrollable={false} edges={['bottom']}>
-        <CustomHeader title="partner.fill.title" />
+      <Screen statusBarStyle="dark-content" whatsapp={false} scrollable={false} edges={['bottom']}>
+        <CustomHeader title="partner.fill.openDetailTitle" />
         <View flex justifyContent="center" alignItems="center" p={24} gap={20}>
           <Text type="headerTitle" semiBold color={Colors.brand} center>
             {isResendMode ? 'partner.fill.successTitleResend' : 'partner.fill.successTitle'}
@@ -443,7 +492,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
           <Button
             title="partner.fill.successCta"
             variant="primary"
-            onPress={() => completedOfferId && router.replace(`/(prestataire)/offers/${completedOfferId}` as never)}
+            onPress={() => completedOfferId && router.replace(`/(prestataire)/offers/${completedOfferId}?sent=1` as never)}
           />
         </View>
       </Screen>
@@ -454,8 +503,8 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
 
   if (loadingRequest) {
     return (
-      <Screen whatsapp={false} scrollable={false} edges={['bottom']}>
-        <CustomHeader title="partner.fill.title" />
+      <Screen statusBarStyle="dark-content" whatsapp={false} scrollable={false} edges={['bottom']}>
+        <CustomHeader title="partner.fill.openDetailTitle" />
         <View flex justifyContent="center" alignItems="center">
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
@@ -465,8 +514,8 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
 
   if (loadError || (isResendMode ? !existingOffer : !request)) {
     return (
-      <Screen whatsapp={false} scrollable={false} edges={['bottom']}>
-        <CustomHeader title="partner.fill.title" />
+      <Screen statusBarStyle="dark-content" whatsapp={false} scrollable={false} edges={['bottom']}>
+        <CustomHeader title="partner.fill.openDetailTitle" />
         <View flex justifyContent="center" alignItems="center" p={24} gap={16}>
           <Text type="default" color={Colors.red} center>
             {loadError ?? t('partner.fill.notFound')}
@@ -479,17 +528,9 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
 
   // ── Main render ────────────────────────────────────────────────────────────
 
-  return (
-    <Screen whatsapp={false} scrollable={false} edges={['bottom']}>
-      <CustomHeader title="partner.fill.title" />
-
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={80}
-      >
+  const content = (
+    <>
         <ScrollView
-          style={isResendMode ? styles.resendScroll : undefined}
           contentContainerStyle={[
             styles.scrollContent,
             isResendMode ? styles.resendScrollContent : undefined,
@@ -500,7 +541,12 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
           {!isResendMode && (
             (request?.images?.length ?? 0) > 0 ? (
               <View style={styles.heroContainer}>
-                <ImageSlider images={request?.images ?? []} />
+                <ImageSlider
+                  images={request?.images ?? []}
+                  height={185}
+                  resizeMode="contain"
+                  counterPlacement="below"
+                />
               </View>
             ) : (
               <View style={styles.imagePlaceholder}>
@@ -512,7 +558,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
           {/* ── Part info block (Figma: name, brand, Condition, Qty, vehicle chip, ref) ── */}
           {!isResendMode && headerItem ? (
             <View style={styles.infoBlock} gap={8}>
-              <Text type="text" semiBold color={Colors.brand} translate={false}>
+              <Text type="textTwo" semiBold color={Colors.brand} translate={false}>
                 {isArabic ? headerItem.categoryTitleAr ?? headerItem.categoryTitle : headerItem.categoryTitle}
               </Text>
               {headerBrand ? (
@@ -521,7 +567,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                 </Text>
               ) : null}
               <View flexDirection="row" alignItems="center" gap={6}>
-                <Icon name="check-circle" type="Feather" size={20} iconColor={Colors.brand} />
+                <Icon name="check-circle-outline" type="MaterialCommunityIcons" size={20} iconColor={Colors.brand} />
                 <Text type="label" translate={false}>
                   {`${t('partner.offerDetail.condition')} ${t(headerItem.condition === 'occasion' ? 'partner.fill.conditionOccasion' : 'partner.fill.conditionEnStock')}`}
                 </Text>
@@ -529,7 +575,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
               <Text type="label" translate={false}>{`${t('partner.offerDetail.qty')} ${headerItem.quantity}`}</Text>
               {/* Request only carries vehicleId (no label) — same fallback copy as ship.tsx */}
               <View style={styles.vehicleCard} flexDirection="row" alignItems="center" gap={12}>
-                <Icon name="car-side" type="MaterialCommunityIcons" size={31} iconColor={Colors.black} />
+                <Icon name="car-outline" type="MaterialCommunityIcons" size={31} iconColor={Colors.black} />
                 <Text type="label" flex>{t('partner.ship.vehicleFallback')}</Text>
               </View>
               <Text type="small" color={Colors.grayMidDark} translate={false}>
@@ -541,7 +587,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
           {/* ── Client note ── */}
           {!isResendMode && request?.notes ? (
             <View style={styles.noteBlock} gap={6}>
-              <Text type="small" semiBold color={Colors.brand}>
+              <Text type="defaultTwo" color={Colors.grayMidDark}>
                 {t('partner.fill.clientGeneralNote')}
               </Text>
               <View style={styles.noteBox}>
@@ -552,8 +598,6 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
             </View>
           ) : null}
 
-          {isResendMode ? <View style={styles.sheetHandle} /> : null}
-
           {/* ── Section header: fill offer + countdown ── */}
           <View
             style={[styles.sectionHeader, isResendMode ? undefined : styles.bodyPadding]}
@@ -562,18 +606,13 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
             justifyContent="space-between"
             gap={12}
           >
-            <Text type="text" semiBold color={Colors.brand}>
+            <Text type={isResendMode ? 'subTitleTwo' : 'titleTwo'} semiBold color={Colors.brand} flex>
               {isResendMode ? 'partner.fill.sectionResend' : 'partner.fill.sectionFill'}
             </Text>
-            {!isResendMode && countdownDisplay ? (
-              <View flexDirection="row" alignItems="center" gap={4}>
-                <Text type="label" semiBold color={isExpired ? Colors.grayMidDark : Colors.red} translate={false}>
-                  {countdownDisplay}
-                </Text>
-                {!isExpired ? (
-                  <Text type="label" semiBold color={Colors.red}>partner.fill.timerRestante</Text>
-                ) : null}
-              </View>
+            {!isResendMode && timerText ? (
+              <Text type="subTitleTwo" semiBold color={timerColor} translate={false}>
+                {timerText}
+              </Text>
             ) : null}
           </View>
 
@@ -582,15 +621,16 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
           {offerLines.map((line, index) => {
             const condItem = conditionItems.find((c) => c.value === line.condition);
             const isCollapsed = !isResendMode && collapsedLineKeys[line.key] === true;
-            const canRemove = !isResendMode && offerLines.length > 1;
+            // Figma: the trash icon only sits on added offers, never on Offre 1.
+            const canRemove = !isResendMode && index > 0;
 
             return (
-                <View key={line.key} style={[styles.offerCard, isResendMode ? styles.resendOfferCard : undefined]} gap={12}>
+                <View key={line.key} style={styles.offerLine} gap={12}>
                 {/* Card header */}
                 <View flexDirection="row" alignItems="center" justifyContent="space-between" gap={8}>
                   {isResendMode ? (
                     <View style={styles.offerIndexBadge}>
-                      <Text type="small" semiBold color={Colors.brand} translate={false}>
+                      <Text type="text" color={Colors.grayMidDark} translate={false}>
                         {t('partner.fill.offerNumber', { count: index + 1 })}
                       </Text>
                     </View>
@@ -603,16 +643,25 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                       style={styles.offerToggle}
                     >
                       <View flexDirection="row" alignItems="center" gap={12}>
-                        <Icon name={isCollapsed ? 'plus' : 'minus'} type="Feather" size={22} iconColor={Colors.brand} />
-                        <Text type="text" semiBold color={Colors.brand} translate={false}>
+                        <Icon name={isCollapsed ? 'plus' : 'minus'} type="Feather" size={24} iconColor={Colors.brand} />
+                        <Text type="subTitleTwo" semiBold color={Colors.brand} translate={false}>
                           {t('partner.fill.offerLabel', { count: index + 1 })}
                         </Text>
                       </View>
                     </Pressable>
                   )}
-                  {isResendMode && (
-                    <View style={styles.checkboxPlaceholder} />
-                  )}
+                  {isResendMode && index === 0 ? (
+                    <Pressable
+                      onPress={() => setResendSelected((selected) => !selected)}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: resendSelected }}
+                      accessibilityLabel={t('partner.fill.selectOffer', { count: index + 1 })}
+                      hitSlop={12}
+                      style={[styles.checkbox, resendSelected && styles.checkboxChecked]}
+                    >
+                      {resendSelected ? <Icon name="check" type="Feather" size={15} iconColor={Colors.primary} /> : null}
+                    </Pressable>
+                  ) : null}
                   {canRemove ? (
                     <Pressable
                       onPress={() => removeLine(index)}
@@ -643,13 +692,10 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                         </Text>
                         <View style={styles.resendPriceBadge}>
                           <Text type="textTwo" semiBold color={Colors.brand} translate={false}>
-                            {`${existingOffer.priceFerrailleur.toFixed(2)} Dhs TTC`}
+                            {`${existingOffer.priceFerrailleur.toFixed(2)} ${t('partner.offerDetail.priceTtc')}`}
                           </Text>
                         </View>
                       </View>
-                      <Text type="textTwo" semiBold color={Colors.brand}>
-                        partner.fill.priceRecapLabel
-                      </Text>
                       {existingOffer.audioUrl ? (
                         <View gap={6}>
                           <Text type="textTwo" semiBold color={Colors.brand}>
@@ -659,7 +705,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                         </View>
                       ) : null}
                       <Text type="textTwo" semiBold color={Colors.brand} numberOfLines={1}>
-                        {`${t("partner.fill.conditionLabel")}: ${t(existingOffer.condition === "occasion" ? "partner.fill.conditionOccasion" : "partner.fill.conditionEnStock")} · ${t("partner.offerDetail.qty")} ${existingOffer.quantity}`}
+                        {`${t("partner.offerDetail.condition")} ${t(existingOffer.condition === "occasion" ? "partner.fill.conditionOccasion" : "partner.fill.conditionEnStock")}`}
                       </Text>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.resendImages}>
                         {(existingOffer.images ?? []).map((uri, imageIndex) => (
@@ -677,7 +723,6 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                 {!isResendMode && !isCollapsed && (
                   <>
                     <View gap={4}>
-                      <Text type="small" color={Colors.grayMidDark}>partner.fill.addPhotos</Text>
                       <ImageInputList
                         imageUris={line.images}
                         onAddImage={(uri) => updateLine(index, { images: [...line.images, uri] })}
@@ -685,13 +730,14 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                         canAdd
                         canRemove
                         upload={false}
+                        addLabel="partner.fill.addPhotos"
                       />
                       {lineErrors[index]?.images ? (
                         <Text type="small" color={Colors.red} translate={false}>{lineErrors[index].images}</Text>
                       ) : null}
                     </View>
                     <View gap={4}>
-                      <Text type="small" color={Colors.grayMidDark}>partner.fill.conditionLabel</Text>
+                      <Text type="default" color={Colors.brand}>partner.fill.conditionLabel</Text>
                       <PickerInput
                         items={conditionItems}
                         placeholder={t("partner.fill.conditionPlaceholder")}
@@ -706,33 +752,25 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                       ) : null}
                     </View>
                     <View gap={4}>
-                      <Text type="small" color={Colors.grayMidDark}>partner.fill.priceLabel</Text>
-                      <View style={styles.priceRow} flexDirection="row" alignItems="center" gap={8}>
-                        <View flex>
-                          <RNTextInput
-                            value={line.priceFerrailleur}
-                            onChangeText={(v) => updateLine(index, { priceFerrailleur: v })}
-                            placeholder={t("partner.fill.pricePlaceholder")}
-                            placeholderTextColor={Colors.gray}
-                            keyboardType="numeric"
-                            style={[styles.priceInput, { textAlign: isArabic ? "right" : "left" }]}
-                          />
-                        </View>
-                        <View style={styles.currencyBadge}>
-                          <Text type="small" semiBold color={Colors.brand} translate={false}>Dhs</Text>
-                        </View>
+                      <Text type="default" color={Colors.brand}>partner.fill.priceLabel</Text>
+                      {/* Figma: "Dhs" suffix inside the field (no separate badge / TTC line). */}
+                      <View style={styles.priceField} flexDirection="row" alignItems="center" gap={8}>
+                        <RNTextInput
+                          value={line.priceFerrailleur}
+                          onChangeText={(v) => updateLine(index, { priceFerrailleur: v })}
+                          placeholder={t("partner.fill.pricePlaceholder")}
+                          placeholderTextColor={Colors.gray}
+                          keyboardType="numeric"
+                          style={[styles.priceInput, { textAlign: isArabic ? "right" : "left" }]}
+                        />
+                        <Text type="default" color={Colors.grayMidDark} translate={false}>{t('partner.currency')}</Text>
                       </View>
-                      {parseFloat(line.priceFerrailleur) > 0 ? (
-                        <Text type="small" color={Colors.primary} semiBold translate={false}>
-                          {`${parseFloat(line.priceFerrailleur).toFixed(2)} Dhs TTC`}
-                        </Text>
-                      ) : null}
                       {lineErrors[index]?.priceFerrailleur ? (
                         <Text type="small" color={Colors.red} translate={false}>{lineErrors[index].priceFerrailleur}</Text>
                       ) : null}
                     </View>
                     <View gap={4}>
-                      <Text type="small" color={Colors.grayMidDark}>partner.fill.commentLabel</Text>
+                      <Text type="default" color={Colors.brand}>partner.fill.commentLabel</Text>
                       <RNTextInput
                         value={line.description}
                         onChangeText={(v) => updateLine(index, { description: v })}
@@ -775,36 +813,40 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
           <View style={styles.bottomSpacer} />
         </ScrollView>
 
-        {/* ── Fixed action bar ── */}
+        {/* ── Fixed action bar (sits directly above the tab bar; Figma 229-37335) ── */}
         <View style={styles.actionBar} flexDirection="row" gap={12}>
           {/* Decline / Non */}
           <View style={styles.actionBtnWrap}>
             {isResendMode ? (
               <Button
                 title="partner.fill.ctaBack"
-                variant="secondary"
+                variant="pink"
                 onPress={() => router.back()}
               />
             ) : (
               <Button
                 title="partner.fill.ctaDecline"
                 variant="pink"
-                rightIcon="close"
-                iconTypeName="AntDesign"
-                sizeIcon={14}
+                rightIcon="x-circle"
+                iconTypeName="Feather"
+                sizeIcon={18}
                 onPress={() => setDeclineVisible(true)}
               />
             )}
           </View>
 
-          {/* Submit / Resend */}
-          <View style={styles.actionBtnWrap}>
+          {/* Submit / Resend — disabled until ready; tapping the disabled send still reveals what is missing. */}
+          <Pressable
+            style={isResendMode ? styles.actionBtnWrap : styles.sendBtnWrap}
+            onPress={!isResendMode && !canSubmit && !submitting ? () => void handleSubmit() : undefined}
+            accessible={false}
+          >
             {isResendMode ? (
               <Button
                 title={resendingOffer ? 'partner.fill.ctaResending' : 'partner.fill.ctaResend'}
                 variant="primary"
                 onPress={handleResend}
-                disabled={resendingOffer}
+                disabled={resendingOffer || !resendSelected}
               />
             ) : (
               <Button
@@ -814,17 +856,62 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
                 iconTypeName="Feather"
                 sizeIcon={16}
                 onPress={handleSubmit}
-                disabled={submitting}
+                disabled={submitting || !canSubmit}
               />
             )}
-          </View>
+          </Pressable>
         </View>
+    </>
+  );
+
+  if (isResendMode) {
+    return (
+      <Screen statusBarStyle="dark-content" whatsapp={false} scrollable={false} edges={['bottom']}>
+        <CustomHeader title="partner.fill.openDetailTitle" />
+        <Modal
+          transparent
+          visible={isFocused}
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => router.back()}
+        >
+          <View style={styles.resendBackdrop}>
+            <SafeAreaView edges={['top']} style={styles.flex}>
+              <Pressable
+                style={styles.resendBackdropTap}
+                onPress={() => router.back()}
+                accessible={false}
+              />
+              <View style={styles.resendSheet}>
+                <View style={styles.sheetHandle} />
+                {content}
+                <SafeAreaView edges={['bottom']} style={styles.resendSafeBottom} />
+              </View>
+            </SafeAreaView>
+          </View>
+        </Modal>
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen statusBarStyle="dark-content" whatsapp={false} scrollable={false} edges={['bottom']}>
+      <CustomHeader title="partner.fill.openDetailTitle" />
+
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={80}
+      >
+        {content}
       </KeyboardAvoidingView>
 
       {/* ── Decline bottom sheet ── */}
       <ConfirmModal
         visible={declineVisible}
         onClose={() => setDeclineVisible(false)}
+        footerBorder="top"
+        minHeightRatio={DECLINE_SHEET_HEIGHT_RATIO}
         primaryButton={{
           title: declining ? 'partner.fill.ctaSending' : 'partner.decline.ctaConfirm',
           variant: 'pink',
@@ -843,7 +930,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
 
           {/* Reason picker */}
           <View gap={4}>
-            <Text type="small" color={Colors.grayMidDark}>
+            <Text type="default" color={Colors.brand}>
               partner.decline.reasonLabel
             </Text>
             <PickerInput
@@ -859,7 +946,7 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
 
           {/* Comment */}
           <View gap={4}>
-            <Text type="small" color={Colors.grayMidDark}>
+            <Text type="default" color={Colors.brand}>
               partner.decline.commentLabel
             </Text>
             <RNTextInput
@@ -883,6 +970,9 @@ export default function PrestataireOfferFillScreen(): React.ReactElement {
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
+/** Figma 229-38465: the decline sheet top sits at ~25% of the screen. */
+const DECLINE_SHEET_HEIGHT_RATIO = 0.75;
+
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
@@ -894,19 +984,31 @@ const styles = StyleSheet.create({
   bodyPadding: {
     paddingHorizontal: 16,
   },
-  resendScroll: {
-    backgroundColor: Colors.white,
+  /** Figma 356-24597: the previous screen is dimmed behind the resend sheet. */
+  resendBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+  },
+  /** Strip of dimmed header left visible above the sheet (tap = close). */
+  resendBackdropTap: {
+    height: 24,
+  },
+  resendSheet: {
+    flex: 1,
+    overflow: 'hidden',
+    backgroundColor: Colors.backgroundLight,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    marginTop: -40,
+  },
+  resendSafeBottom: {
+    backgroundColor: Colors.backgroundLight,
   },
   resendScrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 28,
+    paddingTop: 24,
   },
   heroContainer: {
-    height: 185,
-    overflow: 'hidden',
+    backgroundColor: Colors.white,
   },
   imagePlaceholder: {
     height: 185,
@@ -924,9 +1026,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     shadowColor: Colors.gray,
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.14,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 4,
   },
   noteBlock: {
     paddingHorizontal: 16,
@@ -944,9 +1046,9 @@ const styles = StyleSheet.create({
     width: 120,
     height: 5,
     borderRadius: 3,
-    backgroundColor: Colors.grayMidDark,
+    backgroundColor: Colors.grayDark,
     alignSelf: 'center',
-    marginBottom: 24,
+    marginTop: 10,
   },
   infoBlock: {
     paddingHorizontal: 16,
@@ -971,56 +1073,40 @@ const styles = StyleSheet.create({
   sectionHeader: {
     marginBottom: 12,
   },
-  offerCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 14,
-    shadowColor: Colors.borderLight,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  resendOfferCard: {
-    borderRadius: 0,
-    padding: 0,
-    paddingVertical: 12,
-    marginBottom: 0,
+  /** Figma: offer lines are separated by thin dividers, not white cards. */
+  offerLine: {
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-    shadowOpacity: 0,
-    elevation: 0,
+    borderBottomColor: Colors.greyLight2,
   },
   offerIndexBadge: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  checkboxPlaceholder: {
-    width: 20,
-    height: 20,
+  checkbox: {
+    width: 22,
+    height: 22,
     borderRadius: 3,
+    borderWidth: 1.5,
+    borderColor: Colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: Colors.brand,
+  },
+  priceField: {
     borderWidth: 1,
     borderColor: Colors.borderLight,
-  },
-  priceRow: {
-    alignItems: 'center',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    backgroundColor: Colors.backgroundLight,
   },
   priceInput: {
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    borderRadius: 5,
-    paddingHorizontal: 12,
+    flex: 1,
     paddingVertical: Platform.OS === 'android' ? 8 : 12,
     fontSize: 16,
     color: Colors.brand,
-    backgroundColor: Colors.backgroundLight,
-  },
-  currencyBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    backgroundColor: Colors.backgroundGray,
-    borderRadius: 5,
   },
   commentInput: {
     borderWidth: 1,
@@ -1064,5 +1150,9 @@ const styles = StyleSheet.create({
   },
   actionBtnWrap: {
     flex: 1,
+  },
+  /** Figma: "Refuser" takes 1/3, "Envoyer" 2/3. */
+  sendBtnWrap: {
+    flex: 2,
   },
 });

@@ -26,13 +26,13 @@ const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({
     {
       name: "password",
       rules: ["required", "min:8"],
-      label: "auth.fields.password",
+      label: "auth.recovery.newPassword",
       errorMessages: { min: t("auth.recovery.passwordLength") },
     },
     {
       name: "passwordConfirmation",
       rules: ["required", "oneOf"],
-      label: "auth.fields.passwordConfirmation",
+      label: "auth.recovery.repeatPassword",
       refField: "password",
       errorMessages: {
         required: t("auth.recovery.passwordConfirmationRequired"),
@@ -47,11 +47,11 @@ const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({
       onSubmit={onSubmit}
       validationSchema={validationSchema}
     >
-      <Text style={styles.subTitle} type="loginDefault" center bold>
+      <Text style={styles.subTitle} type="loginSubTitle" center>
         auth.recovery.newPasswordInstructions
       </Text>
       <FormField
-        label="auth.fields.password"
+        label="auth.recovery.newPassword"
         autoCapitalize="none"
         name="password"
         placeholder="••••••"
@@ -63,7 +63,7 @@ const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({
         labelStyle={styles.fieldLabel}
       />
       <FormField
-        label="auth.fields.passwordConfirmation"
+        label="auth.recovery.repeatPassword"
         autoCapitalize="none"
         name="passwordConfirmation"
         placeholder="••••••"
@@ -90,7 +90,9 @@ const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({
 const styles = StyleSheet.create({
   subTitle: {
     marginBottom: 20,
-    fontSize: 15,
+    // Figma: Barlow Condensed SemiBold ~18
+    fontSize: 18,
+    lineHeight: 24,
   },
   fieldLabel: {
     fontSize: 15,

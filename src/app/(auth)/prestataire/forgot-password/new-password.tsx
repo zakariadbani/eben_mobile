@@ -13,12 +13,23 @@ interface ResetPasswordFormValues {
   passwordConfirmation: string;
 }
 
-const PartnerForgotPasswordNewPasswordScreen = () => {
+interface PartnerForgotPasswordNewPasswordScreenProps {
+  /**
+   * Rendered as the dimmed backdrop of the reset-success modal
+   * (`forgot-password/success.tsx`): skips the "no pending reset" error so
+   * the card behind the modal looks like the Figma frame.
+   */
+  backdrop?: boolean;
+}
+
+const PartnerForgotPasswordNewPasswordScreen = ({
+  backdrop = false,
+}: PartnerForgotPasswordNewPasswordScreenProps) => {
   const router = useRouter();
   const { completePasswordReset, pendingPasswordResetPhone } = useSession();
   const { t } = useTranslation();
   const [error, setError] = useState<string | null>(
-    pendingPasswordResetPhone ? null : t("auth.recovery.noPending"),
+    pendingPasswordResetPhone || backdrop ? null : t("auth.recovery.noPending"),
   );
 
   const handleSubmit = async (values: ResetPasswordFormValues) => {
@@ -53,11 +64,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 21,
-    paddingTop: 73,
+    // Figma 205-35529: card top ≈ 186 px under the header
+    paddingTop: 185,
   },
   card: {
     backgroundColor: Colors.backgroundBrand,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 20,
   },

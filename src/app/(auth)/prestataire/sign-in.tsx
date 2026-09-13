@@ -21,6 +21,11 @@ interface LoginFormValues {
   rememberMe: boolean;
 }
 
+/**
+ * Partner sign-in — Figma Sign in (FR 205-35457 / AR 205-35734).
+ * A successful login goes through the "EBEN PARTNERS" splash
+ * (`prestataire/loading`), which then replaces to the dashboard.
+ */
 const PrestataireSignInScreen = () => {
   const router = useRouter();
   const { login } = useSession();
@@ -39,7 +44,7 @@ const PrestataireSignInScreen = () => {
         Role.PRESTATAIRE,
       );
       if (role === Role.PRESTATAIRE) {
-        router.replace("/(prestataire)/dashboard");
+        router.replace("/(auth)/prestataire/loading");
       }
     } catch (loginError) {
       setError(t(getLoginErrorKey(loginError, "auth.prestataire.login.roleMismatch")));
@@ -67,6 +72,7 @@ const PrestataireSignInScreen = () => {
           <LoginForm
             onSubmit={handleSubmit}
             forgotPasswordRoute="/(auth)/prestataire/forgot-password"
+            hidePasswordToggle
           />
         </View>
 
@@ -81,12 +87,13 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     backgroundColor: Colors.backgroundBrand,
-    borderRadius: 10,
-    paddingHorizontal: 12,
+    borderRadius: 12,
+    paddingHorizontal: 16,
     paddingVertical: 20,
   },
   logo: {
     width: 68,
+    height: 18,
     resizeMode: "contain",
   },
   title: {

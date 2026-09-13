@@ -5,10 +5,15 @@ export default function Layout() {
   return (
     <Stack
       screenOptions={{
-        header: (props: { options: { title?: string }; back?: unknown }) => (
+        header: (props: {
+          options: { title?: string; headerBackVisible?: boolean };
+          back?: unknown;
+        }) => (
           <CustomHeader
             title={props.options.title ?? ""}
-            showBackButton={props.back !== undefined}
+            showBackButton={
+              props.back !== undefined && props.options.headerBackVisible !== false
+            }
           />
         ),
       }}
@@ -86,22 +91,24 @@ export default function Layout() {
 
       {/* Partner (Prestataire) onboarding flow */}
       <Stack.Screen
-        name="prestataire/loading"
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="prestataire/language"
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
         name="prestataire/welcome"
         options={{ headerShown: false }}
       />
+      {/* Post-sign-in "EBEN PARTNERS" splash */}
+      <Stack.Screen
+        name="prestataire/loading"
+        options={{ headerShown: false }}
+      />
+      {/* Waitlist request form (Legal placeholder until F-05) */}
+      <Stack.Screen
+        name="prestataire/waitlist"
+        options={{ headerShown: true, title: "partner.waitlist.title" }}
+      />
 
-      {/* Partner (Prestataire) sign-in */}
+      {/* Partner (Prestataire) sign-in — Figma 205-35457 has no back arrow */}
       <Stack.Screen
         name="prestataire/sign-in"
-        options={{ headerShown: true, title: "Se connecter" }}
+        options={{ headerShown: true, title: "Se connecter", headerBackVisible: false }}
       />
     </Stack>
   );

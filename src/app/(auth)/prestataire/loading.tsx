@@ -1,26 +1,38 @@
 import React, { useEffect, useRef } from "react";
-import { StyleSheet, Animated, View as RNView } from "react-native";
+import { Animated, Image, StyleSheet, View as RNView } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { Text } from "@/components/common/Text";
 import Colors from "@/constants/Colors";
+import { useSession } from "@/context/AuthContext";
 
 /**
- * Partner (Prestataire) loading / splash screen.
+ * Partner (Prestataire) splash.
  *
- * Figma: Loading-page_1 (blank+stripe), Loading-page_2 (logo),
- *        Loading-page_3 (greeting+logo) — partner set (203-35792 / 35805 / 35818).
+ * Figma: Loading-page_1 (corner only), Loading-page_2 (logotype),
+ *        Loading-page_3 (greeting + logotype) and the "EBEN PARTNERS"
+ *        variants (203-37541 / 205-35300 / 205-35444 / 252-37966).
  *
- * Matches the same three-phase animated sequence as the client loading screen:
- *   0 ms   → black bg + diagonal yellow stripe visible
- *   300 ms → EBEN wordmark fades in
- *   900 ms → "Bienvenue" greeting fades in
- *  1 800 ms → navigates to partner language selection
+ * Reached right after a successful partner sign-in
+ * (`prestataire/sign-in.tsx` → replace here → replace to the dashboard), so
+ * the Loading-page_3 greeting can show the signed-in user's first name.
  *
- * The stripe decoration (bottom-right corner) uses three layered rotated Views,
- * identical to the client loading screen.
+ * Sequence:
+ *   0 ms     → black background + gold diagonal corner (page_1)
+ *   300 ms   → "EBEN PARTNERS" logotype fades in (page_2)
+ *   800 ms   → "Bienvenue {name}" fades in above the logotype (page_3)
+ *   1 800 ms → replace to /(prestataire)/dashboard
+ *
+ * Both bitmaps are crops of `assets/images/splash.png`, which is the Figma
+ * Loading-page_2 export (identical corner bands and logotype).
  */
+const CORNER_ASPECT_RATIO = 1284 / 878;
+const LOGO_ASPECT_RATIO = 614 / 188;
+
 const PartnerLoadingScreen = () => {
   const router = useRouter();
+  const { t } = useTranslation();
+  const { username } = useSession();
   const { phase } = useLocalSearchParams<{ phase?: string }>();
   const fixedPhase =
     phase === "1" || phase === "2" || phase === "3" ? phase : undefined;
@@ -44,7 +56,7 @@ const PartnerLoadingScreen = () => {
       }),
       Animated.delay(600),
     ]).start(() => {
-      router.replace("/(auth)/prestataire/language");
+      router.replace("/(prestataire)/dashboard");
     });
   }, [fixedPhase, logoOpacity, greetingOpacity, router]);
 
@@ -54,33 +66,46 @@ const PartnerLoadingScreen = () => {
   const greetingStyle = fixedPhase
     ? { opacity: fixedPhase === "3" ? 1 : 0 }
     : { opacity: greetingOpacity };
+  const firstName = username?.trim().split(/\s+/)[0] ?? "";
 
   return (
     <RNView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Diagonal accent stripe — bottom-right corner */}
-      <RNView style={styles.stripeWrapper} pointerEvents="none">
-        <RNView style={styles.stripe1} />
-        <RNView style={styles.stripe2} />
-        <RNView style={styles.stripe3} />
+      {/* Gold diagonal corner — full width, bottom-right (Figma Loading-page_1) */}
+      <RNView style={styles.cornerWrapper} pointerEvents="none">
+        <Image
+          source={require("@/assets/images/others/loading-corner.png")}
+          style={styles.corner}
+          resizeMode="stretch"
+        />
       </RNView>
 
-      {/* Centred brand content */}
       <RNView style={styles.centreContent}>
-        <Animated.View style={greetingStyle}>
-          <Text type="loginDefault" center style={styles.greeting}>
-            Bienvenue sur EBEN
-          </Text>
-        </Animated.View>
+        {firstName ? (
+          <Animated.View style={greetingStyle}>
+            <Text
+              type="loginSubTitle"
+              translate={false}
+              center
+              style={styles.greeting}
+            >
+              {t("Bienvenue {{name}}", { name: firstName })}
+            </Text>
+          </Animated.View>
+        ) : null}
 
-        <Animated.View style={[styles.logoRow, logoStyle]}>
-          <Text type="loginTitle" style={styles.logoE}>
-            E
+        <Animated.View style={[styles.logoBlock, logoStyle]}>
+          {/* Brand wordmark, not copy — stays untranslated */}
+          <Text translate={false} style={styles.partners}>
+            PARTNERS
           </Text>
-          <Text type="loginTitle" style={styles.logoBEN}>
-            BEN
-          </Text>
+          <Image
+            source={require("@/assets/images/others/logo-white.png")}
+            style={styles.logo}
+            resizeMode="contain"
+            accessibilityLabel="EBEN"
+          />
         </Animated.View>
       </RNView>
     </RNView>
@@ -94,69 +119,41 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  stripeWrapper: {
+  cornerWrapper: {
     position: "absolute",
-    bottom: -40,
-    right: -40,
-    width: 280,
-    height: 280,
-    overflow: "hidden",
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
-  stripe1: {
-    position: "absolute",
-    bottom: 20,
-    right: -60,
-    width: 340,
-    height: 60,
-    backgroundColor: Colors.primary,
-    transform: [{ rotate: "-40deg" }],
-    opacity: 0.9,
-  },
-  stripe2: {
-    position: "absolute",
-    bottom: 60,
-    right: -60,
-    width: 340,
-    height: 40,
-    backgroundColor: Colors.primary,
-    transform: [{ rotate: "-40deg" }],
-    opacity: 0.55,
-  },
-  stripe3: {
-    position: "absolute",
-    bottom: 90,
-    right: -60,
-    width: 340,
-    height: 25,
-    backgroundColor: Colors.primary,
-    transform: [{ rotate: "-40deg" }],
-    opacity: 0.3,
+  corner: {
+    width: "100%",
+    aspectRatio: CORNER_ASPECT_RATIO,
   },
   centreContent: {
+    width: "100%",
     alignItems: "center",
     justifyContent: "center",
   },
   greeting: {
-    color: Colors.light,
-    marginBottom: 16,
-    fontSize: 18,
-    fontFamily: "Roboto",
-  },
-  logoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  logoE: {
-    color: Colors.primary,
-    fontSize: 56,
-    fontFamily: "BarlowCondensedBold",
-    lineHeight: 60,
-  },
-  logoBEN: {
     color: Colors.white,
-    fontSize: 56,
-    fontFamily: "BarlowCondensedBold",
-    lineHeight: 60,
+    marginBottom: 48,
+  },
+  logoBlock: {
+    width: "46%",
+  },
+  partners: {
+    alignSelf: "flex-end",
+    color: Colors.primary,
+    fontFamily: "Roboto",
+    fontSize: 13,
+    letterSpacing: 4,
+    marginBottom: 2,
+    marginRight: 4,
+    transform: [{ skewX: "-12deg" }],
+  },
+  logo: {
+    width: "100%",
+    aspectRatio: LOGO_ASPECT_RATIO,
   },
 });
 

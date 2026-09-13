@@ -95,7 +95,7 @@ const PhoneVerificationComponent: React.FC<PhoneVerificationComponentProps> = ({
     <View style={styles.container}>
       <Text type="loginSubTitle">auth.otp.title</Text>
       <View style={styles.messageContainer}>
-        <Text type="loginDefault" translate={false}>
+        <Text type="loginSubTitle" translate={false} style={styles.message}>
           {t("auth.otp.sent", {
             phone: phoneNumber,
           })}
@@ -128,7 +128,7 @@ const PhoneVerificationComponent: React.FC<PhoneVerificationComponentProps> = ({
       />
 
       {showResend ? <View style={styles.resendLinkContainer}>
-        <Text type="loginDefault">auth.otp.notReceived</Text>
+        <Text type="loginSubTitle" style={styles.message}>auth.otp.notReceived</Text>
         <Button
           outline
           variant="orange"
@@ -166,15 +166,22 @@ const styles = StyleSheet.create({
   messageContainer: {
     marginVertical: 20,
   },
+  // Figma: Barlow Condensed SemiBold ~18 for card body copy
+  message: {
+    fontSize: 18,
+    lineHeight: 24,
+  },
   codeFieldRoot: {
     marginHorizontal: 5,
     justifyContent: "space-between",
   },
   cell: {
     height: 56,
-    lineHeight: 48,
+    lineHeight: 52,
     fontSize: 26,
-    borderWidth: 2,
+    // Figma: active cell = yellow bar at the bottom, no outline
+    borderBottomWidth: 3,
+    borderBottomColor: "transparent",
     backgroundColor: Colors.backgroundGray,
     color: Colors.grayDark,
     borderRadius: 12,
@@ -182,7 +189,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   focusCell: {
-    borderColor: Colors.primary,
+    borderBottomColor: Colors.primary,
   },
   resendLinkContainer: {
     marginTop: 30,

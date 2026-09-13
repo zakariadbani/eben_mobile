@@ -47,11 +47,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 21,
-    paddingTop: 102,
+    // Figma 205-35526: card top ≈ 216 px under the header
+    paddingTop: 210,
   },
   card: {
     backgroundColor: Colors.backgroundBrand,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 18,
   },

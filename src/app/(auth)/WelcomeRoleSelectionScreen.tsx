@@ -1,6 +1,12 @@
 import React, { useState } from "react";
-import { StyleSheet, ImageBackground, TouchableOpacity } from "react-native";
+import {
+  StyleSheet,
+  ImageBackground,
+  TouchableOpacity,
+  View as RNView,
+} from "react-native";
 import { Stack, useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/components/common/Text";
 import View from "@/components/common/View";
@@ -10,8 +16,13 @@ import GoBack from "@/components/common/GoBack";
 
 type Role = "acheteur" | "vendeur";
 
+/**
+ * Role fork — Figma Welcome/11 (FR 203-35758) / Welcome/13 (AR 203-37580).
+ * White back arrow, title block starting at ~45 % of the height.
+ */
 const WelcomeRoleSelectionScreen = () => {
   const router = useRouter();
+  const { i18n } = useTranslation();
   const insets = useSafeAreaInsets();
 
   const [selectedRole, setSelectedRole] = useState<Role>("acheteur");
@@ -38,12 +49,19 @@ const WelcomeRoleSelectionScreen = () => {
         style={styles.background}
         resizeMode="cover"
       >
-        <GoBack
-          iconColor={Colors.black}
-          style={[styles.backButton, { top: insets.top + 16 }]}
-        />
+        <RNView
+          testID="welcome-role-back"
+          style={[
+            styles.backButton,
+            { top: insets.top },
+            i18n.language === "ar" && styles.backButtonRtl,
+          ]}
+        >
+          <GoBack iconColor={Colors.white} />
+        </RNView>
+        <RNView style={styles.topSpacer} />
         <View style={styles.container}>
-          <Text type="loginTitle" style={styles.title}>Bienvenue à EBEN</Text>
+          <Text type="loginTitle">Bienvenue à EBEN</Text>
           <Text type="loginDefault" style={styles.description}>
             Votre boutique en ligne de pièces détachées automobiles au Maroc
           </Text>
@@ -92,19 +110,23 @@ const styles = StyleSheet.create({
   background: {
     flex: 1,
   },
+  // Figma: title block starts at ~45 % of the screen height
+  topSpacer: {
+    flex: 45,
+  },
   container: {
-    flex: 1,
+    flex: 55,
     paddingHorizontal: 20,
-    paddingTop: 307,
   },
   backButton: {
     position: "absolute",
-    top: 16,
+    top: 0,
     left: 8,
     zIndex: 1,
   },
-  title: {
-    fontSize: 28,
+  backButtonRtl: {
+    left: undefined,
+    right: 8,
   },
   description: {
     marginTop: 14,

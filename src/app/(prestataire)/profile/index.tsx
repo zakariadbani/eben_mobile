@@ -1,70 +1,65 @@
 /**
  * (prestataire)/profile/index.tsx
  *
- * Prestataire Profile Hub — Sprint P5 sub-flow A.
+ * Prestataire Profile Hub.
  *
  * Figma refs:
  *   - partner/Profile-Main-page__267-36407.png  (FR)
  *   - partner/Profile-Main-page__284-30445.png  (AR)
  *
  * Sections (top → bottom):
- *   Header  — logo, "Hey <name>", notification bell
- *   Group 1 — Aperçus, Mon portefeuille, Historique des commandes,
- *              Historique des offres
+ *   Header  — avatar, "Hey <name> 👋", notification bell (red dot when unread)
+ *   Group 1 — Aperçus, Mon portefeuille, Historique des commandes, Historique des offres
  *   Group 2 — Mon profil: Informations sur l'entreprise, Modifier mon profil
- *   Group 3 — Préférences: Notifications push (toggle), Ne pas faire de suivi
- *              (toggle), Langue
+ *   Group 3 — Préférences: Notifications push (toggle), Ne pas faire de suivi (toggle), Langue
  *   Group 4 — À propos: Contactez-nous, À propos d'EBEN
- *   Group 5 — Mentions légales: Termes et conditions, Politique de
- *              confidentialité, Politique de vente
- *   Footer  — power-off icon (logout), copyright line, version
+ *   Group 5 — Mentions légales: Termes et conditions, Politique de confidentialité, Politique de vente
+ *   Footer  — pink power-off button (logout), copyright line, version
+ *
+ * Preference toggles are stored on-device only (no preferences endpoint yet).
  */
 
 import React, { useCallback, useState } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  StatusBar,
-  Alert,
-} from 'react-native';
+import { Alert, Image, ScrollView, StatusBar, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { Tabs, useFocusEffect, useRouter } from 'expo-router';
+import { Href, useFocusEffect, useRouter } from 'expo-router';
 
 import View from '@/components/common/View';
-import { Text } from '@/components/common/Text';
 import Icon from '@/components/common/Icon';
-import CustomIcon from '@/components/common/CustomIcon';
-import ItemMenuComponent from '@/components/screens/shared/app/ItemMenuComponent';
 import Footer from '@/components/common/Footer';
+import HeaderBell from '@/components/common/navigation/HeaderBell';
+import PartnerGreeting from '@/components/screens/prestataire/PartnerGreeting';
+import {
+  ProfileMenuGroup,
+  ProfileMenuRow,
+  ProfileSectionTitle,
+} from '@/components/screens/prestataire/profile/ProfileMenuRow';
 
 import { useSession } from '@/context/AuthContext';
+import { useStorageState } from '@/context/useStorageState';
+import { usePartnerBadges } from '@/hooks/usePartnerBadges';
 import { getPrestataireProfile } from '@/api';
 import type { PrestataireProfile } from '@/interfaces/User';
 import Colors from '@/constants/Colors';
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+const PARTNER_PUSH_PREFERENCE_KEY = 'eben.partner.pushNotifications';
+const PARTNER_DO_NOT_TRACK_KEY = 'eben.partner.doNotTrack';
 
-function SectionLabel({ label }: { readonly label: string }): React.ReactElement {
-  return (
-    <View style={styles.sectionLabel}>
-      <Text type="subTitle" semiBold color={Colors.brand} style={styles.sectionLabelText}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
+type LegalSection = 'terms' | 'privacy' | 'returns';
 
 export default function PrestataireProfileScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const { logOut, username } = useSession();
+  const { hasUnreadNotifications } = usePartnerBadges();
 
   const [profile, setProfile] = useState<PrestataireProfile | null>(null);
+  const [[pushLoading, pushStored], setPushStored] = useStorageState<boolean>(PARTNER_PUSH_PREFERENCE_KEY);
+  const [[trackLoading, doNotTrackStored], setDoNotTrackStored] = useStorageState<boolean>(PARTNER_DO_NOT_TRACK_KEY);
+  // Figma defaults: push ON, do-not-track OFF.
+  const pushEnabled = pushStored ?? true;
+  const doNotTrack = doNotTrackStored ?? false;
 
   const loadProfile = useCallback(async () => {
     try {
@@ -77,121 +72,129 @@ export default function PrestataireProfileScreen(): React.ReactElement {
 
   useFocusEffect(useCallback(() => { void loadProfile(); }, [loadProfile]));
 
+  const go = (path: string) => router.push(path as Href);
+  const openLegal = (section: LegalSection) => router.push({ pathname: '/(prestataire)/profile/legal', params: { section } } as Href);
+
   const handleLogout = () => {
     Alert.alert(
       t('partner.profile.logoutTitle'),
       t('partner.profile.logoutBody'),
       [
         { text: t('Annuler'), style: 'cancel' },
-        {
-          text: t('Déconnexion'),
-          style: 'destructive',
-          onPress: () => logOut(),
-        },
+        { text: t('Déconnexion'), style: 'destructive', onPress: () => logOut() },
       ],
     );
   };
 
+  const displayName = profile?.name ?? username ?? t('partner.profile.partnerFallback');
+
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
-      <Tabs.Screen options={{ headerShown: false }} />
       <StatusBar backgroundColor={Colors.primary} barStyle="dark-content" />
 
       {/* ── Yellow header ── */}
-      <View style={styles.header} flexDirection="row" alignItems="center">
-        <Image
-          source={profile?.avatar ? { uri: profile.avatar } : require('@/assets/img/avatar.jpg')}
-          style={styles.avatar}
-          accessibilityLabel={profile?.name ?? t('partner.dashboard.greeting')}
-        />
-        <View flex style={styles.headerTextBlock}>
-          <Text type="headerTitle" semiBold color={Colors.brand}>
-            {t('partner.profile.greeting', { name: profile?.name ?? username ?? t('partner.profile.partnerFallback') })}
-          </Text>
-        </View>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={t('partner.notifications.title')}
-          onPress={() => router.push('/(prestataire)/profile/notifications' as never)}
-          style={styles.bellBtn}
-          activeOpacity={0.7}
-        >
-          <CustomIcon name="notif" size={28} />
-        </TouchableOpacity>
+      <View style={styles.header} flexDirection="row" alignItems="center" gap={14}>
+        {profile?.avatar ? (
+          <Image source={{ uri: profile.avatar }} style={styles.avatar} accessibilityLabel={displayName} />
+        ) : (
+          <View style={[styles.avatar, styles.avatarFallback]} alignItems="center" justifyContent="center">
+            <Icon name="user" type="Feather" size={24} iconColor={Colors.grayMidDark} />
+          </View>
+        )}
+        <PartnerGreeting name={displayName} size={26} color={Colors.brand} />
+        <HeaderBell hasUnread={hasUnreadNotifications} onPress={() => go('/(prestataire)/profile/notifications')} />
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* ── Group 1: main nav ── */}
-        <View style={styles.group}>
-          <ItemMenuComponent
-            icon="snipe"
-            title={t('partner.profile.apercu')}
-            navigateTo="(prestataire)/profile/overview"
-          />
-          <ItemMenuComponent
-            icon="wallet"
-            title={t('partner.profile.wallet')}
-            navigateTo="(prestataire)/profile/wallet"
-          />
-          <ItemMenuComponent
-            icon="orders"
-            title={t('partner.profile.ordersHistory')}
-            navigateTo="(prestataire)/profile/orders-history"
-          />
-          <ItemMenuComponent
-            icon="offers"
-            title={t('partner.profile.offersHistory')}
-            navigateTo="(prestataire)/profile/offers-history"
-          />
+        <View style={styles.firstGroup}>
+          <ProfileMenuGroup>
+            <ProfileMenuRow
+              icon={{ kind: 'vector', name: 'stats-chart-outline', set: 'Ionicons' }}
+              title={t('partner.profile.apercu')}
+              onPress={() => go('/(prestataire)/profile/overview')}
+            />
+            <ProfileMenuRow
+              icon={{ kind: 'vector', name: 'wallet-outline', set: 'Ionicons' }}
+              title={t('partner.profile.wallet')}
+              onPress={() => go('/(prestataire)/profile/wallet')}
+            />
+            <ProfileMenuRow
+              icon={{ kind: 'custom', name: 'orders' }}
+              title={t('partner.profile.ordersHistory')}
+              onPress={() => go('/(prestataire)/profile/orders-history')}
+            />
+            <ProfileMenuRow
+              icon={{ kind: 'custom', name: 'offers' }}
+              title={t('partner.profile.offersHistory')}
+              onPress={() => go('/(prestataire)/profile/offers-history')}
+            />
+          </ProfileMenuGroup>
         </View>
 
         {/* ── Group 2: Mon profil ── */}
-        <SectionLabel label={t('partner.profile.sectionProfile')} />
-        <View style={styles.group}>
-          <ItemMenuComponent
-            icon="info"
+        <ProfileSectionTitle title={t('partner.profile.sectionProfile')} />
+        <ProfileMenuGroup>
+          <ProfileMenuRow
+            icon={{ kind: 'vector', name: 'office-building-outline', set: 'MaterialCommunityIcons' }}
             title={t('partner.profile.company')}
-            navigateTo="(prestataire)/profile/company"
+            onPress={() => go('/(prestataire)/profile/company')}
           />
-          <ItemMenuComponent
-            icon="pen"
+          <ProfileMenuRow
+            icon={{ kind: 'custom', name: 'pen' }}
             title={t('partner.profile.editProfile')}
-            navigateTo="(prestataire)/profile/edit"
+            onPress={() => go('/(prestataire)/profile/edit')}
           />
-        </View>
+        </ProfileMenuGroup>
 
         {/* ── Group 3: Préférences ── */}
-        <SectionLabel label={t('partner.profile.sectionPrefs')} />
-        <View style={styles.group}>
-          <ItemMenuComponent
-            icon="language"
-            title={t('partner.profile.language')}
-            navigateTo="(prestataire)/profile/language"
+        <ProfileSectionTitle title={t('partner.profile.sectionPrefs')} />
+        <ProfileMenuGroup>
+          <ProfileMenuRow
+            icon={{ kind: 'custom', name: 'notif' }}
+            title={t('partner.profile.notifPush')}
+            toggleValue={pushEnabled}
+            toggleDisabled={pushLoading}
+            onToggle={(value) => { void setPushStored(value); }}
           />
-        </View>
+          <ProfileMenuRow
+            icon={{ kind: 'custom', name: 'eye' }}
+            title={t('partner.profile.doNotTrack')}
+            toggleValue={doNotTrack}
+            toggleDisabled={trackLoading}
+            onToggle={(value) => { void setDoNotTrackStored(value); }}
+          />
+          <ProfileMenuRow
+            icon={{ kind: 'custom', name: 'language' }}
+            title={t('partner.profile.language')}
+            onPress={() => go('/(prestataire)/profile/language')}
+          />
+        </ProfileMenuGroup>
 
         {/* ── Group 4: À propos ── */}
-        <SectionLabel label={t('partner.profile.sectionAbout')} />
-        <View style={styles.group}>
-          <ItemMenuComponent
-            icon="casque"
+        <ProfileSectionTitle title={t('partner.profile.sectionAbout')} />
+        <ProfileMenuGroup>
+          <ProfileMenuRow
+            icon={{ kind: 'custom', name: 'casque' }}
             title={t('partner.profile.contactUs')}
-            navigateTo="(prestataire)/profile/about"
+            onPress={() => go('/(prestataire)/profile/about')}
           />
-          <ItemMenuComponent
-            icon="logo"
+          <ProfileMenuRow
+            icon={{ kind: 'custom', name: 'logo' }}
             title={t('partner.profile.aboutEben')}
-            navigateTo="(prestataire)/profile/about"
+            onPress={() => go('/(prestataire)/profile/about')}
           />
-        </View>
+        </ProfileMenuGroup>
 
         {/* ── Group 5: Mentions légales ── */}
+        <ProfileSectionTitle title={t('partner.profile.sectionLegal')} />
+        <ProfileMenuGroup>
+          <ProfileMenuRow icon={{ kind: 'custom', name: 'info2' }} title={t('partner.profile.terms')} onPress={() => openLegal('terms')} />
+          <ProfileMenuRow icon={{ kind: 'custom', name: 'protection' }} title={t('partner.profile.privacy')} onPress={() => openLegal('privacy')} />
+          <ProfileMenuRow icon={{ kind: 'custom', name: 'info2' }} title={t('partner.profile.salesPolicy')} onPress={() => openLegal('returns')} />
+        </ProfileMenuGroup>
 
-        {/* ── Logout button ── */}
+        {/* ── Logout button (icon only, Figma) ── */}
         <View style={styles.logoutSection} alignItems="center">
           <TouchableOpacity
             style={styles.logoutBtn}
@@ -200,81 +203,47 @@ export default function PrestataireProfileScreen(): React.ReactElement {
             accessibilityRole="button"
             accessibilityLabel={t('partner.profile.logoutTitle')}
           >
-            <Icon name="power" size={28} iconColor={Colors.red} type="Feather" />
+            <Icon name="power" size={30} iconColor={Colors.brand} type="Feather" />
           </TouchableOpacity>
-          <Text type="small" color={Colors.red} style={styles.logoutLabel}>
-            {t('partner.profile.logoutTitle')}
-          </Text>
         </View>
 
-        {/* ── Footer ── */}
         <Footer />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-  },
+  safeArea: { flex: 1, backgroundColor: Colors.primary },
   header: {
     backgroundColor: Colors.primary,
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 12,
+    paddingBottom: 14,
   },
   avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     borderWidth: 2,
     borderColor: Colors.white,
   },
-  headerTextBlock: {
-    paddingHorizontal: 12,
-  },
-  bellBtn: {
-    padding: 4,
-  },
-  scroll: {
-    flex: 1,
-    backgroundColor: Colors.white,
-  },
-  scrollContent: {
-    paddingBottom: 32,
-  },
-  sectionLabel: {
-    paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 12,
-    backgroundColor: Colors.white,
-  },
-  sectionLabelText: {
-    width: '100%',
-    flexShrink: 1,
-  },
-  group: {
-    backgroundColor: Colors.backgroundGray,
-    borderRadius: 0,
-    overflow: 'hidden',
-  },
-  logoutSection: {
-    marginTop: 32,
-    marginBottom: 8,
-  },
+  avatarFallback: { backgroundColor: Colors.backgroundGray },
+  scroll: { flex: 1, backgroundColor: Colors.backgroundLight },
+  scrollContent: { paddingBottom: 24 },
+  firstGroup: { paddingTop: 24 },
+  logoutSection: { marginTop: 40, marginBottom: 56 },
   logoutBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: Colors.pink,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  logoutLabel: {
-    marginTop: 6,
+    shadowColor: Colors.red,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 4,
   },
 });

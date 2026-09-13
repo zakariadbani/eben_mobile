@@ -8,6 +8,7 @@ import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
 import Colors from "@/constants/Colors";
 import type { Request, RequestItem } from "@/interfaces/Request";
+import { remainingColor, remainingLabel } from "@/components/screens/prestataire/dashboard/remaining";
 
 export interface ItemIncomingRequestCardProps {
   request: Request;
@@ -16,15 +17,10 @@ export interface ItemIncomingRequestCardProps {
   styleContainer?: ViewStyle;
 }
 
-function formatExpiry(expiresAt: string | null): { label: string; color: string } {
+/** Figma countdown: "0h 13min restante" / "0 س 50 دقيقة متبقية", red < 1h, amber ≤ 1h30, green beyond. */
+function formatExpiry(expiresAt: string | null, isArabic: boolean): { label: string; color: string } {
   if (!expiresAt) return { label: "—", color: Colors.gray };
-  const diff = new Date(expiresAt).getTime() - Date.now();
-  if (diff <= 0) return { label: "0h 00min", color: Colors.red };
-  const minutes = Math.floor(diff / 60_000);
-  const hours = Math.floor(minutes / 60);
-  const remaining = minutes % 60;
-  const color = minutes <= 20 ? Colors.red : minutes <= 90 ? Colors.orange : Colors.greenDark;
-  return { label: `${hours}h ${String(remaining).padStart(2, "0")}min`, color };
+  return { label: remainingLabel(expiresAt, isArabic), color: remainingColor(expiresAt) };
 }
 
 export default function ItemIncomingRequestCard({ request, item, onPress, styleContainer }: ItemIncomingRequestCardProps): React.ReactElement {
@@ -35,8 +31,7 @@ export default function ItemIncomingRequestCard({ request, item, onPress, styleC
     ? item.categoryTitleAr ?? item.categoryTitle ?? t("partner.offers.unknownPart")
     : item.categoryTitle ?? t("partner.offers.unknownPart");
   const brandLabel = isArabic ? item.brandNameAr ?? item.brandName : item.brandName;
-  const conditionKey = item.condition === "occasion" ? "partner.fill.conditionOccasion" : "partner.fill.conditionEnStock";
-  const expiry = formatExpiry(request.expiresAt);
+  const expiry = formatExpiry(request.expiresAt, isArabic);
   const imageSource = typeof item.categoryImage === "string"
     ? { uri: item.categoryImage }
     : item.categoryImage || require("@/assets/img/freins.png");
@@ -51,19 +46,16 @@ export default function ItemIncomingRequestCard({ request, item, onPress, styleC
       />
       <View flex style={styles.content}>
         <Text type="label" color={Colors.gray} translate={false} style={isArabic ? styles.textRtl : undefined}>{`${t("partner.offers.card.ref")} ${request.reference}`}</Text>
-        <Text type="labelTwo" semiBold numberOfLines={2} translate={false} style={isArabic ? styles.textRtl : undefined}>{title}</Text>
+        <Text type="textTwo" semiBold numberOfLines={2} translate={false} style={[styles.title, isArabic && styles.textRtl]}>{title}</Text>
         {brandLabel ? (
           <Text type="label" color={Colors.gray} translate={false} style={isArabic ? styles.textRtl : undefined}>
             {t("requestList.brand", { value: brandLabel })}
           </Text>
         ) : null}
-        <Text type="label" color={Colors.gray} translate={false} style={isArabic ? styles.textRtl : undefined}>
-          {`${t("partner.offerDetail.qty")} ${item.quantity} · ${t(conditionKey)}`}
-        </Text>
         <View flexDirection="row" alignItems="center" gap={7} style={[styles.expiry, isArabic && styles.rowRtl]}>
           <Icon name="clock" type="Feather" size={20} iconColor={expiry.color} />
           <Text type="labelTwo" semiBold color={expiry.color} translate={false} style={isArabic ? styles.textRtl : undefined}>
-            {`${expiry.label} ${t("partner.offers.card.restante")}`}
+            {expiry.label}
           </Text>
         </View>
       </View>
@@ -79,8 +71,10 @@ const styles = StyleSheet.create({
   cardRtl: { flexDirection: "row-reverse" },
   image: { width: 61, height: 61, marginEnd: 12 },
   content: { minWidth: 0 },
+  title: { lineHeight: 21 },
   expiry: { marginTop: 10 },
   rowRtl: { flexDirection: "row-reverse" },
   textRtl: { textAlign: "right" },
-  button: { alignSelf: "flex-end", marginStart: 8, marginBottom: 1, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 4, backgroundColor: Colors.primary },
+  // Figma: compact "Détails" button.
+  button: { alignSelf: "flex-end", marginStart: 8, marginBottom: 1, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4, backgroundColor: Colors.primary },
 });

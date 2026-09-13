@@ -47,6 +47,21 @@ it("sizes image pages from their rendered container and describes each image", (
   expect(screen.getByLabelText(`${i18n.t("requestFlow.images")} 1/2`)).toBeTruthy();
 });
 
+it("shows one page-tracking counter under the image when placed below", () => {
+  const screen = render(
+    <ImageSlider images={["https://cdn.example.test/1.jpg", "https://cdn.example.test/2.jpg"]} height={185} counterPlacement="below" />,
+  );
+  const slider = screen.getByTestId("image-slider");
+  fireEvent(slider, "layout", { nativeEvent: { layout: { width: 328, height: 185, x: 0, y: 0 } } });
+
+  expect(slider.props.style).toEqual(expect.arrayContaining([{ height: 185 }]));
+  expect(screen.getByTestId("image-slider-counter")).toBeTruthy();
+  expect(screen.getByText("1/2")).toBeTruthy();
+  fireEvent.scroll(slider, { nativeEvent: { contentOffset: { x: 328, y: 0 } } });
+  expect(screen.getByText("2/2")).toBeTruthy();
+  expect(screen.queryByText("1/2")).toBeNull();
+});
+
 it("announces picker items using their localized display value", async () => {
   const screen = render(
     <PickerInput

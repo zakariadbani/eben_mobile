@@ -1,6 +1,6 @@
-import { Href, Tabs, useRouter } from "expo-router";
-import React from "react";
-import { Image, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Href, Tabs, usePathname, useRouter } from "expo-router";
+import React, { useEffect } from "react";
+import { Image, Platform, StatusBar, StyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -8,33 +8,52 @@ import {
   TabBarIcon,
   TabBarLabel,
 } from "@/components/common/navigation/TabBarElement";
+import HeaderBell from "@/components/common/navigation/HeaderBell";
 import Colors from "@/constants/Colors";
 import CustomHeader from "@/components/common/CustomHeader";
-import CustomIcon from "@/components/common/CustomIcon";
-import { Text } from "@/components/common/Text";
+import PartnerGreeting from "@/components/screens/prestataire/PartnerGreeting";
 import { useSession } from "@/context/AuthContext";
+import { refreshPartnerUnreadNotifications, usePartnerBadges } from "@/hooks/usePartnerBadges";
 
 // Minimal type alias so tabBarIcon/tabBarLabel callbacks are typed without
 // depending on @react-navigation/bottom-tabs .d.ts (which is absent in this
 // version of the package).
 type FocusedParam = { focused: boolean; color: string };
 
+/** The five Figma tabs, in Figma order. */
+type PartnerTab = "dashboard" | "search" | "offers" | "orders" | "profile";
+
+/**
+ * Figma shows the tab bar on every vendeur screen with the *section* tab
+ * highlighted (e.g. "Liste" on an offer detail). Nested routes are not focused
+ * tabs for react-navigation, so we derive the section from the pathname.
+ */
+export function partnerSectionFromPath(pathname: string): PartnerTab {
+  if (pathname.startsWith("/search")) return "search";
+  if (pathname.startsWith("/offers")) return "offers";
+  if (pathname.startsWith("/orders")) return "orders";
+  if (pathname.startsWith("/profile") || pathname.startsWith("/settings")) return "profile";
+  return "dashboard";
+}
+
 // ---------------------------------------------------------------------------
-// Tab-bar styling — matches client bar for visual consistency.
+// Tab-bar styling — Figma: white bar, rounded top corners, soft top shadow.
 // ---------------------------------------------------------------------------
 const TAB_BAR_STYLE = StyleSheet.create({
   bar: {
     backgroundColor: Colors.white,
     borderTopWidth: 0,
-    paddingTop: 6,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    paddingTop: 8,
     ...Platform.select({
       ios: {
-        shadowColor: Colors.borderLight,
+        shadowColor: Colors.black,
         shadowOffset: { width: 0, height: -3 },
-        shadowOpacity: 0.8,
-        shadowRadius: 3,
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
       },
-      android: { elevation: 5 },
+      android: { elevation: 8 },
     }),
   },
   item: {
@@ -63,54 +82,34 @@ const TAB_BAR_STYLE = StyleSheet.create({
     borderWidth: 2,
     borderColor: Colors.white,
   },
-  greeting: {
-    flex: 1,
-    fontSize: 23,
-  },
-  notification: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  notificationDot: {
-    position: "absolute",
-    top: 7,
-    right: 7,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.red,
-  },
 });
-
-const HIDDEN_TAB_BAR_STYLE = { display: "none" as const };
 
 const PartnerDashboardHeader: React.FC = () => {
   const router = useRouter();
   const { t, i18n } = useTranslation();
   const { username, session } = useSession();
+  const { hasUnreadNotifications } = usePartnerBadges();
   const avatar = session?.user.avatar;
+
+  useEffect(() => {
+    void refreshPartnerUnreadNotifications();
+  }, []);
+
   return (
     <View style={TAB_BAR_STYLE.dashboardHeaderInset}>
+      {/* Dark status-bar icons on the yellow header, like every vendeur screen. */}
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.primary} />
       <CustomHeader showBackButton={false}>
         <View style={[TAB_BAR_STYLE.headerRow, { flexDirection: i18n.language === "ar" ? "row-reverse" : "row" }]}>
           <Image
             source={avatar ? { uri: avatar } : require("@/assets/img/avatar.jpg")}
             style={TAB_BAR_STYLE.avatar}
           />
-          <Text type="subTitleTwo" semiBold style={TAB_BAR_STYLE.greeting} numberOfLines={1}>
-            {t("partner.profile.greeting", { name: username ?? t("partner.profile.partnerFallback") })}
-          </Text>
-          <TouchableOpacity
-            style={TAB_BAR_STYLE.notification}
+          <PartnerGreeting name={username ?? t("partner.profile.partnerFallback")} size={23} />
+          <HeaderBell
+            hasUnread={hasUnreadNotifications}
             onPress={() => router.push("/(prestataire)/profile/notifications" as Href)}
-            accessibilityRole="button"
-            accessibilityLabel={t("partner.notifications.title")}
-          >
-            <CustomIcon name="notif" size={25} tintColor={Colors.brand} />
-            <View style={TAB_BAR_STYLE.notificationDot} />
-          </TouchableOpacity>
+          />
         </View>
       </CustomHeader>
     </View>
@@ -123,7 +122,11 @@ export default function PrestataireLayout() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === "ar";
   const insets = useSafeAreaInsets();
-  const barHeight = (Platform.OS === "android" ? 60 : 56) + insets.bottom;
+  const pathname = usePathname();
+  const router = useRouter();
+  const section = partnerSectionFromPath(pathname ?? "");
+  const { openRequestsCount } = usePartnerBadges();
+  const barHeight = (Platform.OS === "android" ? 64 : 60) + insets.bottom;
   const barPaddingBottom = Math.max(insets.bottom, Platform.OS === "android" ? 6 : 12);
 
   const customHeader = (props: { options: { title?: string } }) => (
@@ -132,6 +135,21 @@ export default function PrestataireLayout() {
       showBackButton={false}
     />
   );
+
+  /**
+   * Figma: icon + label in brand colour on the active tab only; other tabs are
+   * icon-only in grey. `focused` is what react-navigation reports; nested
+   * routes fall back to the pathname section.
+   */
+  const tabOptions = (tab: PartnerTab, icon: string, label: string, badge?: number) => ({
+    title: label,
+    tabBarIcon: ({ focused }: FocusedParam) => (
+      <TabBarIcon name={icon} focused={focused || section === tab} badge={badge} />
+    ),
+    tabBarLabel: ({ focused }: FocusedParam) =>
+      focused || section === tab ? <TabBarLabel focused label={label} /> : null,
+    tabBarAccessibilityLabel: label,
+  });
 
   return (
     <Tabs
@@ -154,172 +172,85 @@ export default function PrestataireLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: t("Accueil"),
+          ...tabOptions("dashboard", "home", t("partner.tabs.home")),
           header: () => <PartnerDashboardHeader />,
-          tabBarIcon: ({ focused }: FocusedParam) => (
-            <TabBarIcon name="home" focused={focused} />
-          ),
-          tabBarLabel: ({ focused }: FocusedParam) => (
-            <TabBarLabel focused={focused} label={t("Accueil")} />
-          ),
         }}
       />
 
       {/* ================================================================
           TAB 2 — Chercher / Search
-          (screen to be built Sprint 1 — route scaffolded now)
           ================================================================ */}
+      {/* Tab roots that draw their own header: headerShown is set here rather than with a
+          <Tabs.Screen options> inside the screen, whose setOptions runs on every render. */}
       <Tabs.Screen
         name="search/index"
-        options={{
-          title: t("Chercher"),
-          tabBarIcon: ({ focused }: FocusedParam) => (
-            <TabBarIcon name="search" focused={focused} />
-          ),
-          tabBarLabel: ({ focused }: FocusedParam) => (
-            <TabBarLabel focused={focused} label={t("Chercher")} />
-          ),
-        }}
+        options={{ ...tabOptions("search", "search", t("partner.tabs.search")), headerShown: false }}
       />
 
       {/* ================================================================
-          TAB 3 — Commandes / Orders
-          (screen to be built Sprint 1 — route scaffolded now)
-          ================================================================ */}
-      <Tabs.Screen
-        name="orders/index"
-        options={{
-          title: t("Mes commandes"),
-          tabBarIcon: ({ focused }: FocusedParam) => (
-            <TabBarIcon name="orders" focused={focused} />
-          ),
-          tabBarLabel: ({ focused }: FocusedParam) => (
-            <TabBarLabel focused={focused} label={t("Mes commandes")} />
-          ),
-        }}
-      />
-
-      {/* ================================================================
-          TAB 4 — Offres
-          (screen to be built Sprint 1 — route scaffolded now)
+          TAB 3 — Liste (offers hub) — badge = open incoming requests
           ================================================================ */}
       <Tabs.Screen
         name="offers/index"
-        options={{
-          title: t("Les offres"),
-          tabBarIcon: ({ focused }: FocusedParam) => (
-            <TabBarIcon name="offers" focused={focused} />
-          ),
-          tabBarLabel: ({ focused }: FocusedParam) => (
-            <TabBarLabel focused={focused} label={t("Les offres")} />
-          ),
+        options={{ ...tabOptions("offers", "offers", t("partner.tabs.list"), openRequestsCount), headerShown: false }}
+        listeners={{
+          // Re-tapping "Liste" on an offers list view goes back to the hub.
+          tabPress: () => {
+            if (pathname === "/offers") router.setParams({ view: undefined, state: undefined });
+          },
         }}
+      />
+
+      {/* ================================================================
+          TAB 4 — Expéditions / Orders
+          ================================================================ */}
+      <Tabs.Screen
+        name="orders/index"
+        options={{ ...tabOptions("orders", "orders", t("partner.tabs.orders")), headerShown: false }}
       />
 
       {/* ================================================================
           TAB 5 — Profil
-          (screen to be built Sprint 1 — route scaffolded now)
           ================================================================ */}
       <Tabs.Screen
         name="profile/index"
-        options={{
-          title: t("Profil"),
-          tabBarIcon: ({ focused }: FocusedParam) => (
-            <TabBarIcon name="profile" focused={focused} />
-          ),
-          tabBarLabel: ({ focused }: FocusedParam) => (
-            <TabBarLabel focused={focused} label={t("Profil")} />
-          ),
-        }}
+        options={{ ...tabOptions("profile", "profile", t("partner.tabs.profile")), headerShown: false }}
       />
 
       {/* ================================================================
-          Legacy stub screens — hidden from tab bar, kept to prevent
-          expo-router from erroring on the existing files.
+          Nested screens — not tab entries (href: null) but the tab bar stays
+          visible on all of them (Figma), with the section tab highlighted.
           ================================================================ */}
-      <Tabs.Screen
-        name="settings"
-        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
-      />
+      <Tabs.Screen name="settings" options={{ href: null, headerShown: false }} />
 
-      {/* ================================================================
-          Order detail screen — hidden from tab bar (drill-down only)
-          ================================================================ */}
-      <Tabs.Screen
-        name="orders/[orderId]/index"
-        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
-      />
+      {/* Order detail (drill-down only) */}
+      <Tabs.Screen name="orders/[orderId]/index" options={{ href: null, headerShown: false }} />
 
-      {/* ================================================================
-          Offer sub-flow screens — hidden from tab bar (drill-down only)
-          ================================================================ */}
-      <Tabs.Screen
-        name="offers/[offerId]/index"
-        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
-      />
-      <Tabs.Screen
-        name="offers/[offerId]/fill"
-        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
-      />
-      <Tabs.Screen
-        name="offers/[offerId]/ship"
-        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
-      />
+      {/* Offer sub-flow (drill-down only) */}
+      <Tabs.Screen name="offers/[offerId]/index" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="offers/[offerId]/fill" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="offers/[offerId]/ship" options={{ href: null, headerShown: false }} />
 
-      {/* ================================================================
-          Profile sub-screens — hidden from tab bar (drill-down only)
-          ================================================================ */}
-      <Tabs.Screen
-        name="profile/overview"
-        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
-      />
-      <Tabs.Screen
-        name="profile/edit"
-        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
-      />
-      <Tabs.Screen
-        name="profile/company"
-        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
-      />
-      <Tabs.Screen
-        name="profile/wallet/index"
-        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
-      />
-      <Tabs.Screen
-        name="profile/wallet/withdraw"
-        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
-      />
-      <Tabs.Screen
-        name="profile/wallet/verification"
-        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
-      />
-      <Tabs.Screen
-        name="profile/wallet/success"
-        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
-      />
-      <Tabs.Screen
-        name="profile/orders-history"
-        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
-      />
-      <Tabs.Screen
-        name="profile/offers-history"
-        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
-      />
-      <Tabs.Screen
-        name="profile/notifications"
-        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
-      />
-      <Tabs.Screen
-        name="profile/language"
-        options={{ href: null, headerShown: false, tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
-      />
+      {/* Profile sub-screens (drill-down only) */}
+      <Tabs.Screen name="profile/overview" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="profile/edit" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="profile/company" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="profile/wallet/index" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="profile/wallet/withdraw" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="profile/wallet/verification" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="profile/wallet/success" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="profile/orders-history" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="profile/offers-history" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="profile/notifications" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="profile/language" options={{ href: null, headerShown: false }} />
+      {/* about / legal render their own back header (CustomHeader). */}
       <Tabs.Screen
         name="profile/about"
-        options={{ href: null, title: t("partner.profile.aboutEben"), tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, title: t("partner.profile.aboutEben") }}
       />
       <Tabs.Screen
         name="profile/legal"
-        options={{ href: null, title: t("partner.profile.terms"), tabBarStyle: HIDDEN_TAB_BAR_STYLE }}
+        options={{ href: null, headerShown: false, title: t("partner.profile.terms") }}
       />
     </Tabs>
   );

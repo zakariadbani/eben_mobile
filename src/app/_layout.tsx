@@ -39,11 +39,10 @@ function RootLayoutContent() {
   //   Roboto-Regular.ttf, Roboto-Medium.ttf, Roboto-Bold.ttf
   //   BarlowCondensed-Regular.ttf, BarlowCondensed-Medium.ttf,
   //   BarlowCondensed-SemiBold.ttf, BarlowCondensed-Bold.ttf
-  //   NotoNaskhArabic.ttf  (Regular weight only — Bold/Medium not yet available)
-  //
-  // Missing font files (need to be sourced from Google Fonts and added to assets):
-  //   NotoNaskhArabic-Bold.ttf   — NotoNaskhArabic weight 700
-  //   NotoNaskhArabic-Medium.ttf — NotoNaskhArabic weight 500
+  //   NotoNaskhArabic.ttf (variable, default Regular 400)
+  //   NotoNaskhArabic-SemiBold.ttf / NotoNaskhArabic-Bold.ttf — static wght 600 / 700
+  //     instances of NotoNaskhArabic.ttf (fonttools varLib.instancer): React Native
+  //     cannot select a variable-font weight, so Text.tsx picks these by family name.
   const [fontsLoaded, fontError] = useFonts({
     // Roboto (Latin body)
     Roboto: require("../assets/fonts/Roboto-Regular.ttf"),
@@ -56,8 +55,10 @@ function RootLayoutContent() {
     // the "medium" weight alias used by Text.tsx labelTwo/titleTwo variants.
     BarlowCondensedSemiBold: require("../assets/fonts/BarlowCondensed-SemiBold.ttf"),
     BarlowCondensedMedium: require("../assets/fonts/BarlowCondensed-Medium.ttf"),
-    // Noto Naskh Arabic (RTL / Arabic — Regular only until bold/medium sourced)
+    // Noto Naskh Arabic (RTL / Arabic): Regular + semi-bold / bold for `semiBold` / `bold` Text
     NotoNaskhArabic: require("../assets/fonts/NotoNaskhArabic.ttf"),
+    NotoNaskhArabicSemiBold: require("../assets/fonts/NotoNaskhArabic-SemiBold.ttf"),
+    NotoNaskhArabicBold: require("../assets/fonts/NotoNaskhArabic-Bold.ttf"),
   });
 
   // Treat a font load error as "done" — render with system-font fallback
@@ -116,6 +117,9 @@ const StackLayout = () => {
       currentRoute === "(auth)/ForgotPasswordScreen" ||
       currentRoute.startsWith("(auth)/forgot-password/") ||
       currentRoute.startsWith("(auth)/prestataire/forgot-password/");
+    // Post-sign-in "EBEN PARTNERS" splash: let it play before the dashboard.
+    const isPartnerSplashRoute =
+      currentRoute === "(auth)/prestataire/loading" && role === "prestataire";
 
     // If there's no session, only intentional preview routes are available.
     if (!session) {
@@ -143,7 +147,8 @@ const StackLayout = () => {
     if (
       currentRoute.startsWith("(auth)") &&
       !currentRoute.startsWith("(auth)/register/") &&
-      !isRecoveryRoute
+      !isRecoveryRoute &&
+      !isPartnerSplashRoute
     ) {
       router.replace(
         role === "prestataire" ? "/(prestataire)/dashboard" : getClientReturnTo(returnTo),

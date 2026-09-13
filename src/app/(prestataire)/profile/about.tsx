@@ -1,20 +1,39 @@
+/**
+ * (prestataire)/profile/about.tsx
+ *
+ * À propos — no partner frame; mirrors client Figma "Profile / A propos" (93-17331):
+ * yellow-tinted hero with the EBEN logo and "Made in Morocco", mission / vision / values sections
+ * (60px icons, Barlow titles), Barlow contact lines, copyright + version footer.
+ */
+
 import React from 'react';
 import { Image, ImageBackground, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import CustomHeader from '@/components/common/CustomHeader';
+import CustomIcon from '@/components/common/CustomIcon';
+import Footer from '@/components/common/Footer';
 import Icon from '@/components/common/Icon';
 import { Screen } from '@/components/common/Screen';
 import { Text } from '@/components/common/Text';
 import View from '@/components/common/View';
 import Colors from '@/constants/Colors';
 
-function AboutSection({ icon, title, body }: { icon: string; title: string; body: string }): React.ReactElement {
+function AboutSection({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }): React.ReactElement {
   return (
-    <View style={styles.section} gap={8}>
-      <Icon name={icon} type="Feather" size={30} iconColor={Colors.brand} />
-      <Text type="subTitle" semiBold color={Colors.brand} translate={false}>{title}</Text>
-      <Text type="default" color={Colors.grayMidDark} translate={false}>{body}</Text>
+    <View style={styles.section} gap={10}>
+      <CustomIcon name={icon} size={64} />
+      <Text type="titleTwo" semiBold color={Colors.brand} translate={false} style={styles.sectionTitle}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
+function Contact({ icon, value }: { icon: string; value: string }): React.ReactElement {
+  return (
+    <View flexDirection="row" alignItems="center" gap={12}>
+      <Icon name={icon} type="Feather" size={22} iconColor={Colors.brand} />
+      <Text type="textTwo" semiBold color={Colors.brand} translate={false} flex>{value}</Text>
     </View>
   );
 }
@@ -22,51 +41,48 @@ function AboutSection({ icon, title, body }: { icon: string; title: string; body
 export default function PrestataireAboutScreen(): React.ReactElement {
   const { t } = useTranslation();
   return (
-    <Screen scrollable whatsapp={false} edges={['bottom']}>
+    <Screen statusBarStyle="dark-content" scrollable whatsapp={false} edges={['bottom']}>
       <CustomHeader title={t('partner.about.title')} />
       <ImageBackground source={require('@/assets/images/backgrounds/about.png')} style={styles.hero} resizeMode="cover">
-        <View style={styles.tint} />
-        <View alignItems="center">
+        <View alignItems="center" gap={12}>
           <Image source={require('@/assets/images/others/logo.png')} style={styles.logo} resizeMode="contain" accessibilityLabel="EBEN" />
-          <View style={styles.origin}><Text type="label" color={Colors.white} semiBold center translate={false}>{t('partner.about.madeInMorocco')}</Text></View>
+          <Text type="titleTwo" semiBold color={Colors.brand} center translate={false}>{t('partner.about.madeInMorocco')}</Text>
         </View>
       </ImageBackground>
       <View style={styles.content}>
-        <AboutSection icon="crosshair" title={t('partner.about.missionTitle')} body={t('partner.about.missionBody')} />
-        <AboutSection icon="send" title={t('partner.about.visionTitle')} body={t('partner.about.visionBody')} />
-        <View style={styles.section} gap={8}>
-          <Icon name="star" type="Feather" size={30} iconColor={Colors.brand} />
-          <Text type="subTitle" semiBold color={Colors.brand} translate={false}>{t('partner.about.valuesTitle')}</Text>
-          <View flexDirection="row" style={styles.values} gap={12}>
-            {['speed', 'discipline', 'boldness'].map((value) => <Text key={value} type="label" semiBold color={Colors.brand} translate={false} flex>{t(`partner.about.values.${value}`)}</Text>)}
+        <AboutSection icon="snipe" title={t('partner.about.missionTitle')}>
+          <Text type="text" color={Colors.brand} translate={false} style={styles.body}>{t('partner.about.missionBody')}</Text>
+        </AboutSection>
+        <AboutSection icon="rocket" title={t('partner.about.visionTitle')}>
+          <Text type="text" color={Colors.brand} translate={false} style={styles.body}>{t('partner.about.visionBody')}</Text>
+        </AboutSection>
+        <AboutSection icon="star" title={t('partner.about.valuesTitle')}>
+          <View flexDirection="row" style={styles.values} gap={28}>
+            {['speed', 'discipline', 'boldness'].map((value) => (
+              <Text key={value} type="titleTwo" color={Colors.brand} translate={false} style={styles.valueText}>{t(`partner.about.values.${value}`)}</Text>
+            ))}
           </View>
-        </View>
-        <View style={styles.contact} gap={12}>
-          <Text type="label" semiBold color={Colors.brand} translate={false}>{t('partner.about.contactTitle')}</Text>
+        </AboutSection>
+        <View style={styles.contact} gap={18}>
+          <Text type="titleTwo" semiBold color={Colors.brand} translate={false} style={styles.sectionTitle}>{t('partner.about.contactTitle')}</Text>
           <Contact icon="mail" value="info@eben.ma" />
           <Contact icon="phone" value="+212 6 61 39 39 71" />
           <Contact icon="map-pin" value={t('partner.about.address')} />
         </View>
       </View>
-      <View style={styles.footer} flexDirection="row">
-        <Text type="small" color={Colors.gray} translate={false} flex>{`EBEN Solutions SARL © ${new Date().getFullYear()}`}</Text>
-      </View>
+      <Footer />
     </Screen>
   );
 }
 
-function Contact({ icon, value }: { icon: string; value: string }): React.ReactElement {
-  return <View flexDirection="row" alignItems="center" gap={10}><Icon name={icon} type="Feather" size={18} iconColor={Colors.gray} /><Text type="default" color={Colors.grayMidDark} translate={false} flex>{value}</Text></View>;
-}
-
 const styles = StyleSheet.create({
-  hero: { height: 200, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  tint: { ...StyleSheet.absoluteFillObject, backgroundColor: Colors.primary, opacity: 0.3 },
-  logo: { width: 180, height: 60, marginBottom: 8 },
-  origin: { backgroundColor: Colors.brand, paddingHorizontal: 12, paddingVertical: 3 },
-  content: { paddingHorizontal: 20, paddingTop: 12 },
-  section: { paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: Colors.backgroundGray },
-  values: { flexWrap: 'wrap' },
-  contact: { paddingVertical: 20 },
-  footer: { padding: 20, borderTopWidth: 1, borderTopColor: Colors.backgroundGray },
+  hero: { width: '100%', aspectRatio: 1.35, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  logo: { width: '55%', aspectRatio: 273 / 55 },
+  content: { paddingHorizontal: 24, paddingTop: 16 },
+  section: { paddingVertical: 24 },
+  sectionTitle: { fontSize: 34 },
+  body: { lineHeight: 26 },
+  values: { flexWrap: 'wrap', marginTop: 8 },
+  valueText: { fontSize: 30 },
+  contact: { paddingTop: 24, paddingBottom: 40 },
 });

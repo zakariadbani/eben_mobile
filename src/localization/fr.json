@@ -39,7 +39,7 @@
   "auth.otp.sent": "Un code d'identification a été envoyé au {{phone}}",
   "auth.otp.notReceived": "Vous n'avez pas reçu le code ?",
   "auth.otp.seconds": "{{count}} sec",
-  "auth.otp.resend": "Renvoyez-le maintenant",
+  "auth.otp.resend": "Renvoyez-le maintenant !",
   "auth.otp.resending": "Envoi...",
   "auth.otp.verify": "Vérifier",
   "auth.otp.verifying": "Vérification...",
@@ -60,6 +60,8 @@
   "auth.recovery.passwordConfirmationRequired": "Vous devez confirmer votre mot de passe",
   "auth.recovery.passwordMismatch": "Les mots de passe doivent correspondre",
   "auth.recovery.confirm": "Confirmer",
+  "auth.recovery.newPassword": "Mot de passe",
+  "auth.recovery.repeatPassword": "Répéter le mot de passe",
   "auth.recovery.confirming": "Confirmation...",
   "auth.recovery.noPending": "Recommencez la réinitialisation pour recevoir un nouveau code.",
   "auth.recovery.startError": "Impossible d'envoyer le code. Vérifiez le numéro et réessayez.",
@@ -402,6 +404,8 @@
   "Nom de l'entreprise, ou magasin": "Nom de l'entreprise, ou magasin",
   "Demande envoyée": "Demande envoyée",
   "Bienvenue sur EBEN": "Bienvenue sur EBEN",
+  "Bienvenue {{name}}": "Bienvenue {{name}}",
+  "Connectez-vous": "Connectez-vous",
 
   "partner.dashboard.greeting": "Bonjour Auto Maroc 👋",
   "partner.dashboard.revenueLabel": "Solde courant",
@@ -415,8 +419,8 @@
   "partner.dashboard.pendingPayout": "À retirer",
   "partner.dashboard.receivedCount": "Demandes reçues",
   "partner.dashboard.activeCount": "Offres actives",
-  "partner.dashboard.acceptedCount": "Offres acceptées",
-  "partner.dashboard.sentCount": "Envois",
+  "partner.dashboard.acceptedCount": "Demandes acceptées",
+  "partner.dashboard.sentCount": "Demandes envoyées",
   "partner.dashboard.emptyOffers": "Aucune offre active pour le moment",
   "partner.dashboard.loadError": "Impossible de charger le tableau de bord",
   "partner.dashboard.offersLoadError": "Impossible de charger les offres actives",
@@ -429,10 +433,22 @@
   "partner.dashboard.missedCount": "Demandes manquées",
   "partner.dashboard.salesMonth": "Ventes en mai 2022",
   "partner.dashboard.seeMore": "Voir plus",
-  "partner.dashboard.supportTitle": "Une question ?",
+  "partner.dashboard.salesIn": "Ventes en {{month}}",
+  "partner.currency": "Dhs",
+  "partner.amountCurrency": "Dhs",
+  "partner.dashboard.supportTitle": "3ndk chi sou2al??",
   "partner.dashboard.supportBody": "Vous pouvez nous appeler de 8h à 19h du lundi au vendredi au numéro suivant :",
   "partner.dashboard.supportCall": "Appeler le support",
   "partner.dashboard.supportPhone": "+212 6 61 39 39 71",
+  "partner.tabs.home": "Accueil",
+  "partner.tabs.search": "Chercher",
+  "partner.tabs.list": "Liste",
+  "partner.tabs.orders": "Expéditions",
+  "partner.tabs.profile": "Profil",
+  "partner.status.order.readyToCollect": "Prêt à être collecter",
+  "partner.status.order.returned": "Retourné",
+  "partner.status.order.delivered": "Livré",
+  "Sélectionner ...": "Sélectionner ...",
   "partner.sent.shipped": "Expédiée",
   "partner.offer.statusActive": "Active",
   "partner.offer.statusPending": "Envoyée",
@@ -446,7 +462,7 @@
   "partner.sent.refusee": "Refusée",
   "partner.sent.livree": "Livrée",
 
-  "partner.offers.title": "Vos offres",
+  "partner.offers.title": "Votre liste",
   "partner.offers.tab.incoming": "Offres",
   "partner.offers.tab.active": "Actives",
   "partner.offers.tab.accepted": "Acceptées",
@@ -457,7 +473,7 @@
   "partner.offers.empty.sent": "Aucune offre envoyée",
   "partner.offers.loadError.incoming": "Impossible de charger les demandes",
   "partner.offers.loadError.offers": "Impossible de charger les offres",
-  "partner.offers.card.ref": "Réf:",
+  "partner.offers.card.ref": "Ref:",
   "partner.offers.card.pieces": "pièces",
   "partner.offers.card.restante": "restante",
   "partner.offers.card.expire": "Expiré",
@@ -520,10 +536,10 @@
   "partner.fill.pricePlaceholder": ".....",
   "partner.fill.commentLabel": "Laissez un commentaire",
   "partner.fill.commentPlaceholder": "......",
-  "partner.fill.clientGeneralNote": "Note générale sur la demande",
+  "partner.fill.clientGeneralNote": "Note de client",
   "partner.fill.remarksLabel": "Remarques sur la pièce",
   "partner.fill.priceRecapLabel": "Prix",
-  "partner.fill.ctaSend": "Envoyer l'offre",
+  "partner.fill.ctaSend": "Envoyer",
   "partner.fill.ctaSending": "Envoi...",
   "partner.fill.ctaDecline": "Refuser",
   "partner.fill.ctaBack": "Non",
@@ -634,14 +650,14 @@
   "partner.notifications.retry": "Réessayer",
   "partner.notifications.unread": "non lus",
   "partner.notifications.timeNow": "À l'instant",
-  "partner.notifications.timeHours": "il y a {{count}} heure(s)",
-  "partner.notifications.timeDays": "il y a {{count}} jour(s)",
+  "partner.notifications.timeHours": "il y a {{count}} heure",
+  "partner.notifications.timeDays": "il y a {{count}} jour",
   "partner.notifications.cta.sendOffer": "Envoyer une offre",
   "partner.notifications.cta.details": "Détails",
   "partner.notifications.cta.ship": "Expédier la pièce",
   "partner.notifications.noUnread": "Aucune notification non lue",
-  "partner.notifications.unreadCount": "· {{count}} non lue(s)",
-  "partner.notifications.markAllRead": "Tout lire",
+  "partner.notifications.unreadCount": "· {{count}} non lu",
+  "partner.notifications.markAllRead": "Tout marquer comme lu",
   "partner.notifications.filterUnread": "Afficher uniquement les notifications non lues",
   "partner.notifications.mutationError": "Impossible de mettre à jour les notifications",
 
@@ -666,7 +682,7 @@
   "partner.withdraw.formTitle": "Veuillez sélectionner le montant que vous souhaitez retirer",
   "partner.withdraw.balanceLabel": "Solde Courant:",
   "partner.withdraw.amountLabel": "Montant (XX.XXX,XX)",
-  "partner.withdraw.amountPlaceholder": "1.000,00 DHS",
+  "partner.withdraw.amountPlaceholder": "10.000,00 DHS",
   "partner.withdraw.methodLabel": "Méthode",
   "partner.withdraw.methodPlaceholder": "Choisissez la méthode de retrait",
   "partner.withdraw.ctaSend": "Envoyer la demande",
@@ -709,7 +725,7 @@
   "partner.profile.logoutBody": "Êtes-vous sûr(e) de vouloir vous déconnecter ?",
   "partner.profile.copyright": "EBEN Solutions SARL © 2022",
   "partner.profile.version": "v 1.0.0",
-  "partner.profile.greeting": "Bonjour {{name}} 👋",
+  "partner.profile.greeting": "Hey {{name}} 👋",
   "partner.profile.partnerFallback": "Partenaire",
   "Déconnexion": "Déconnexion",
   "Annuler": "Annuler",
@@ -783,10 +799,10 @@
   "partner.company.bankSupportOnly": "La configuration des coordonnées bancaires est disponible uniquement via le support EBEN.",
   "partner.company.noBrandResults": "Aucune marque ne correspond à votre recherche",
   "partner.company.removeBrandAccessibility": "Retirer la marque {{brand}}",
-  "partner.about.title": "À propos d'EBEN",
+  "partner.about.title": "À propos",
   "partner.about.madeInMorocco": "Fabriqué au Maroc",
   "partner.about.missionTitle": "NOTRE MISSION",
-  "partner.about.missionBody": "Faciliter la commande et l'achat de pièces automobiles partout au Maroc en supprimant les obstacles liés à l'achat et à la vente.",
+  "partner.about.missionBody": "Faciliter la commande et l'achat de pièces automobiles dans tout le Maroc en supprimant toutes les barrières d'achat et de vente associées à l'industrie.",
   "partner.about.visionTitle": "NOTRE VISION",
   "partner.about.visionBody": "Contribuer à numériser et à améliorer l'industrie marocaine des pièces automobiles.",
   "partner.about.valuesTitle": "NOS VALEURS",
@@ -862,8 +878,15 @@
   "partner.offers.filter.apply": "Appliquer",
   "Filters": "Filtres",
   "partner.offers.unknownPart": "Pièce automobile",
-  "partner.offers.action": "Préparer",
-  "partner.offers.quantityOne": "Qty 1",
+  "partner.offers.action": "Action",
+  "partner.offers.prepareCollect": "Préparer la collecte",
+  "partner.offers.showMore": "Afficher plus",
+  "partner.offers.status.rejected": "Rejeté",
+  "partner.offers.stats.periodDays": "{{count}} derniers jours",
+  "partner.fill.selectOffer": "Sélectionner l'offre {{count}}",
+  "partner.offers.allMonths": "Tous les mois",
+  "partner.offers.monthFilter": "Filtrer par mois",
+  "partner.offers.quantityOne": "Qté 1",
   "partner.fill.openDetailTitle": "Offres ouvertes - Détails",
   "partner.fill.offerNumber": "— Offre {{count}}",
   "partner.fill.offerLabel": "Offre {{count}}",
@@ -871,14 +894,14 @@
   "partner.fill.removeOffer": "Supprimer l'offre {{count}}",
   "partner.fill.errorTitle": "Erreur",
   "partner.ship.acceptedDetailTitle": "Offres acceptées - Détails",
-  "partner.ship.shippedDetailTitle": "Offres expédiées - Détails",
+  "partner.ship.shippedDetailTitle": "Offres acceptées - Détails",
   "partner.ship.vehicleFallback": "Véhicule associé à la demande",
-  "partner.ship.prepareStatus": "Préparer l'expédition",
+  "partner.ship.prepareStatus": "Passer à l'action - Expédier",
   "partner.ship.shippedStatus": "Acceptée et expédiée",
-  "partner.ship.prepareBody": "Veuillez étiqueter la pièce avec la référence {{reference}}, puis la préparer pour l'expédition.",
+  "partner.ship.prepareBody": "Veuillez étiqueter la pièce en question avec la référence ci-dessus, et la préparer pour l'expédition, puis cliquez sur le bouton : Prêt à être expédié !",
   "partner.ship.sentAt": "Colis expédié le",
   "partner.ship.noRemarks": "Aucune remarque sur cette pièce.",
-  "partner.ship.readyCta": "Renseigner l'expédition",
+  "partner.ship.readyCta": "Prêt à être expédié !",
   "partner.ship.confirmCta": "Confirmer",
   "partner.offerDetail.countdownRemaining": "{{value}} restantes",
   "partner.offerDetail.date": "Date :",
@@ -1299,4 +1322,47 @@
   ,"update.body": "Une nouvelle version d'EBEN est disponible sur Google Play. Mettez à jour pour profiter des dernières améliorations."
   ,"update.cta": "Mettre à jour"
   ,"update.later": "Plus tard"
+  ,"partner.offerDetail.sentToast": "L'offre a été envoyée pour {{part}}"
+  ,"partner.ship.readyToast": "Votre colis {{part}} est prêt à être expédié"
+  ,"partner.orders.shippedAt": "Colis envoyé à"
+  ,"partner.orders.count": "({{count}})"
+  ,"partner.orders.empty.all": "Aucune expédition pour le moment"
+  ,"partner.history.dotsPlaceholder": "......"
+  ,"partner.history.searchLabel": "Rechercher"
+  ,"partner.history.allMonths": "Toutes les périodes"
+  ,"partner.history.monthPicker": "Choisir le mois"
+  ,"partner.history.monthPickerTitle": "Choisissez le mois"
+  ,"partner.history.filter": "Filtrer"
+  ,"partner.history.ref": "Ref: {{ref}}"
+  ,"partner.history.statusLine": "Statut : {{status}}"
+  ,"partner.history.qty": "Qté {{count}}"
+  ,"partner.wallet.filter.credit": "Crédits"
+  ,"partner.wallet.filter.debit": "Débits"
+  ,"partner.company.dataLine": "{{label}} : {{value}}"
+  ,"partner.company.sheetBrandPlaceholder": "Choisissez une marque"
+  ,"partner.editProfile.modify": "Modifier"
+  ,"partner.editProfile.confirm": "Confirmer"
+  ,"partner.editProfile.nameField": "Nom"
+  ,"partner.editProfile.currentPassword": "Mot de passe actuel"
+  ,"partner.editProfile.currentPasswordRequired": "Saisissez votre mot de passe actuel pour modifier l'email"
+  ,"partner.editProfile.currentPasswordInvalid": "Mot de passe actuel incorrect"
+  ,"partner.editProfile.emailInvalid": "Adresse email invalide ou déjà utilisée"
+  ,"partner.editProfile.firstNameRequired": "Le prénom est obligatoire"
+  ,"partner.editProfile.saveError": "Impossible d'enregistrer la modification. Réessayez."
+  ,"partner.notifications.menu": "Options pour {{title}}"
+  ,"partner.notifications.markRead": "Marquer comme lu"
+  ,"partner.notifications.unreadCount_plural": "· {{count}} non lus"
+  ,"partner.notifications.timeMinutes": "il y a {{count}} minute"
+  ,"partner.notifications.timeMinutes_plural": "il y a {{count}} minutes"
+  ,"partner.notifications.timeHours_plural": "il y a {{count}} heures"
+  ,"partner.notifications.timeDays_plural": "il y a {{count}} jours"
+  ,"partner.overview.dateRangeMetric": "{{metric}} entre ({{from}} et {{to}})"
+  ,"partner.language.description": "Changer votre langue"
+  ,"partner.language.hint": "La langue sera appliquée immédiatement."
+  ,"partner.dashboard.currencyCode": "MAD"
+  ,"partner.offerDetail.countdownValue": "{{hours}}h {{minutes}}min"
+  ,"partner.company.addressEmpty": "Aucune adresse renseignée pour le moment."
+  ,"partner.offerDetail.countdownDaysValue": "{{days}}j {{hours}}h"
+  ,"partner.countdown.remainingHours": "{{hours}}h {{minutes}}min restante"
+  ,"partner.countdown.remainingDays": "{{days}}j {{hours}}h restante"
 }

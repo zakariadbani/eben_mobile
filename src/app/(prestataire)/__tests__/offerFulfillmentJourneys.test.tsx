@@ -1,6 +1,6 @@
 import React from "react";
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
-import { Alert } from "react-native";
+import { Alert, ScrollView, StyleSheet } from "react-native";
 
 import i18n from "@/localization/i18n";
 import { ApiClientError } from "@/api/types";
@@ -17,9 +17,12 @@ import {
 } from "@/api/resources/prestataire";
 import type { PrestataireOffer, PrestataireShipment } from "@/interfaces/Offer";
 import type { Request } from "@/interfaces/Request";
+import { formatPartnerDateTime } from "@/components/screens/prestataire/PartnerDetailBlocks";
+import { offerStatusLabelKey, statusColor } from "@/helpers/partnerStatus";
 import OfferDetailScreen from "../offers/[offerId]";
 import OfferFillScreen from "../offers/[offerId]/fill";
 import OfferShipScreen from "../offers/[offerId]/ship";
+import Colors from "@/constants/Colors";
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -27,6 +30,7 @@ const mockBack = jest.fn();
 let mockParams: Record<string, string | undefined> = {};
 let mockNextImageUris: string[] = [];
 let mockFocusCleanup: (() => void) | null = null;
+let mockFocusCallback: (() => void | (() => void)) | null = null;
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn().mockResolvedValue(null),
@@ -38,6 +42,7 @@ jest.mock("expo-router", () => ({
   useFocusEffect: (callback: () => void | (() => void)) => {
     const ReactModule = require("react") as typeof React;
     ReactModule.useEffect(() => {
+      mockFocusCallback = callback;
       const cleanup = callback();
       mockFocusCleanup = typeof cleanup === "function" ? cleanup : null;
       return cleanup;
@@ -252,6 +257,7 @@ beforeEach(async () => {
   mockParams = { offerId: "33" };
   mockNextImageUris = [];
   mockFocusCleanup = null;
+  mockFocusCallback = null;
   await i18n.changeLanguage("fr");
   mockGetIncoming.mockResolvedValue({ success: true, data: [incomingRequest], pagination });
   mockGetOffer.mockResolvedValue({ success: true, data: offer });
@@ -302,6 +308,12 @@ it("falls back to the default header when itemId does not match any request line
   expect(screen.getAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"))).toHaveLength(1);
 });
 
+/** Adding an offer folds the previous lines; reopen one by tapping its "Offre N" header. */
+const addOfferLineAndExpandAll = (screen: ReturnType<typeof render>) => {
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.addAnotherOffer") }));
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.offerLabel", { count: 1 }) }));
+};
+
 it("renders the request images in the shared hero slider", async () => {
   const screen = render(<OfferFillScreen />);
 
@@ -315,11 +327,16 @@ it("adds a second offer line for the same part and removes it again", async () =
   expect(screen.queryByRole("button", { name: i18n.t("partner.fill.removeOffer", { count: 1 }) })).toBeNull();
 
   fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.addAnotherOffer") }));
-  expect(screen.getAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"))).toHaveLength(2);
-  expect(screen.getByText(i18n.t("partner.fill.offerLabel", { count: 2 }))).toBeTruthy();
+  // The previous offer folds and the added one opens; the trash only sits on the added offer.
+  expect(screen.getAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"))).toHaveLength(1);
+  expect(screen.getByRole("button", { name: i18n.t("partner.fill.offerLabel", { count: 1 }) }).props.accessibilityState).toEqual({ expanded: false });
+  expect(screen.getByRole("button", { name: i18n.t("partner.fill.offerLabel", { count: 2 }) }).props.accessibilityState).toEqual({ expanded: true });
+  expect(screen.queryByRole("button", { name: i18n.t("partner.fill.removeOffer", { count: 1 }) })).toBeNull();
 
   fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.removeOffer", { count: 2 }) }));
+  // Removing the open offer reopens the remaining one.
   expect(screen.getAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"))).toHaveLength(1);
+  expect(screen.getByRole("button", { name: i18n.t("partner.fill.offerLabel", { count: 1 }) }).props.accessibilityState).toEqual({ expanded: true });
   expect(screen.queryByRole("button", { name: i18n.t("partner.fill.removeOffer", { count: 1 }) })).toBeNull();
   expect(screen.queryByText(i18n.t("partner.fill.offerLabel", { count: 2 }))).toBeNull();
 });
@@ -334,14 +351,18 @@ it("labels the client's request note with the general note key", async () => {
 it("requires a positive raw price and at least one image for every offer line", async () => {
   const screen = render(<OfferFillScreen />);
   expect(await screen.findAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"))).toHaveLength(1);
-  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.addAnotherOffer") }));
+  addOfferLineAndExpandAll(screen);
   const priceInputs = screen.getAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"));
   expect(priceInputs).toHaveLength(2);
-  expect(screen.getByText(i18n.t("partner.fill.title"))).toBeTruthy();
-  expect(screen.queryByText(i18n.t("partner.fill.openDetailTitle"))).toBeNull();
+  expect(screen.getByText(i18n.t("partner.fill.openDetailTitle"))).toBeTruthy();
+  expect(screen.queryByText(i18n.t("partner.fill.title"))).toBeNull();
+  const sendButton = () => screen.getByRole("button", { name: i18n.t("partner.fill.ctaSend") });
+  expect(sendButton().props.accessibilityState).toEqual({ disabled: true });
   fireEvent.changeText(priceInputs[0], "250");
   fireEvent.changeText(priceInputs[1], "300");
-  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.ctaSend") }));
+  expect(sendButton().props.accessibilityState).toEqual({ disabled: true });
+  // Tapping the still-disabled CTA reveals what is missing instead of submitting.
+  fireEvent.press(sendButton());
 
   expect(await screen.findAllByText(i18n.t("requestFlow.noPhoto"))).toHaveLength(2);
   expect(mockUploadLocalImages).not.toHaveBeenCalled();
@@ -350,8 +371,35 @@ it("requires a positive raw price and at least one image for every offer line", 
   mockNextImageUris = ["file:///a.jpg", "file:///b.jpg"];
   const addButtons = screen.getAllByRole("button", { name: i18n.t("requestFlow.addImage") });
   fireEvent.press(addButtons[0]);
+  expect(sendButton().props.accessibilityState).toEqual({ disabled: true });
   fireEvent.press(addButtons[1]);
   expect(screen.queryAllByText(i18n.t("requestFlow.noPhoto"))).toHaveLength(0);
+  expect(sendButton().props.accessibilityState).toEqual({ disabled: false });
+
+  fireEvent.changeText(priceInputs[1], "0");
+  expect(sendButton().props.accessibilityState).toEqual({ disabled: true });
+});
+
+it("keeps the Dhs suffix inside the price field without a TTC echo and shows the Arabic countdown", async () => {
+  mockGetIncoming.mockResolvedValue({
+    success: true,
+    data: [{ ...incomingRequest, expiresAt: new Date(Date.now() + 30 * 60_000 + 30_000).toISOString() }],
+    pagination,
+  });
+  const screen = render(<OfferFillScreen />);
+  const [priceInput] = await screen.findAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"));
+  fireEvent.changeText(priceInput!, "300");
+
+  expect(screen.getByText(i18n.t("partner.currency"))).toBeTruthy();
+  expect(screen.queryByText("300.00 Dhs TTC")).toBeNull();
+  const timer = screen.getByText(`0h 30min ${i18n.t("partner.fill.timerRestante")}`);
+  expect(timer.props.style).toEqual(expect.arrayContaining([{ color: Colors.red }]));
+  screen.unmount();
+
+  await i18n.changeLanguage("ar");
+  const arabic = render(<OfferFillScreen />);
+  expect(await arabic.findByText("0 س 30 دقيقة متبقية")).toBeTruthy();
+  expect(arabic.getByText(i18n.t("partner.fill.openDetailTitle"))).toBeTruthy();
 });
 
 it("surfaces a generic upload failure immediately", async () => {
@@ -360,7 +408,7 @@ it("surfaces a generic upload failure immediately", async () => {
   mockUploadLocalImages.mockRejectedValueOnce(new Error("upload failed"));
   const screen = render(<OfferFillScreen />);
   await screen.findAllByRole("button", { name: i18n.t("requestFlow.addImage") });
-  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.addAnotherOffer") }));
+  addOfferLineAndExpandAll(screen);
   const addButtons = screen.getAllByRole("button", { name: i18n.t("requestFlow.addImage") });
   fireEvent.press(addButtons[0]);
   fireEvent.press(addButtons[1]);
@@ -384,7 +432,7 @@ it("uploads multi-line local images in order, submits raw prices only, and retri
     .mockResolvedValueOnce({ success: true, data: { success: true, offerId: 402 } });
   const screen = render(<OfferFillScreen />);
   await screen.findAllByRole("button", { name: i18n.t("requestFlow.addImage") });
-  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.addAnotherOffer") }));
+  addOfferLineAndExpandAll(screen);
   const addButtons = screen.getAllByRole("button", { name: i18n.t("requestFlow.addImage") });
   fireEvent.press(addButtons[0]);
   fireEvent.press(addButtons[1]);
@@ -433,6 +481,14 @@ it("resends the existing backend offer once without uploading its public URLs", 
   mockResendOffer.mockReturnValue(pending.promise);
   const screen = render(<OfferFillScreen />);
   const resend = await screen.findByRole("button", { name: i18n.t("partner.fill.ctaResend") });
+  expect(resend.props.accessibilityState).toEqual({ disabled: true });
+  expect(screen.getAllByText(i18n.t("partner.fill.priceRecapLabel"))).toHaveLength(1);
+  fireEvent.press(resend);
+  expect(mockResendOffer).not.toHaveBeenCalled();
+
+  const checkbox = screen.getByRole("checkbox", { name: i18n.t("partner.fill.selectOffer", { count: 1 }) });
+  fireEvent.press(checkbox);
+  expect(screen.getByRole("checkbox", { name: i18n.t("partner.fill.selectOffer", { count: 1 }) }).props.accessibilityState).toEqual({ checked: true });
   fireEvent.press(resend);
   fireEvent.press(resend);
 
@@ -442,6 +498,8 @@ it("resends the existing backend offer once without uploading its public URLs", 
   expect(mockUploadLocalImages).not.toHaveBeenCalled();
   pending.resolve({ success: true, data: { success: true, offerId: 401 } });
   expect(await screen.findByText(i18n.t("partner.fill.successTitleResend"))).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.successCta") }));
+  expect(mockReplace).toHaveBeenCalledWith("/(prestataire)/offers/401?sent=1");
 });
 
 it("loads a new-offer request returned after the first incoming page", async () => {
@@ -482,18 +540,148 @@ it("labels an offer with no seller photo instead of showing a different part", a
   expect(screen.queryByTestId("image-slider")).toBeNull();
 });
 
-it("keeps every description line visible when a canonical category title is shown", async () => {
+it("shows the canonical part name once and the full description only under the remarks", async () => {
   mockParams = { offerId: "401" };
   mockGetOffer.mockResolvedValueOnce({
     success: true,
-    data: { ...offer, description: "Ligne info\nLigne détail\nLigne remarque" },
+    data: { ...offer, status: "pending", brandName: "Bosch", adminNotes: "Note admin", description: "Ligne info\nLigne détail\nLigne remarque" },
   });
   const screen = render(<OfferDetailScreen />);
 
-  expect(await screen.findByText("Plaquettes")).toBeTruthy();
-  expect(screen.getByText("Ligne info")).toBeTruthy();
-  expect(screen.getByText(/Ligne détail/)).toBeTruthy();
-  expect(screen.getByText(/Ligne remarque/)).toBeTruthy();
+  expect(await screen.findAllByText("Plaquettes")).toHaveLength(1);
+  expect(screen.getAllByText("Ligne info\nLigne détail\nLigne remarque")).toHaveLength(1);
+  expect(screen.queryByText("Ligne info")).toBeNull();
+  expect(screen.getByText(i18n.t("partner.offerDetail.remarks"))).toBeTruthy();
+  expect(screen.getByText(i18n.t("partner.ship.vehicleFallback"))).toBeTruthy();
+  expect(screen.getByText(`250 ${i18n.t("partner.offerDetail.priceTtc")}`)).toBeTruthy();
+  // Figma removed the brand line, the FR reference chip, the date line and the admin note box.
+  expect(screen.queryByText(i18n.t("requestList.brand", { value: "Bosch" }))).toBeNull();
+  expect(screen.queryByText(/OFF-401/)).toBeNull();
+  expect(screen.queryByText(new RegExp(i18n.t("partner.offerDetail.date")))).toBeNull();
+  expect(screen.queryByText("Note admin")).toBeNull();
+});
+
+it("renders the pending status in the helper colour with the countdown stacked under it", async () => {
+  const now = jest.spyOn(Date, "now").mockReturnValue(new Date("2026-08-01T20:00:00.000Z").getTime());
+  try {
+    mockParams = { offerId: "401" };
+    mockGetOffer.mockResolvedValueOnce({ success: true, data: { ...offer, status: "pending", validatedAt: null } });
+    const screen = render(<OfferDetailScreen />);
+
+    const status = await screen.findByText(i18n.t("partner.offerDetail.statusPending"));
+    expect(status.props.style).toEqual(expect.arrayContaining([{ color: statusColor("pending") }]));
+    const countdown = screen.getByText(i18n.t("partner.offerDetail.countdownRemaining", { value: "14h 00min" }));
+    expect(countdown.props.style).toEqual(expect.arrayContaining([{ color: statusColor("pending") }]));
+  } finally {
+    now.mockRestore();
+  }
+});
+
+it("localizes the Arabic countdown and mirrors the price badge to the right", async () => {
+  const now = jest.spyOn(Date, "now").mockReturnValue(new Date("2026-08-01T20:00:00.000Z").getTime());
+  try {
+    await i18n.changeLanguage("ar");
+    mockParams = { offerId: "401" };
+    mockGetOffer.mockResolvedValueOnce({ success: true, data: { ...offer, status: "pending", validatedAt: null } });
+    const screen = render(<OfferDetailScreen />);
+
+    expect(await screen.findByText("14 ساعة و 00 دقيقة متبقية")).toBeTruthy();
+    let badge = screen.getByText(`250 ${i18n.t("partner.offerDetail.priceTtc")}`).parent;
+    while (badge && StyleSheet.flatten(badge.props.style)?.alignSelf === undefined) badge = badge.parent;
+    expect(StyleSheet.flatten(badge?.props.style)?.alignSelf).toBe("flex-end");
+  } finally {
+    now.mockRestore();
+  }
+});
+
+it("colours the fill timer with the list-card thresholds and reopens folded offers that miss data", async () => {
+  mockGetIncoming.mockResolvedValue({
+    success: true,
+    data: [{ ...incomingRequest, expiresAt: new Date(Date.now() + 13 * 3_600_000 + 30 * 60_000).toISOString() }],
+    pagination,
+  });
+  const screen = render(<OfferFillScreen />);
+  const timer = await screen.findByText(/^13h \d{2}\s?min /);
+  expect(timer.props.style).toEqual(expect.arrayContaining([{ color: Colors.greenDark }]));
+
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.addAnotherOffer") }));
+  expect(screen.getAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"))).toHaveLength(1);
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.fill.ctaSend") }));
+
+  expect(await screen.findAllByText(i18n.t("requestFlow.noPhoto"))).toHaveLength(2);
+  expect(screen.getAllByPlaceholderText(i18n.t("partner.fill.pricePlaceholder"))).toHaveLength(2);
+});
+
+it("shows a dismissible sent toast when opened after submitting an offer", async () => {
+  mockParams = { offerId: "401", sent: "1" };
+  mockGetOffer.mockResolvedValueOnce({ success: true, data: { ...offer, status: "pending" } });
+  const screen = render(<OfferDetailScreen />);
+
+  const message = i18n.t("partner.offerDetail.sentToast", { part: "Plaquettes" });
+  expect(await screen.findByText(message)).toBeTruthy();
+  fireEvent.press(screen.getByTestId("partner-toast"));
+  expect(screen.queryByText(message)).toBeNull();
+});
+
+it("lists the partner's other offers in a carousel that opens their detail", async () => {
+  mockParams = { offerId: "401" };
+  mockGetOffers.mockResolvedValue({
+    success: true,
+    data: [offer, { ...offer, id: 402, reference: "OFF-402", status: "rejected" }],
+    pagination,
+  });
+  const screen = render(<OfferDetailScreen />);
+
+  const card = await screen.findByLabelText(`${i18n.t("partner.offers.card.details")} OFF-402`);
+  expect(screen.queryByLabelText(`${i18n.t("partner.offers.card.details")} OFF-401`)).toBeNull();
+  expect(screen.getByText(i18n.t(offerStatusLabelKey("rejected")))).toBeTruthy();
+  fireEvent.press(card);
+  expect(mockPush).toHaveBeenCalledWith("/(prestataire)/offers/402");
+});
+
+it("times carousel cards with the list-card wording and thresholds, not the detail status colour", async () => {
+  const now = jest.spyOn(Date, "now").mockReturnValue(new Date("2026-08-01T20:00:00.000Z").getTime());
+  try {
+    mockParams = { offerId: "401" };
+    mockGetOffer.mockResolvedValueOnce({ success: true, data: { ...offer, status: "pending", validatedAt: null } });
+    mockGetOffers.mockResolvedValue({
+      success: true,
+      data: [
+        offer,
+        // 18h left → green; 30 min left → red (24 h window from validatedAt ?? createdAt).
+        { ...offer, id: 402, reference: "OFF-402", status: "pending", validatedAt: null, createdAt: "2026-08-01T14:00:00.000Z" },
+        { ...offer, id: 403, reference: "OFF-403", status: "validated", validatedAt: "2026-07-31T20:30:00.000Z" },
+      ],
+      pagination,
+    });
+    const screen = render(<OfferDetailScreen />);
+
+    const green = await screen.findByText("18h 00min restante");
+    expect(green.props.style).toEqual(expect.arrayContaining([{ color: Colors.greenDark }]));
+    const red = screen.getByText("0h 30min restante");
+    expect(red.props.style).toEqual(expect.arrayContaining([{ color: Colors.red }]));
+    // The main status countdown keeps the Figma detail wording in the status colour.
+    const main = screen.getByText(i18n.t("partner.offerDetail.countdownRemaining", { value: "14h 00min" }));
+    expect(main.props.style).toEqual(expect.arrayContaining([{ color: statusColor("pending") }]));
+  } finally {
+    now.mockRestore();
+  }
+});
+
+it("scrolls the kept-mounted detail back to the top when it regains focus", async () => {
+  mockParams = { offerId: "401" };
+  mockGetOffer.mockResolvedValue({ success: true, data: { ...offer, status: "pending" } });
+  const screen = render(<OfferDetailScreen />);
+  await screen.findByText(i18n.t("partner.offerDetail.statusPending"));
+  const scrollTo = jest.mocked(ScrollView.prototype.scrollTo);
+  scrollTo.mockClear();
+
+  act(() => {
+    mockFocusCleanup?.();
+    mockFocusCallback?.();
+  });
+
+  expect(scrollTo).toHaveBeenCalledWith({ y: 0, animated: false });
 });
 
 it("offers the existing resend flow from a rejected offer detail", async () => {
@@ -522,7 +710,7 @@ it("rejects an invalid shipment id without an API call", async () => {
   mockParams = { offerId: "0" };
   const screen = render(<OfferShipScreen />);
 
-  expect(await screen.findByText(i18n.t("partner.offerDetail.loadError"))).toBeTruthy();
+  expect(await screen.findByText(i18n.t("partner.offerDetail.notFound"))).toBeTruthy();
   expect(mockGetOffer).not.toHaveBeenCalled();
   expect(mockGetOfferShipment).not.toHaveBeenCalled();
 });
@@ -532,7 +720,11 @@ it("uses shipment read-back instead of offer notes to decide whether shipping is
   mockGetOffer.mockResolvedValueOnce({ success: true, data: { ...offer, adminNotes: "expédié manuellement" } });
   const screen = render(<OfferDetailScreen />);
 
-  expect(await screen.findByRole("button", { name: i18n.t("partner.offerDetail.ctaShip") })).toBeTruthy();
+  // The detail route renders the same Ship it layout as the ship route for an accepted offer.
+  expect(await screen.findByRole("button", { name: i18n.t("partner.ship.readyCta") })).toBeTruthy();
+  expect(screen.getByText(i18n.t("partner.ship.prepareStatus"))).toBeTruthy();
+  expect(screen.getByText(`${i18n.t("partner.offerDetail.ref")} OFF-401`)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: i18n.t("partner.offerDetail.ctaShip") })).toBeNull();
   expect(mockGetOfferShipment).toHaveBeenCalledWith(401);
 });
 
@@ -548,7 +740,7 @@ it("hides shipment actions when the backend marks a selected offer ineligible", 
   mockGetOffer.mockResolvedValue({ success: true, data: { ...offer, shippingEligible: false } });
   const detail = render(<OfferDetailScreen />);
   await detail.findAllByText("Plaquettes disponibles");
-  expect(detail.queryByRole("button", { name: i18n.t("partner.offerDetail.ctaShip") })).toBeNull();
+  expect(detail.queryByRole("button", { name: i18n.t("partner.ship.readyCta") })).toBeNull();
   detail.unmount();
 
   const shipping = render(<OfferShipScreen />);
@@ -572,7 +764,7 @@ it("blocks shipping for a non-selected offer and renders canonical condition and
 
   expect(await detail.findByText(i18n.t("partner.fill.conditionEnStock"))).toBeTruthy();
   expect(detail.getByText("4")).toBeTruthy();
-  expect(detail.queryByRole("button", { name: i18n.t("partner.offerDetail.ctaShip") })).toBeNull();
+  expect(detail.queryByRole("button", { name: i18n.t("partner.ship.readyCta") })).toBeNull();
   detail.unmount();
 
   const shipping = render(<OfferShipScreen />);
@@ -581,12 +773,20 @@ it("blocks shipping for a non-selected offer and renders canonical condition and
   expect(shipping.queryByRole("button", { name: i18n.t("partner.ship.readyCta") })).toBeNull();
 });
 
-it("formats offer dates with the active Arabic locale", async () => {
+it("renders the Arabic shipped layout with the ref above the name, sent date and condition line", async () => {
   await i18n.changeLanguage("ar");
   mockParams = { offerId: "401" };
+  mockGetOfferShipment.mockResolvedValue({ success: true, data: shipment });
   const screen = render(<OfferDetailScreen />);
 
-  expect(await screen.findByText("01 غشت 2026")).toBeTruthy();
+  expect(await screen.findByText("Plaquettes AR")).toBeTruthy();
+  expect(screen.getByText(i18n.t("partner.ship.shippedDetailTitle"))).toBeTruthy();
+  expect(screen.getByText(`${i18n.t("partner.offers.card.ref")} OFF-401`)).toBeTruthy();
+  expect(screen.getByText(i18n.t("partner.ship.shippedStatus"))).toBeTruthy();
+  expect(screen.getByText(formatPartnerDateTime(shipment.shippedAt))).toBeTruthy();
+  expect(screen.getByText(`${i18n.t("partner.offerDetail.ref")} TRACK-1`)).toBeTruthy();
+  expect(screen.getByText(`${i18n.t("partner.offerDetail.condition")} ${i18n.t("partner.fill.conditionEnStock")}`)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: i18n.t("partner.ship.readyCta") })).toBeNull();
 });
 
 it("validates shipment fields, sends them once, and renders the shipment read-back", async () => {
@@ -600,40 +800,41 @@ it("validates shipment fields, sends them once, and renders the shipment read-ba
   expect(await screen.findByText(i18n.t("partner.ship.errorRequired"))).toBeTruthy();
   expect(mockShipOffer).not.toHaveBeenCalled();
 
+  // Figma sheet (255-39950) only has the reference field.
+  expect(screen.queryByPlaceholderText(i18n.t("partner.ship.carrierPlaceholder"))).toBeNull();
+  expect(screen.queryByPlaceholderText(i18n.t("partner.ship.notesPlaceholder"))).toBeNull();
   fireEvent.changeText(screen.getByPlaceholderText(i18n.t("partner.ship.trackingPlaceholder")), " TRACK-1 ");
-  fireEvent.changeText(screen.getByPlaceholderText(i18n.t("partner.ship.carrierPlaceholder")), " Amana ");
-  fireEvent.changeText(screen.getByPlaceholderText(i18n.t("partner.ship.notesPlaceholder")), " Fragile ");
   fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.ship.ctaConfirm") }));
   const confirm = screen.getByRole("button", { name: i18n.t("partner.ship.confirmCta") });
   fireEvent.press(confirm);
   fireEvent.press(confirm);
 
   await waitFor(() => expect(mockShipOffer).toHaveBeenCalledTimes(1));
-  expect(mockShipOffer).toHaveBeenCalledWith(401, { trackingNumber: "TRACK-1", carrier: "Amana", notes: "Fragile" });
+  expect(mockShipOffer).toHaveBeenCalledWith(401, { trackingNumber: "TRACK-1" });
   await waitFor(() => expect(mockGetOfferShipment).toHaveBeenCalledTimes(2));
-  expect(await screen.findByText("TRACK-1")).toBeTruthy();
+  expect(await screen.findByText(`${i18n.t("partner.offerDetail.ref")} TRACK-1`)).toBeTruthy();
+  expect(screen.getByText(i18n.t("partner.ship.shippedStatus"))).toBeTruthy();
+  expect(screen.getByText(i18n.t("partner.ship.readyToast", { part: "Plaquettes" }))).toBeTruthy();
+  expect(screen.queryByRole("button", { name: i18n.t("partner.ship.readyCta") })).toBeNull();
 });
 
-it("maps Laravel shipment validation fields and preserves the entered shipment", async () => {
+it("maps Laravel shipment validation errors and preserves the entered reference", async () => {
   mockParams = { offerId: "401" };
-  mockShipOffer.mockRejectedValueOnce(new ApiClientError("Validation failed", 422, {
-    trackingNumber: ["Référence refusée"],
-    carrier: ["Transporteur refusé"],
-    notes: ["Remarque refusée"],
-  }));
+  mockShipOffer
+    .mockRejectedValueOnce(new ApiClientError("Validation failed", 422, { trackingNumber: ["Référence refusée"] }))
+    .mockRejectedValueOnce(new ApiClientError("Validation failed", 422, { offer: ["Offre déjà expédiée"] }));
   const screen = render(<OfferShipScreen />);
   fireEvent.press(await screen.findByRole("button", { name: i18n.t("partner.ship.readyCta") }));
   fireEvent.changeText(screen.getByPlaceholderText(i18n.t("partner.ship.trackingPlaceholder")), "TRACK-X");
-  fireEvent.changeText(screen.getByPlaceholderText(i18n.t("partner.ship.carrierPlaceholder")), "Carrier X");
-  fireEvent.changeText(screen.getByPlaceholderText(i18n.t("partner.ship.notesPlaceholder")), "Notes X");
   fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.ship.ctaConfirm") }));
   fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.ship.confirmCta") }));
 
   expect(await screen.findByText("Référence refusée")).toBeTruthy();
-  expect(screen.getByText("Transporteur refusé")).toBeTruthy();
-  expect(screen.getByText("Remarque refusée")).toBeTruthy();
   expect(screen.getByDisplayValue("TRACK-X")).toBeTruthy();
-  expect(screen.getByDisplayValue("Carrier X")).toBeTruthy();
-  expect(screen.getByDisplayValue("Notes X")).toBeTruthy();
+
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.ship.ctaConfirm") }));
+  fireEvent.press(screen.getByRole("button", { name: i18n.t("partner.ship.confirmCta") }));
+  expect(await screen.findByText("Offre déjà expédiée")).toBeTruthy();
+  expect(screen.getByDisplayValue("TRACK-X")).toBeTruthy();
   expect(mockGetOfferShipment).toHaveBeenCalledTimes(1);
 });

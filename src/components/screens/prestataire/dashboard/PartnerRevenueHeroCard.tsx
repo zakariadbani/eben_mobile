@@ -28,7 +28,7 @@ const PartnerRevenueHeroCard: React.FC<PartnerRevenueHeroCardProps> = ({
           {`${pendingPayout.toLocaleString("fr-MA", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
-          })} Dhs`}
+          })} ${t("partner.amountCurrency")}`}
         </Text>
       </View>
       <Text type="textTwo" semiBold style={styles.label}>

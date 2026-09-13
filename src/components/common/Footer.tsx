@@ -1,6 +1,7 @@
 import React from "react";
-import { View, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 import { Text } from "@/components/common/Text"; // Assuming you have a custom Text component
+import View from "@/components/common/View";
 import Constants from "expo-constants";
 import Colors from "@/constants/Colors";
 
@@ -10,7 +11,8 @@ const Footer = () => {
   const appVersion = android?.versionCode ? `${version} (${android.versionCode})` : version;
 
   return (
-    <View style={styles.container}>
+    // RTL-aware row: © on the leading edge, version on the trailing edge (mirrored in Arabic).
+    <View style={styles.container} flexDirection="row" justifyContent="space-between">
       <Text type="smallTwo" color={Colors.grayMidDark} translate={false}>
         {`EBEN Solutions SARL © ${new Date().getFullYear()}`}
       </Text>
@@ -23,8 +25,6 @@ const Footer = () => {
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: "row",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 5,
   },

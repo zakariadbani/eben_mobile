@@ -1,192 +1,91 @@
 /**
  * (prestataire)/profile/overview.tsx
  *
- * Aperçus — partner performance overview screen — Sprint P5 sub-flow A.
+ * Aperçus — partner performance overview.
  *
  * Figma refs:
  *   - partner/Aperçus__267-37244.png  (FR)
  *   - partner/Aperçus__286-30470.png  (AR)
  *
  * Layout (top → bottom):
- *   CustomHeader — back + "Aperçus" title + bell
- *   Metric selector  — dropdown showing active metric label + count
- *   Period tabs      — 1 jour | 7 jours (active) | 1 mois | 6 mois | 1 ans | MAX
- *   Chart area       — View-based area line chart (NO external chart lib)
- *   KPI cards row    — received / active / accepted / sent / revenue / payout
+ *   CustomHeader   — back + "Aperçus" + bell (red dot when unread)
+ *   Metric selector — "Demandes envoyées ⌄" dropdown, value, "<metric> entre (<from> et <to>)"
+ *   Period tabs     — 1 jour | 7 jours | 1 mois | 6 mois | 1 ans | MAX (equal grey pills, active yellow)
+ *   Chart           — smooth yellow curve + gradient area, Y ticks, X bucket labels (react-native-svg)
  *
- * Data: getPrestataireStats() — PrestataireDashboardStats
+ * Data: getPrestataireDashboardSeries(period). The "top sold products" block of the AR frame
+ * needs a backend field that does not exist yet.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-} from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
 
 import View from '@/components/common/View';
 import { Text } from '@/components/common/Text';
 import CustomHeader from '@/components/common/CustomHeader';
 import Icon from '@/components/common/Icon';
-import CustomIcon from '@/components/common/CustomIcon';
 import Button from '@/components/common/Button';
 import { Screen } from '@/components/common/Screen';
+import OverviewChart from '@/components/screens/prestataire/profile/OverviewChart';
 
-import {
-  getPrestataireDashboardSeries,
-  getPrestataireStats,
-} from '@/api/resources/prestataire';
+import { getPrestataireDashboardSeries } from '@/api/resources/prestataire';
 import type {
   DashboardPeriod,
   PrestataireDashboardSeries,
   PrestataireDashboardSeriesBucket,
-  PrestataireDashboardStats,
 } from '@/interfaces/PrestataireDashboard';
 import Colors from '@/constants/Colors';
+import { usePartnerBadges } from '@/hooks/usePartnerBadges';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type MetricKey =
-  | 'offersReceivedCount'
-  | 'offersActiveCount'
-  | 'offersAcceptedCount'
-  | 'offersSentCount'
-  | 'revenue30d'
-  | 'pendingPayout';
+type SeriesKey = keyof Omit<PrestataireDashboardSeriesBucket, 'label'>;
 
 interface MetricOption {
-  key: MetricKey;
+  key: SeriesKey;
   labelKey: string;
-  seriesKey: keyof Omit<PrestataireDashboardSeriesBucket, 'label'>;
+  monetary: boolean;
+  /**
+   * Running balance per bucket (the headline is the latest point). Other metrics are
+   * per-bucket counts / amounts, so the headline is their total over the period.
+   */
+  cumulative?: boolean;
 }
 
 const METRIC_OPTIONS: MetricOption[] = [
-  { key: 'offersSentCount', labelKey: 'partner.overview.metricSent', seriesKey: 'offersSent' },
-  { key: 'offersReceivedCount', labelKey: 'partner.overview.metricReceived', seriesKey: 'offersReceived' },
-  { key: 'offersActiveCount', labelKey: 'partner.overview.metricActive', seriesKey: 'offersActive' },
-  { key: 'offersAcceptedCount', labelKey: 'partner.overview.metricAccepted', seriesKey: 'offersAccepted' },
-  { key: 'revenue30d', labelKey: 'partner.overview.metricRevenue', seriesKey: 'revenue' },
-  { key: 'pendingPayout', labelKey: 'partner.overview.metricPayout', seriesKey: 'pendingPayout' },
+  { key: 'offersSent', labelKey: 'partner.overview.metricSent', monetary: false },
+  { key: 'offersReceived', labelKey: 'partner.overview.metricReceived', monetary: false },
+  { key: 'offersActive', labelKey: 'partner.overview.metricActive', monetary: false },
+  { key: 'offersAccepted', labelKey: 'partner.overview.metricAccepted', monetary: false },
+  { key: 'revenue', labelKey: 'partner.overview.metricRevenue', monetary: true },
+  { key: 'pendingPayout', labelKey: 'partner.overview.metricPayout', monetary: true, cumulative: true },
 ];
 
 const PERIODS: { key: DashboardPeriod; labelKey: string }[] = [
-  { key: '1j',  labelKey: 'partner.overview.period1d' },
-  { key: '7j',  labelKey: 'partner.overview.period7d' },
-  { key: '1m',  labelKey: 'partner.overview.period1m' },
-  { key: '6m',  labelKey: 'partner.overview.period6m' },
-  { key: '1a',  labelKey: 'partner.overview.period1y' },
+  { key: '1j', labelKey: 'partner.overview.period1d' },
+  { key: '7j', labelKey: 'partner.overview.period7d' },
+  { key: '1m', labelKey: 'partner.overview.period1m' },
+  { key: '6m', labelKey: 'partner.overview.period6m' },
+  { key: '1a', labelKey: 'partner.overview.period1y' },
   { key: 'max', labelKey: 'partner.overview.periodMax' },
 ];
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-interface KpiCardProps {
-  readonly label: string;
-  readonly value: string;
-  readonly accent?: boolean;
-}
-
-function KpiCard({ label, value, accent = false }: KpiCardProps): React.ReactElement {
-  return (
-    <View style={[styles.kpiCard, accent && styles.kpiCardAccent]}>
-      <Text type="title" bold color={accent ? Colors.brand : Colors.brand} translate={false}>
-        {value}
-      </Text>
-      <Text type="small" color={Colors.grayMidDark}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-/** Simplistic view-based line/area chart using normalised values. */
-interface MiniChartProps {
-  readonly values: number[];
-}
-
-function MiniChart({ values }: MiniChartProps): React.ReactElement {
-  if (values.length < 2) {
-    return <View style={styles.chartPlaceholder} />;
-  }
-  const max = Math.max(...values, 1);
-  const min = Math.min(...values);
-  const range = max - min || 1;
-  const CHART_HEIGHT = 120;
-  const points = values.map((v, i) => ({
-    x: (i / (values.length - 1)) * 100,
-    y: CHART_HEIGHT - ((v - min) / range) * CHART_HEIGHT,
-  }));
-
-  return (
-    <View style={[styles.chart, { height: CHART_HEIGHT + 24 }]}>
-      {points.map((pt, i) => {
-        if (i === 0) return null;
-        const prev = points[i - 1];
-        return (
-          <View
-            key={i}
-            style={[
-              styles.chartSegment,
-              {
-                left: `${prev.x}%` as never,
-                top: pt.y + 12,
-                width: `${pt.x - prev.x}%` as never,
-                height: 2,
-              },
-            ]}
-          />
-        );
-      })}
-      {/* Y-axis labels */}
-      {[max, Math.round((max + min) / 2), min].map((v, i) => (
-        <Text
-          key={i}
-          type="small"
-          color={Colors.gray}
-          translate={false}
-          style={[styles.chartYLabel, { top: i * (CHART_HEIGHT / 2) + 8 }]}
-        >
-          {v}
-        </Text>
-      ))}
-    </View>
-  );
-}
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function OverviewScreen(): React.ReactElement {
-  const { t } = useTranslation();
-  const router = useRouter();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+  const { hasUnreadNotifications } = usePartnerBadges();
 
-  const [stats, setStats] = useState<PrestataireDashboardStats | null>(null);
   const [dashboardSeries, setDashboardSeries] = useState<PrestataireDashboardSeries | null>(null);
-  const [statsLoading, setStatsLoading] = useState(true);
   const [seriesLoading, setSeriesLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [statsError, setStatsError] = useState(false);
   const [seriesError, setSeriesError] = useState(false);
   const [activePeriod, setActivePeriod] = useState<DashboardPeriod>('7j');
-  const [activeMetric, setActiveMetric] = useState<MetricKey>('offersSentCount');
+  const [activeMetric, setActiveMetric] = useState<SeriesKey>('offersSent');
   const [metricMenuOpen, setMetricMenuOpen] = useState(false);
   const seriesRequestGeneration = useRef(0);
-
-  const loadStats = useCallback(async (isRefresh = false) => {
-    try {
-      if (!isRefresh) setStatsLoading(true);
-      setStatsError(false);
-      const res = await getPrestataireStats();
-      setStats(res.data);
-    } catch {
-      setStatsError(true);
-    } finally {
-      setStatsLoading(false);
-    }
-  }, []);
 
   const loadSeries = useCallback(async (period: DashboardPeriod, isRefresh = false) => {
     const generation = ++seriesRequestGeneration.current;
@@ -208,107 +107,70 @@ export default function OverviewScreen(): React.ReactElement {
   }, []);
 
   useEffect(() => {
-    void loadStats();
-  }, [loadStats]);
-
-  useEffect(() => {
     void loadSeries(activePeriod);
   }, [activePeriod, loadSeries]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    void Promise.allSettled([loadStats(true), loadSeries(activePeriod, true)])
-      .finally(() => setRefreshing(false));
-  }, [activePeriod, loadSeries, loadStats]);
+    void loadSeries(activePeriod, true).finally(() => setRefreshing(false));
+  }, [activePeriod, loadSeries]);
 
   // ── Derived values ──────────────────────────────────────────────────────────
 
-  const currentMetricOption = METRIC_OPTIONS.find((m) => m.key === activeMetric)!;
-  const chartValues = dashboardSeries?.buckets.map(
-    (bucket) => bucket[currentMetricOption.seriesKey],
-  ) ?? [];
-  const currentValue = chartValues[chartValues.length - 1] ?? 0;
-  const firstBucketLabel = dashboardSeries?.buckets[0]?.label;
-  const lastBucketLabel = dashboardSeries?.buckets[dashboardSeries.buckets.length - 1]?.label;
-  const isMonetary = activeMetric === 'revenue30d' || activeMetric === 'pendingPayout';
+  const currentMetric = METRIC_OPTIONS.find((option) => option.key === activeMetric) ?? METRIC_OPTIONS[0]!;
+  const buckets = dashboardSeries?.buckets ?? [];
+  const chartPoints = buckets.map((bucket) => ({ label: bucket.label, value: bucket[currentMetric.key] }));
+  // The headline must match the curve: period total, or the latest balance for a running metric.
+  const currentValue = currentMetric.cumulative
+    ? chartPoints[chartPoints.length - 1]?.value ?? 0
+    : Math.round(chartPoints.reduce((total, point) => total + point.value, 0) * 100) / 100;
+  const firstBucketLabel = buckets[0]?.label;
+  const lastBucketLabel = buckets[buckets.length - 1]?.label;
+  const metricLabel = t(currentMetric.labelKey);
 
-  const formatValue = (v: number) =>
-    isMonetary ? `${v.toLocaleString('fr-MA')} MAD` : v.toString();
-
-  // ── Render ──────────────────────────────────────────────────────────────────
-
-  const headerWithBell = (
-    <CustomHeader>
-      <View flexDirection="row" alignItems="center" style={styles.headerRow}>
-        <Text type="headerTitle" color={Colors.brand} style={styles.headerTitle}>
-          {t('partner.overview.title')}
-        </Text>
-        <View flex />
-        <TouchableOpacity
-          onPress={() => router.push('/(prestataire)/profile/notifications' as never)}
-          activeOpacity={0.7}
-        >
-          <CustomIcon name="notif" size={28} />
-        </TouchableOpacity>
-      </View>
-    </CustomHeader>
-  );
+  const formatValue = (value: number) => (currentMetric.monetary ? `${value.toLocaleString('fr-MA')} MAD` : value.toString());
 
   return (
-    <Screen whatsapp={false} scrollable={false} edges={['bottom']}>
-      {headerWithBell}
+    <Screen statusBarStyle="dark-content" whatsapp={false} scrollable={false} edges={['bottom']}>
+      <CustomHeader title={t('partner.overview.title')} showNotifications hasUnread={hasUnreadNotifications} />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[Colors.primary]}
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
         showsVerticalScrollIndicator={false}
       >
         {/* ── Metric selector ── */}
         <View style={styles.metricSelector}>
           <TouchableOpacity
-            style={styles.metricDropdown}
-            onPress={() => setMetricMenuOpen((v) => !v)}
+            onPress={() => setMetricMenuOpen((open) => !open)}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={metricLabel}
+            accessibilityState={{ expanded: metricMenuOpen }}
+            style={styles.metricDropdown}
           >
-            <Text type="subTitle" semiBold color={Colors.brand} flex>
-              {t(currentMetricOption.labelKey)}
-            </Text>
-            <Icon
-              name={metricMenuOpen ? 'chevron-up' : 'chevron-down'}
-              size={20}
-              iconColor={Colors.brand}
-              type="Feather"
-            />
+            <View flexDirection="row" alignItems="center" gap={24}>
+              <Text type="titleTwo" color={Colors.grayDark} translate={false} style={styles.metricTitle}>
+                {metricLabel}
+              </Text>
+              <Icon name={metricMenuOpen ? 'chevron-up' : 'chevron-down'} size={24} iconColor={Colors.brand} type="Feather" />
+            </View>
           </TouchableOpacity>
 
           {metricMenuOpen ? (
             <View style={styles.metricMenu}>
-              {METRIC_OPTIONS.map((opt) => (
+              {METRIC_OPTIONS.map((option) => (
                 <TouchableOpacity
-                  key={opt.key}
-                  style={[
-                    styles.metricMenuItem,
-                    opt.key === activeMetric && styles.metricMenuItemActive,
-                  ]}
+                  key={option.key}
+                  style={[styles.metricMenuItem, option.key === activeMetric && styles.metricMenuItemActive]}
                   onPress={() => {
-                    setActiveMetric(opt.key);
+                    setActiveMetric(option.key);
                     setMetricMenuOpen(false);
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text
-                    type="label"
-                    color={
-                      opt.key === activeMetric ? Colors.brand : Colors.grayMidDark
-                    }
-                  >
-                    {t(opt.labelKey)}
+                  <Text type="textTwo" semiBold color={Colors.brand} translate={false}>
+                    {t(option.labelKey)}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -316,120 +178,53 @@ export default function OverviewScreen(): React.ReactElement {
           ) : null}
 
           {seriesLoading && !dashboardSeries ? (
-            <ActivityIndicator color={Colors.primary} />
+            <ActivityIndicator color={Colors.primary} style={styles.valueLoader} />
           ) : seriesError ? (
-            <View alignItems="center" gap={8}>
+            <View alignItems="center" gap={8} style={styles.valueLoader}>
               <Text type="label" color={Colors.grayMidDark} center>
                 {t('partner.overview.seriesLoadError')}
               </Text>
-              <Button
-                title={t('partner.overview.seriesRetry')}
-                fit
-                onPress={() => void loadSeries(activePeriod)}
-              />
+              <Button title={t('partner.overview.seriesRetry')} fit onPress={() => void loadSeries(activePeriod)} />
             </View>
           ) : (
-            <Text type="title" bold color={Colors.brand} translate={false}>
+            <Text type="titleTwo" semiBold color={Colors.brand} translate={false} style={styles.value}>
               {formatValue(currentValue)}
             </Text>
           )}
-          <Text type="small" color={Colors.gray}>
+          <Text type="labelTwo" semiBold color={Colors.brand} translate={false}>
             {firstBucketLabel && lastBucketLabel
-              ? t('partner.overview.dateRangeDynamic', { from: firstBucketLabel, to: lastBucketLabel })
+              ? t('partner.overview.dateRangeMetric', { metric: metricLabel, from: firstBucketLabel, to: lastBucketLabel })
               : t('partner.overview.dateRangeUnavailable')}
           </Text>
         </View>
 
         {/* ── Period tabs ── */}
-        <View flexDirection="row" style={styles.periodRow} gap={6}>
-          {PERIODS.map((p) => (
-            <TouchableOpacity
-              key={p.key}
-              style={[
-                styles.periodTab,
-                activePeriod === p.key && styles.periodTabActive,
-              ]}
-              onPress={() => setActivePeriod(p.key)}
-              activeOpacity={0.7}
-            >
-              <Text
-                type="small"
-                color={activePeriod === p.key ? Colors.brand : Colors.grayMidDark}
-                translate={false}
+        <View flexDirection="row" style={styles.periodRow} gap={8}>
+          {PERIODS.map((period) => {
+            const active = activePeriod === period.key;
+            return (
+              <TouchableOpacity
+                key={period.key}
+                style={[styles.periodTab, active && styles.periodTabActive]}
+                onPress={() => setActivePeriod(period.key)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
               >
-                {t(p.labelKey)}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text type="textTwo" color={Colors.brand} translate={false} center numberOfLines={1}>
+                  {t(period.labelKey)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* ── Chart ── */}
         <View style={styles.chartWrapper}>
-          {seriesError ? <View style={styles.chartPlaceholder} /> : <MiniChart values={chartValues} />}
+          {seriesError || chartPoints.length === 0
+            ? <View style={styles.chartPlaceholder} />
+            : <OverviewChart points={chartPoints} rtl={isArabic} integerTicks={!currentMetric.monetary} />}
         </View>
-
-        {/* ── KPI grid ── */}
-        {statsLoading && !stats ? (
-          <ActivityIndicator color={Colors.primary} style={styles.statsLoader} />
-        ) : statsError ? (
-          <View alignItems="center" p={24}>
-            <Text type="label" color={Colors.grayMidDark} center>
-              {t('partner.overview.loadError')}
-            </Text>
-            <Button
-              title={t('partner.overview.retry')}
-              fit
-              onPress={() => void loadStats()}
-              style={styles.retryBtn}
-            />
-          </View>
-        ) : stats ? (
-          <View style={styles.kpiGrid}>
-            <View flexDirection="row" gap={12} style={styles.kpiRow}>
-              <View flex>
-                <KpiCard
-                  label={t('partner.dashboard.receivedCount')}
-                  value={stats.offersReceivedCount.toString()}
-                />
-              </View>
-              <View flex>
-                <KpiCard
-                  label={t('partner.dashboard.activeCount')}
-                  value={stats.offersActiveCount.toString()}
-                />
-              </View>
-            </View>
-            <View flexDirection="row" gap={12} style={styles.kpiRow}>
-              <View flex>
-                <KpiCard
-                  label={t('partner.dashboard.acceptedCount')}
-                  value={stats.offersAcceptedCount.toString()}
-                />
-              </View>
-              <View flex>
-                <KpiCard
-                  label={t('partner.dashboard.sentCount')}
-                  value={stats.offersSentCount.toString()}
-                />
-              </View>
-            </View>
-            <View flexDirection="row" gap={12} style={styles.kpiRow}>
-              <View flex>
-                <KpiCard
-                  label={t('partner.dashboard.revenueSubLabel')}
-                  value={`${stats.revenue30d.toLocaleString('fr-MA')} MAD`}
-                  accent
-                />
-              </View>
-              <View flex>
-                <KpiCard
-                  label={t('partner.dashboard.pendingPayout')}
-                  value={`${stats.pendingPayout.toLocaleString('fr-MA')} MAD`}
-                />
-              </View>
-            </View>
-          </View>
-        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -438,117 +233,46 @@ export default function OverviewScreen(): React.ReactElement {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  headerRow: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-  },
-  scroll: {
-    flex: 1,
-    backgroundColor: Colors.backgroundLight,
-  },
-  scrollContent: {
-    paddingBottom: 32,
-  },
-  metricSelector: {
-    padding: 20,
-    backgroundColor: Colors.white,
-    marginBottom: 2,
-  },
-  metricDropdown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
+  scroll: { flex: 1, backgroundColor: Colors.backgroundLight },
+  scrollContent: { paddingBottom: 96 },
+  metricSelector: { paddingHorizontal: 16, paddingTop: 24 },
+  metricDropdown: { alignSelf: 'flex-start', minHeight: 48, justifyContent: 'center' },
+  // Figma Aperçus 267-37244: ~22 dp selector label.
+  metricTitle: { fontSize: 22 },
   metricMenu: {
     backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
     borderRadius: 8,
+    marginTop: 4,
     marginBottom: 8,
     overflow: 'hidden',
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  metricMenuItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.borderLight,
-  },
-  metricMenuItemActive: {
-    backgroundColor: Colors.backgroundGray,
-  },
-  periodRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.white,
-    flexWrap: 'wrap',
-  },
+  metricMenuItem: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 14 },
+  metricMenuItemActive: { backgroundColor: Colors.primary },
+  valueLoader: { marginVertical: 12 },
+  value: { fontSize: 44, lineHeight: 52, marginTop: 8 },
+  periodRow: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8 },
   periodTab: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    flex: 1,
+    minHeight: 48,
     borderRadius: 8,
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.greyLight2,
+    backgroundColor: Colors.backgroundGray,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
   },
   periodTabActive: {
     backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  chartWrapper: {
-    backgroundColor: Colors.white,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 16,
-  },
-  chart: {
-    width: '100%',
-    position: 'relative',
-    backgroundColor: '#FFFDE7',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  chartPlaceholder: {
-    height: 120,
-    backgroundColor: Colors.backgroundGray,
-    borderRadius: 8,
-  },
-  chartSegment: {
-    position: 'absolute',
-    backgroundColor: Colors.primary,
-  },
-  chartYLabel: {
-    position: 'absolute',
-    left: 4,
-  },
-  kpiGrid: {
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  kpiRow: {
-    marginBottom: 0,
-  },
-  kpiCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
     shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  kpiCardAccent: {
-    backgroundColor: Colors.primary,
-  },
-  retryBtn: {
-    marginTop: 16,
-  },
-  statsLoader: {
-    marginVertical: 32,
-  },
+  chartWrapper: { paddingHorizontal: 16, paddingTop: 16 },
+  chartPlaceholder: { height: 280, borderRadius: 8, backgroundColor: Colors.backgroundGray },
 });

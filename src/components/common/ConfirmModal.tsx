@@ -33,6 +33,13 @@ interface ConfirmModalProps {
   primaryButton?: ButtonProps;
   secondaryButton?: ButtonProps;
   zIndexValue?: number; // Optional zIndex prop
+  /**
+   * Footer outline: "box" (default) draws a thin border on every side;
+   * "top" keeps a single top hairline (vendeur decline sheet, Figma 229-38465).
+   */
+  footerBorder?: "box" | "top";
+  /** Minimum sheet height as a fraction of the window height (e.g. 0.75). */
+  minHeightRatio?: number;
 }
 
 const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -42,6 +49,8 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   primaryButton,
   secondaryButton,
   zIndexValue = 100,
+  footerBorder = "box",
+  minHeightRatio,
 }) => {
   const slideAnim = useRef(new Animated.Value(height)).current;
 
@@ -85,16 +94,16 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
       <Animated.View
         style={[
           styles.modalContainer,
-
+          minHeightRatio ? { minHeight: height * minHeightRatio } : null,
           { transform: [{ translateY: slideAnim }], zIndex: zIndexValue },
         ]}
         pointerEvents={visible ? "auto" : "none"}
       >
         <View style={styles.bar}></View>
-        <View style={styles.contentContainer}>
+        <View style={[styles.contentContainer, minHeightRatio ? styles.contentFill : null]}>
           <ScrollView>{children}</ScrollView>
         </View>
-        <View style={styles.buttonContainer} flexDirection="row" gap={20}>
+        <View style={[styles.buttonContainer, footerBorder === "top" && styles.buttonContainerTopHairline]} flexDirection="row" gap={20}>
           {secondaryButton && (
             <View style={styles.button}>
               <Button
@@ -180,6 +189,13 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+  buttonContainerTopHairline: {
+    borderWidth: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+  },
+  contentFill: { flex: 1 },
   button: {
     flex: 1,
     paddingVertical: 10,

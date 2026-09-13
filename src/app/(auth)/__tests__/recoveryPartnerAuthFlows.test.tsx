@@ -14,16 +14,22 @@ import PrestataireSignInScreen from "../prestataire/sign-in";
 import PartnerForgotPasswordScreen from "../prestataire/forgot-password";
 import PartnerForgotPasswordVerificationScreen from "../prestataire/forgot-password/verification";
 import PartnerForgotPasswordNewPasswordScreen from "../prestataire/forgot-password/new-password";
+import PartnerForgotPasswordSuccessScreen from "../prestataire/forgot-password/success";
 import PartnerWaitlistScreen from "../prestataire/waitlist";
 import PartnerWelcomeScreen from "../prestataire/welcome";
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
 const mockBack = jest.fn();
+const mockDismissAll = jest.fn();
 const mockLogin = jest.fn();
 const mockStartPasswordReset = jest.fn();
 const mockVerifyPasswordReset = jest.fn();
 const mockCompletePasswordReset = jest.fn();
+
+jest.mock("react-native-safe-area-context", () =>
+  require("react-native-safe-area-context/jest/mock").default,
+);
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
   getItem: jest.fn().mockResolvedValue(null),
@@ -42,6 +48,7 @@ jest.mock("expo-router", () => {
     Stack,
     useRouter: () => ({
       back: mockBack,
+      dismissAll: mockDismissAll,
       push: mockPush,
       replace: mockReplace,
     }),
@@ -123,11 +130,11 @@ function submitPhone(screen: ReturnType<typeof render>) {
 
 function submitNewPassword(screen: ReturnType<typeof render>) {
   fireEvent.changeText(
-    screen.getByLabelText(i18n.t("auth.fields.password")),
+    screen.getByLabelText(i18n.t("auth.recovery.newPassword")),
     "new-password",
   );
   fireEvent.changeText(
-    screen.getByLabelText(i18n.t("auth.fields.passwordConfirmation")),
+    screen.getByLabelText(i18n.t("auth.recovery.repeatPassword")),
     "new-password",
   );
   fireEvent.press(
@@ -187,7 +194,7 @@ it("awaits Prestataire login and navigates only after a successful role match", 
 
   await act(async () => resolveLogin(Role.PRESTATAIRE));
   await waitFor(() =>
-    expect(mockReplace).toHaveBeenCalledWith("/(prestataire)/dashboard"),
+    expect(mockReplace).toHaveBeenCalledWith("/(auth)/prestataire/loading"),
   );
 });
 
@@ -245,6 +252,7 @@ it.each(["fr", "ar"])(
       screen.queryByText(i18n.t("Voir la version de démonstration")),
     ).toBeNull();
     expect(screen.queryByText(i18n.t("Conditions et nos accords."))).toBeNull();
+    expect(screen.getByText(i18n.t("Si vous avez un compte"))).toBeTruthy();
 
     fireEvent.press(
       screen.getByRole("button", { name: i18n.t("Connectez-vous") }),
@@ -348,3 +356,27 @@ it.each(["fr", "ar"])("blocks waitlist consent in %s until official EBEN terms e
   fireEvent.press(screen.getByRole("button", { name: i18n.t("legal.back") }));
   expect(mockBack).toHaveBeenCalled();
 });
+
+it.each(["fr", "ar"])(
+  "shows the Prestataire reset success as a modal over the new-password screen in %s",
+  async (language) => {
+    await i18n.changeLanguage(language);
+    mockedUseSession.mockReturnValue(sessionValue(null));
+    const screen = render(<PartnerForgotPasswordSuccessScreen />);
+
+    expect(
+      screen.getByText(
+        i18n.t(
+          "Votre mot de passe a été réinitialisé, vous pouvez vous connecter en utilisant votre nouveau mot de passe maintenant.",
+        ),
+      ),
+    ).toBeTruthy();
+    // Backdrop = the new-password card, without its "no pending reset" error
+    expect(screen.getByText(i18n.t("auth.recovery.newPasswordInstructions"))).toBeTruthy();
+    expect(screen.queryByText(i18n.t("auth.recovery.noPending"))).toBeNull();
+
+    fireEvent.press(screen.getByRole("button", { name: i18n.t("Se connecter") }));
+    expect(mockDismissAll).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith("/(auth)/prestataire/sign-in");
+  },
+);

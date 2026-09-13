@@ -1,12 +1,16 @@
 import React from "react";
-import { StyleSheet } from "react-native";
-import { Href, Stack, useRouter } from "expo-router";
-import View from "@/components/common/View";
-import Screen from "@/components/common/Screen";
-import Colors from "@/constants/Colors";
+import { StyleSheet, View as RNView } from "react-native";
+import { Href, useRouter } from "expo-router";
 import { Text } from "@/components/common/Text";
 import Button from "@/components/common/Button";
+import Colors from "@/constants/Colors";
+import PartnerForgotPasswordNewPasswordScreen from "./new-password";
 
+/**
+ * Reset-success — Figma Sign in / Forgot password_success
+ * (FR 205-35532 / AR 205-36411): a light modal card over the dimmed
+ * "new password" screen (yellow header + black card stay visible behind).
+ */
 const PartnerForgotPasswordSuccessScreen = () => {
   const router = useRouter();
 
@@ -16,35 +20,44 @@ const PartnerForgotPasswordSuccessScreen = () => {
   };
 
   return (
-    <Screen padding whatsapp={false}>
-      <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.container}>
-        <View style={styles.card}>
-          <Text style={styles.message} type="defaultTwo" center>
+    <RNView style={styles.root}>
+      <PartnerForgotPasswordNewPasswordScreen backdrop />
+      <RNView style={styles.overlay}>
+        <RNView style={styles.modal} accessibilityViewIsModal>
+          <Text
+            type="textTwo"
+            semiBold
+            center
+            color={Colors.brand}
+            style={styles.message}
+          >
             Votre mot de passe a été réinitialisé, vous pouvez vous connecter en utilisant votre nouveau mot de passe maintenant.
           </Text>
           <Button title="Se connecter" onPress={handleGoToLogin} />
-        </View>
-      </View>
-    </Screen>
+        </RNView>
+      </RNView>
+    </RNView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  root: { flex: 1 },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
-    alignItems: "center",
+    // card margin 21 + 8 inset inside the black card (Figma)
+    paddingHorizontal: 29,
+    backgroundColor: "rgba(0,0,0,0.7)",
   },
-  card: {
-    backgroundColor: Colors.backgroundLight,
-    borderRadius: 10,
-    padding: 20,
+  modal: {
     width: "100%",
+    padding: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.light,
   },
   message: {
     marginBottom: 20,
-    textAlign: "center",
+    lineHeight: 24,
   },
 });
 

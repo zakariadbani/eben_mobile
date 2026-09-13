@@ -33,7 +33,7 @@ const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
       onSubmit={onSubmit}
       validationSchema={validationSchema}
     >
-      <Text style={styles.subTitle} type="loginDefault" center>
+      <Text style={styles.subTitle} type="loginSubTitle" center>
         auth.recovery.instructions
       </Text>
       <FormField
@@ -60,8 +60,9 @@ const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
 const styles = StyleSheet.create({
   subTitle: {
     marginBottom: 18,
-    fontSize: 15,
-    lineHeight: 20,
+    // Figma: Barlow Condensed SemiBold ~18
+    fontSize: 18,
+    lineHeight: 24,
   },
   inputField: {
     paddingVertical: 8,

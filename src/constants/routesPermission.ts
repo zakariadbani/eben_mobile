@@ -164,7 +164,7 @@ const allowedRoutes: Record<AllowedRole, string[]> = {
 
     // Partner (Prestataire) onboarding + sign-in
     "(auth)/prestataire/loading",
-    "(auth)/prestataire/language",
+    "(auth)/prestataire/waitlist",
     "(auth)/prestataire/welcome",
     "(auth)/prestataire/sign-in",
     "(auth)/prestataire/forgot-password/index",

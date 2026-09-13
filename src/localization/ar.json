@@ -7,7 +7,7 @@
   "auth.fields.password": "كلمة المرور",
   "auth.fields.passwordConfirmation": "تأكيد كلمة المرور",
   "auth.login.title": "لنبدأ",
-  "auth.login.subtitle": "سجل الدخول للمتابعة",
+  "auth.login.subtitle": "تسجيل الدخول للمتابعة",
   "auth.login.remember": "تذكرني",
   "catalog.conditionQuestion": "هل تبحث عن قطعة مستعملة أم جديدة؟",
   "auth.login.forgotPassword": "نسيت كلمة المرور؟",
@@ -35,14 +35,14 @@
   "auth.register.fieldError.email": "عنوان البريد الإلكتروني هذا غير متاح",
   "auth.register.fieldError.phone": "رقم الهاتف هذا غير متاح",
   "auth.register.fieldError.password": "تحقق من كلمة المرور",
-  "auth.otp.title": "التحقق عبر الرسائل القصيرة",
+  "auth.otp.title": "التحقق من خلال رسالة نصية قصيرة",
   "auth.otp.codeLabel": "\u0631\u0645\u0632 \u0627\u0644\u062a\u062d\u0642\u0642 \u0627\u0644\u0645\u0643\u0648\u0646 \u0645\u0646 6 \u0623\u0631\u0642\u0627\u0645",
-  "auth.otp.sent": "تم إرسال رمز التحقق إلى {{phone}}",
-  "auth.otp.notReceived": "لم تستلم الرمز؟",
+  "auth.otp.sent": "تم إرسال رسالة تعريفية إلى {{phone}}",
+  "auth.otp.notReceived": "لم يصلك الرمز؟",
   "auth.otp.seconds": "{{count}} ثانية",
-  "auth.otp.resend": "أعد إرساله الآن",
+  "auth.otp.resend": "أعده الآن!",
   "auth.otp.resending": "جارٍ الإرسال...",
-  "auth.otp.verify": "تحقق",
+  "auth.otp.verify": "أكد",
   "auth.otp.verifying": "جارٍ التحقق...",
   "auth.otp.incomplete": "أدخل أرقام الرمز الستة",
   "auth.otp.invalid": "الرمز غير صالح أو منتهي الصلاحية",
@@ -60,7 +60,9 @@
   "auth.recovery.passwordLength": "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل",
   "auth.recovery.passwordConfirmationRequired": "يجب تأكيد كلمة المرور",
   "auth.recovery.passwordMismatch": "يجب أن تتطابق كلمتا المرور",
-  "auth.recovery.confirm": "تأكيد",
+  "auth.recovery.confirm": "إعادة تعيين كلمة المرور",
+  "auth.recovery.newPassword": "كلمة سر جديدة",
+  "auth.recovery.repeatPassword": "اعد كلمة السر",
   "auth.recovery.confirming": "جارٍ التأكيد...",
   "auth.recovery.noPending": "أعد بدء تعيين كلمة المرور للحصول على رمز جديد.",
   "auth.recovery.startError": "تعذر إرسال الرمز. تحقق من الرقم وحاول مرة أخرى.",
@@ -100,11 +102,11 @@
   "Saisissez votre numéro de téléphone que vous avez utilisée pour vous inscrire sur EBEN.": "أدخل رقم الهاتف الذي استخدمته للتسجيل في EBEN.",
   "Un message d'identification a été envoyé au {{phone}}": "تم إرسال رسالة تعريف إلى {{phone}}",
   "Choisissez votre langue": "اختر لغتك",
-  "Bienvenue à EBEN": "EBEN مرحبًا في",
-  "Votre boutique en ligne de pièces détachées automobiles au Maroc": "الوصول إلى العملاء في جميع أنحاء المغرب! أنت تقدم سعرك ونحن نهتم بالباقي.",
+  "Bienvenue à EBEN": "مرحبًا بك في EBEN",
+  "Votre boutique en ligne de pièces détachées automobiles au Maroc": "متجر قطع غيار السيارات عبر الإنترنت في المغرب",
   "Êtes-vous": "هل أنت",
-  "Acheteur": "مشتري",
-  "Vendeur": "بائع",
+  "Acheteur": "مشتر",
+  "Vendeur": "تاجر",
   "Commandez n'importe quelle pièce automobile depuis le confort de votre domicile.": "اطلب أي قطعة غيار سيارة من راحة منزلك.",
   "Connectez-vous": "تسجيل الدخول",
   "Se connecter": "تسجيل الدخول",
@@ -343,6 +345,7 @@
   "Moteur": "المحرك",
   "Numéro de téléphone": "رقم الهاتف",
   "Bienvenue sur EBEN": "مرحباً بك في EBEN",
+  "Bienvenue {{name}}": "مرحبًا بك {{name}}",
   "Saisissez votre numéro de téléphone que vous avez utilisée pour vous inscrire sur EBEN.": "أدخل رقم الهاتف الذي استخدمته للتسجيل في EBEN.",
   "Saisissez votre nouveau mot de passe": "أدخل كلمة مرورك الجديدة",
   "Produits disponibles sur stock": "المنتجات المتوفرة في المخزون",
@@ -628,7 +631,7 @@
   "Impossible de charger les offres archivées": "تعذر تحميل العروض المؤرشفة",
   "Impossible de charger la commande": "تعذر تحميل الطلب",
   "Rejoindre la liste d'attente": "انضم إلى قائمة الانتظار",
-  "Conditions et nos accords.": "الشروط والاتفاقياتنا.",
+  "Conditions et nos accords.": "الشروط والاتفاقيات الخاصة بنا.",
   "Atteindre des clients dans tout le Maroc!": "الوصول إلى العملاء في جميع أنحاء المغرب!",
   "Vous fournissez votre prix et nous nous occupons du reste.": "أنت تقدم سعرك ونحن نهتم بالباقي.",
   "Rejoignez le réseau EBEN": "انضم إلى شبكة EBEN",
@@ -642,17 +645,17 @@
   "partner.dashboard.greeting": "مرحباً أوتو ماروك 👋",
   "partner.dashboard.revenueLabel": "الرصيد الحالي",
   "partner.dashboard.revenueSubLabel": "إيرادات آخر 30 يوماً",
-  "partner.dashboard.retirer": "سحب",
+  "partner.dashboard.retirer": "سحب الأموال",
   "partner.dashboard.openOffers": "عروضك المفتوحة",
   "partner.dashboard.sentStatus": "حالة عروضك المُرسَلة",
-  "partner.dashboard.activeOffers": "إرسالاتك النشطة",
-  "partner.dashboard.stats30d": "إحصائيات سريعة لـ 30 يوماً",
+  "partner.dashboard.activeOffers": "شحناتك النشطة",
+  "partner.dashboard.stats30d": "إحصائيات سريعة لآخر 30 يومًا",
   "partner.dashboard.statsComparePrev": "مقارنةً بالشهر الماضي",
   "partner.dashboard.pendingPayout": "للسحب",
   "partner.dashboard.receivedCount": "الطلبات المستلمة",
   "partner.dashboard.activeCount": "العروض النشطة",
-  "partner.dashboard.acceptedCount": "العروض المقبولة",
-  "partner.dashboard.sentCount": "الإرسالات",
+  "partner.dashboard.acceptedCount": "الطلبات المقبولة",
+  "partner.dashboard.sentCount": "الطلبات المرسلة",
   "partner.dashboard.emptyOffers": "لا توجد عروض نشطة حالياً",
   "partner.dashboard.loadError": "تعذّر تحميل لوحة التحكم",
   "partner.dashboard.offersLoadError": "تعذّر تحميل العروض النشطة",
@@ -665,10 +668,21 @@
   "partner.dashboard.missedCount": "الطلبات الفائتة",
   "partner.dashboard.salesMonth": "المبيعات في مايو 2022",
   "partner.dashboard.seeMore": "شاهد المزيد",
-  "partner.dashboard.supportTitle": "هل لديك سؤال؟",
+  "partner.dashboard.salesIn": "المبيعات في {{month}}",
+  "partner.currency": "دم",
+  "partner.amountCurrency": "Dhs",
+  "partner.dashboard.supportTitle": "3ndk chi sou2al??",
   "partner.dashboard.supportBody": "يمكنك الاتصال بنا من الساعة 8 صباحاً حتى 7 مساءً من الاثنين إلى الجمعة على الرقم التالي:",
   "partner.dashboard.supportCall": "الاتصال بالدعم",
   "partner.dashboard.supportPhone": "+212 6 61 39 39 71",
+  "partner.tabs.home": "الرئيسية",
+  "partner.tabs.search": "البحث",
+  "partner.tabs.list": "عروض",
+  "partner.tabs.orders": "الشحنات",
+  "partner.tabs.profile": "الملف الشخصي",
+  "partner.status.order.readyToCollect": "جاهز للاستلام",
+  "partner.status.order.returned": "مُرتجع",
+  "partner.status.order.delivered": "تم التوصيل",
   "partner.sent.shipped": "تم شحنها",
   "partner.offer.statusActive": "نشط",
   "partner.offer.statusPending": "مُرسَل",
@@ -676,10 +690,10 @@
   "partner.offer.statusRejected": "مرفوض",
   "partner.offer.statusExpired": "منتهية",
   "partner.offer.priceLabel": "سعري",
-  "partner.offer.details": "التفاصيل",
-  "partner.sent.offerManquee": "عرض فائت",
-  "partner.sent.enAttente": "قيد الانتظار",
-  "partner.sent.refusee": "مرفوضة",
+  "partner.offer.details": "تفاصيل",
+  "partner.sent.offerManquee": "فات العرض",
+  "partner.sent.enAttente": "في تقدم",
+  "partner.sent.refusee": "مرفوض",
   "partner.sent.livree": "مُسلَّمة",
   "partner.offers.title": "عروضك",
   "partner.offers.tab.incoming": "العروض",
@@ -697,7 +711,7 @@
   "partner.offers.card.restante": "متبقي",
   "partner.offers.card.expire": "منتهي",
   "partner.offers.card.repondre": "رد",
-  "partner.offers.card.details": "التفاصيل",
+  "partner.offers.card.details": "تفاصيل",
   "partner.offers.card.prixNet": "سعرك الصافي",
   "partner.offers.retry": "إعادة المحاولة",
   "Aucune demande en attente": "لا توجد طلبات معلقة",
@@ -711,11 +725,11 @@
   "pièces": "قطع",
   "Votre prix net": "سعرك الصافي",
   "Réessayer": "إعادة المحاولة",
-  "partner.offerDetail.title": "العروض المُرسَلة - تفاصيل",
+  "partner.offerDetail.title": "عروضك المرسلة - تفاصيل",
   "partner.offerDetail.loadError": "تعذر تحميل العرض",
   "partner.offerDetail.notFound": "العرض غير موجود",
   "partner.offerDetail.sectionDetails": "تفاصيل العرض",
-  "partner.offerDetail.statusLabel": "الحالة :",
+  "partner.offerDetail.statusLabel": "الحالة:",
   "partner.offerDetail.condition": "الحالة :",
   "partner.offerDetail.qty": "الكمية :",
   "partner.offerDetail.remarks": "ملاحظات على القطعة",
@@ -724,11 +738,11 @@
   "partner.offerDetail.ctaShip": "شحن",
   "partner.offerDetail.ctaResend": "إعادة إرسال هذا العرض",
   "partner.offerDetail.otherOffers": "عروضك الأخرى",
-  "partner.offerDetail.statusPending": "في انتظار الرد",
+  "partner.offerDetail.statusPending": "في تقدم",
   "partner.offerDetail.statusAccepted": "مقبول - شحن",
   "partner.offerDetail.statusShipped": "تم الشحن",
   "partner.offerDetail.ref": "المرجع :",
-  "partner.offerDetail.priceTtc": "درهم شامل الضرائب",
+  "partner.offerDetail.priceTtc": "دم شامل الضرائب",
   "partner.offerDetail.availability": "التوفر :",
   "partner.offerDetail.availableLabel": "متوفر",
   "partner.offerDetail.notAvailableLabel": "غير متوفر",
@@ -750,7 +764,7 @@
   "partner.ship.orderRef": "رقم الطلب :",
   "partner.ship.confirmLabel": "تأكد من وضع علامة على المنتج بالرقم المرجعي الصحيح :",
   "partner.fill.title": "تفاصيل الطلب",
-  "partner.fill.sectionFill": "تعبئة عروضك",
+  "partner.fill.sectionFill": "أكمل العرض",
   "partner.fill.sectionResend": "عروضك القديمة غير المباعة لنفس المنتج:",
   "partner.fill.timerRestante": "متبقي",
   "partner.fill.timerExpired": "انتهت المدة",
@@ -763,10 +777,10 @@
   "partner.fill.pricePlaceholder": ".....",
   "partner.fill.commentLabel": "اترك تعليقاً",
   "partner.fill.commentPlaceholder": "......",
-  "partner.fill.clientGeneralNote": "ملاحظة عامة حول الطلب",
+  "partner.fill.clientGeneralNote": "ملاحظة العميل",
   "partner.fill.remarksLabel": "ملاحظات على القطعة",
   "partner.fill.priceRecapLabel": "السعر",
-  "partner.fill.ctaSend": "إرسال العرض",
+  "partner.fill.ctaSend": "إرسال",
   "partner.fill.ctaSending": "جارٍ الإرسال...",
   "partner.fill.ctaDecline": "رفض",
   "partner.fill.ctaBack": "لا",
@@ -816,7 +830,7 @@
   "partner.withdraw.formTitle": "يرجى اختيار المبلغ الذي تريد سحبه",
   "partner.withdraw.balanceLabel": "الرصيد الحالي:",
   "partner.withdraw.amountLabel": "المبلغ (XX.XXX,XX)",
-  "partner.withdraw.amountPlaceholder": "1.000,00 DHS",
+  "partner.withdraw.amountPlaceholder": "10.000,00 DHS",
   "partner.withdraw.methodLabel": "الطريقة",
   "partner.withdraw.methodPlaceholder": "اختر طريقة السحب",
   "partner.withdraw.ctaSend": "إرسال الطلب",
@@ -855,7 +869,7 @@
   "Photo pièce": "صورة القطعة",
   "partner.history.searchPlaceholder": "بحث",
   "partner.orders.detailTitle": "طرودك المشحونة - التفاصيل",
-  "partner.orders.title": "شحناتك",
+  "partner.orders.title": "طرودك المشحونة",
   "partner.orders.tabs.accepted": "العروض المقبولة",
   "partner.orders.tabs.shipped": "المشحونة",
   "partner.orders.tabs.delivered": "السجل",
@@ -917,7 +931,7 @@
   "partner.notifications.cta.ship": "شحن القطعة",
   "partner.notifications.noUnread": "لا توجد إشعارات غير مقروءة",
   "partner.notifications.unreadCount": "· {{count}} غير مقروء",
-  "partner.notifications.markAllRead": "قراءة الكل",
+  "partner.notifications.markAllRead": "تعليم الكل كمقروء",
   "partner.notifications.filterUnread": "عرض الإشعارات غير المقروءة فقط",
   "partner.notifications.mutationError": "تعذر تحديث الإشعارات",
   "partner.profile.hey": "مرحبا",
@@ -1014,7 +1028,7 @@
   "partner.company.bankSupportOnly": "إعداد البيانات البنكية متاح فقط عبر دعم EBEN.",
   "partner.company.noBrandResults": "لا توجد علامة تطابق بحثك",
   "partner.company.removeBrandAccessibility": "إزالة العلامة {{brand}}",
-  "partner.about.title": "عن EBEN",
+  "partner.about.title": "معلومات عنا",
   "partner.about.madeInMorocco": "صنع في المغرب",
   "partner.about.missionTitle": "مهمتنا",
   "partner.about.missionBody": "تسهيل طلب وشراء قطع السيارات في جميع أنحاء المغرب وإزالة عوائق الشراء والبيع.",
@@ -1093,9 +1107,16 @@
   "partner.offers.filter.apply": "تطبيق",
   "Filters": "الفلاتر",
   "partner.offers.unknownPart": "قطعة سيارة",
-  "partner.offers.action": "تحضير",
+  "partner.offers.action": "اتخاذ إجراء",
+  "partner.offers.prepareCollect": "اتخاذ إجراء",
+  "partner.offers.showMore": "عرض المزيد",
+  "partner.offers.status.rejected": "مرفوض",
+  "partner.offers.stats.periodDays": "آخر {{count}} يومًا",
+  "partner.fill.selectOffer": "اختيار العرض {{count}}",
+  "partner.offers.allMonths": "كل الأشهر",
+  "partner.offers.monthFilter": "تصفية حسب الشهر",
   "partner.offers.quantityOne": "الكمية 1",
-  "partner.fill.openDetailTitle": "تفاصيل العرض المقبول",
+  "partner.fill.openDetailTitle": "عروضك المفتوحة - تفاصيل",
   "partner.fill.offerNumber": "— العرض {{count}}",
   "partner.fill.offerLabel": "العرض {{count}}",
   "partner.fill.addAnotherOffer": "إضافة عرض آخر",
@@ -1104,14 +1125,14 @@
   "partner.ship.acceptedDetailTitle": "عروضك المقبولة - تفاصيل",
   "partner.ship.shippedDetailTitle": "طرودك المشحونة - تفاصيل",
   "partner.ship.vehicleFallback": "السيارة المرتبطة بالطلب",
-  "partner.ship.prepareStatus": "تحضير الشحنة",
+  "partner.ship.prepareStatus": "اتخاذ إجراء - اشحن",
   "partner.ship.shippedStatus": "مقبولة وشحنها",
-  "partner.ship.prepareBody": "يرجى وضع علامة على القطعة بالمرجع {{reference}}، ثم تحضيرها للشحن.",
+  "partner.ship.prepareBody": "يرجى وضع علامة على القطعة المعنية بالمرجع أعلاه وتحضيرها للشحن، ثم اضغط على الزر: تأكيد الشحنة",
   "partner.ship.sentAt": "تم إرسال الطرد في",
   "partner.ship.noRemarks": "لا توجد ملاحظات على هذه القطعة.",
   "partner.ship.readyCta": "تأكيد الشحنة",
   "partner.ship.confirmCta": "تأكيد",
-  "partner.offerDetail.countdownRemaining": "متبقي {{value}}",
+  "partner.offerDetail.countdownRemaining": "{{value}} متبقية",
   "partner.offerDetail.date": "التاريخ:",
   "partner.search.title": "البحث عن طلب",
   "partner.search.placeholder": "المرجع أو القطعة أو كلمة مفتاحية",
@@ -1461,4 +1482,53 @@
   ,"update.body": "\u064a\u062a\u0648\u0641\u0631 \u0625\u0635\u062f\u0627\u0631 \u062c\u062f\u064a\u062f \u0645\u0646 EBEN \u0639\u0644\u0649 Google Play. \u0642\u0645 \u0628\u0627\u0644\u062a\u062d\u062f\u064a\u062b \u0644\u0644\u0627\u0633\u062a\u0641\u0627\u062f\u0629 \u0645\u0646 \u0622\u062e\u0631 \u0627\u0644\u062a\u062d\u0633\u064a\u0646\u0627\u062a."
   ,"update.cta": "\u062a\u062d\u062f\u064a\u062b"
   ,"update.later": "\u0644\u0627\u062d\u0642\u0627\u064b"
+  ,"partner.offerDetail.sentToast": "تم إرسال العرض {{part}}"
+  ,"partner.ship.readyToast": "طردك {{part}} جاهز للشحن"
+  ,"partner.orders.shippedAt": "تم إرسال الطرد في"
+  ,"partner.orders.count": "({{count}})"
+  ,"partner.orders.empty.all": "لا توجد شحنات حالياً"
+  ,"partner.history.dotsPlaceholder": "......"
+  ,"partner.history.searchLabel": "بحث"
+  ,"partner.history.allMonths": "كل الفترات"
+  ,"partner.history.monthPicker": "اختيار الشهر"
+  ,"partner.history.monthPickerTitle": "اختر الشهر"
+  ,"partner.history.filter": "تصفية"
+  ,"partner.history.ref": "المرجع: {{ref}}"
+  ,"partner.history.statusLine": "الحالة: {{status}}"
+  ,"partner.history.qty": "الكمية {{count}}"
+  ,"partner.wallet.filter.credit": "الإيداعات"
+  ,"partner.wallet.filter.debit": "السحوبات"
+  ,"partner.company.dataLine": "{{label}}: {{value}}"
+  ,"partner.company.sheetBrandPlaceholder": "اختر العلامة التجارية"
+  ,"partner.editProfile.modify": "تغير"
+  ,"partner.editProfile.confirm": "أكد"
+  ,"partner.editProfile.nameField": "الاسم"
+  ,"partner.editProfile.currentPassword": "كلمة المرور الحالية"
+  ,"partner.editProfile.currentPasswordRequired": "أدخل كلمة المرور الحالية لتغيير البريد الإلكتروني"
+  ,"partner.editProfile.currentPasswordInvalid": "كلمة المرور الحالية غير صحيحة"
+  ,"partner.editProfile.emailInvalid": "البريد الإلكتروني غير صالح أو مستخدم بالفعل"
+  ,"partner.editProfile.firstNameRequired": "الاسم الشخصي مطلوب"
+  ,"partner.editProfile.saveError": "تعذر حفظ التعديل. حاول مرة أخرى."
+  ,"partner.notifications.menu": "خيارات {{title}}"
+  ,"partner.notifications.markRead": "تعليم كمقروء"
+  ,"partner.notifications.timeMinutes": "منذ {{count}} دقيقة"
+  ,"partner.notifications.timeMinutes_1": "منذ دقيقة"
+  ,"partner.notifications.timeMinutes_2": "منذ دقيقتين"
+  ,"partner.notifications.timeMinutes_3": "منذ {{count}} دقائق"
+  ,"partner.notifications.timeHours_1": "منذ ساعة"
+  ,"partner.notifications.timeHours_2": "منذ ساعتين"
+  ,"partner.notifications.timeHours_3": "منذ {{count}} ساعات"
+  ,"partner.notifications.timeDays_1": "منذ يوم"
+  ,"partner.notifications.timeDays_2": "منذ يومين"
+  ,"partner.notifications.timeDays_3": "منذ {{count}} أيام"
+  ,"partner.notifications.timeDays_4": "منذ {{count}} يومًا"
+  ,"partner.overview.dateRangeMetric": "{{metric}} بين ({{from}} و{{to}})"
+  ,"partner.language.description": "تغيير لغتك"
+  ,"partner.language.hint": "سيتم تطبيق اللغة فورًا."
+  ,"partner.dashboard.currencyCode": "MAD"
+  ,"partner.offerDetail.countdownValue": "{{hours}} ساعة و {{minutes}} دقيقة"
+  ,"partner.company.addressEmpty": "لم تتم إضافة أي عنوان بعد."
+  ,"partner.offerDetail.countdownDaysValue": "{{days}} يوم و {{hours}} ساعة"
+  ,"partner.countdown.remainingHours": "{{hours}} س {{minutes}} دقيقة متبقية"
+  ,"partner.countdown.remainingDays": "{{days}} يوم و {{hours}} ساعة متبقية"
 }

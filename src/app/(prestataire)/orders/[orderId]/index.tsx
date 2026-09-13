@@ -1,49 +1,69 @@
 /**
  * /(prestataire)/orders/[orderId]/index.tsx
  *
- * Partner order detail — Figma: "Vos expéditions - Détails" /
- * "Orders-page Your-accepted-offers-Shipped - Détails"
+ * Partner order detail — Figma "Vos expéditions - Détails"
+ * (Orders-page-Your-accepted-offers-Shipped 257-41160 FR, 257-41632 AR).
  *
- * Shows:
- *   - Part image (first item image placeholder)
- *   - Order reference + status stepper
- *   - Détails de l'offre: status + shipped date
- *   - Remarques sur la pièce: order notes
- *   - Parts list with qty/condition
- *   - Prix: server-owned partner net revenue
- *   - Shipping / tracking section (when shipped)
+ * Same layout as the offer detail (PartnerDetailBlocks):
+ *   - Hero slider (linked offer photos), Ref + part name, condition, qty, vehicle chip
+ *   - "Détails de l'offre": big status label (partnerStatus helper) and, once shipped,
+ *     "Colis envoyé à" + date and tracking reference on one line
+ *   - Remarques, compact price badge, audio note, condition line
+ *   - Other offers carousel, support banner, WhatsApp FAB
+ *
+ * Fulfillment stays reachable (Figma only draws the shipped state): the focused
+ * purchase-order line exposes its next action in a sticky CTA — acknowledge,
+ * prepare, then ship with the reference entered in the details section.
+ *
+ * `?itemId=` focuses one owned line; multi-line orders also get a part switcher.
  *
  * MARGIN: displays only immutable purchase-order net snapshots.
- * RTL-aware. All strings FR keys → auto-translated; translate={false} for
- * refs, prices, tracking numbers, dates.
  */
 
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   ScrollView,
   StyleSheet,
   TextInput,
+  TouchableOpacity,
 } from "react-native";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
 
-import Screen from "@/components/common/Screen";
-import View from "@/components/common/View";
-import { Text } from "@/components/common/Text";
-import { Button } from "@/components/common/Button";
-import CustomHeader from "@/components/common/CustomHeader";
-import ProgressStepperComponent from "@/components/screens/shared/app/ProgressStepperComponent";
-import Colors from "@/constants/Colors";
-
 import {
   acknowledgePurchaseOrder,
+  getPrestataireOffer,
   getPrestataireOrder,
   preparePurchaseOrder,
   shipPurchaseOrder,
 } from "@/api/resources/prestataire";
 import { ApiClientError } from "@/api/types";
+import { Button } from "@/components/common/Button";
+import CustomHeader from "@/components/common/CustomHeader";
+import Icon from "@/components/common/Icon";
+import PartnerSupportBanner from "@/components/common/PartnerSupportBanner";
+import Screen from "@/components/common/Screen";
+import { Text } from "@/components/common/Text";
+import View from "@/components/common/View";
+import WhatsappBtn from "@/components/common/WhatsappBtn";
+import {
+  PARTNER_STICKY_CTA_HEIGHT,
+  PartnerAudioNote,
+  PartnerConditionLine,
+  PartnerDetailHero,
+  PartnerOtherOffersCarousel,
+  PartnerPartBlock,
+  PartnerPriceBadge,
+  PartnerRemarks,
+  PartnerSectionTitle,
+  formatPartnerDateTime,
+  partnerDetailStyles,
+} from "@/components/screens/prestataire/PartnerDetailBlocks";
+import Colors from "@/constants/Colors";
+import { orderStatusLabelKey, statusColor } from "@/helpers/partnerStatus";
+import { usePartnerBadges } from "@/hooks/usePartnerBadges";
+import type { PrestataireOffer } from "@/interfaces/Offer";
 import type {
   PrestataireOrder,
   PrestataireOrderItem,
@@ -51,75 +71,7 @@ import type {
   PurchaseOrderStatus,
 } from "@/interfaces/Order";
 
-// ── Status stepper ─────────────────────────────────────────────────────────────
-
-type StepperInfo = { steps: string[]; currentStep: number };
-
-function getStepperInfo(status: PurchaseOrderStatus, steps: string[]): StepperInfo {
-  switch (status) {
-    case "sent":
-    case "acknowledged":
-    case "preparing":
-    case "ready":
-      return { steps, currentStep: 0 };
-    case "shipped":
-      return { steps, currentStep: 1 };
-    case "received":
-      return { steps, currentStep: 2 };
-    default:
-      return { steps, currentStep: 0 };
-  }
-}
-
-// ── Status badge ───────────────────────────────────────────────────────────────
-
-type StatusCfg = { translationKey: string; color: string; bg: string };
-
-const ORDER_STATUS_BADGE: Record<string, StatusCfg> = {
-  sent: {
-    translationKey: "partner.orders.purchaseOrderStatus.sent",
-    color: Colors.noticeUnread,
-    bg: Colors.noticeRead,
-  },
-  acknowledged: {
-    translationKey: "partner.orders.purchaseOrderStatus.acknowledged",
-    color: Colors.grayMidDark,
-    bg: Colors.backgroundGray,
-  },
-  preparing: {
-    translationKey: "partner.orders.purchaseOrderStatus.preparing",
-    color: Colors.grayMidDark,
-    bg: Colors.backgroundGray,
-  },
-  ready: {
-    translationKey: "partner.orders.purchaseOrderStatus.ready",
-    color: Colors.greenDark,
-    bg: Colors.noticeRead,
-  },
-  shipped: {
-    translationKey: "partner.orders.purchaseOrderStatus.shipped",
-    color: Colors.white,
-    bg: Colors.blue,
-  },
-  received: {
-    translationKey: "partner.orders.purchaseOrderStatus.received",
-    color: Colors.white,
-    bg: Colors.greenDark,
-  },
-  cancelled: {
-    translationKey: "partner.orders.purchaseOrderStatus.cancelled",
-    color: Colors.white,
-    bg: Colors.red,
-  },
-};
-
-function fallbackStatusCfg(status: string): StatusCfg {
-  return ORDER_STATUS_BADGE[status] ?? {
-    translationKey: status,
-    color: Colors.grayMidDark,
-    bg: Colors.backgroundGray,
-  };
-}
+type FulfillmentAction = "acknowledge" | "prepare" | "ship";
 
 function aggregateFulfillmentStatus(items: PrestataireOrderItem[]): PurchaseOrderStatus {
   const priority: PurchaseOrderStatus[] = [
@@ -129,65 +81,46 @@ function aggregateFulfillmentStatus(items: PrestataireOrderItem[]): PurchaseOrde
     ?? "cancelled";
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function formatDate(iso: string, locale: string): string {
-  return new Date(iso).toLocaleDateString(locale, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function nextAction(status: PurchaseOrderStatus): FulfillmentAction | null {
+  if (status === "sent") return "acknowledge";
+  if (status === "acknowledged") return "prepare";
+  if (status === "preparing" || status === "ready") return "ship";
+  return null;
 }
 
-// ── Section wrapper ────────────────────────────────────────────────────────────
+const ACTION_TITLE: Record<FulfillmentAction, string> = {
+  acknowledge: "partner.orders.acknowledge",
+  prepare: "partner.orders.prepare",
+  ship: "partner.ship.readyCta",
+};
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}): React.ReactElement {
-  return (
-    <View style={sectionStyles.container}>
-      <Text type="text" semiBold color={Colors.brand} style={sectionStyles.title}>
-        {title}
-      </Text>
-      {children}
-    </View>
-  );
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
 }
-
-const sectionStyles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 4,
-  },
-  title: {
-    marginBottom: 12,
-  },
-});
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function PrestataireOrderDetailScreen(): React.ReactElement {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === "ar";
-  const locale = isArabic ? "ar-MA" : "fr-MA";
-  const rawParams = useLocalSearchParams();
-  const orderId = Number(rawParams.orderId ?? 0);
+  const { hasUnreadNotifications } = usePartnerBadges();
+  const params = useLocalSearchParams<{ orderId?: string; itemId?: string }>();
+  const orderId = Number(firstParam(params.orderId) ?? 0);
+  const requestedItemId = Number(firstParam(params.itemId) ?? 0);
 
   const [order, setOrder] = useState<PrestataireOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(
+    Number.isSafeInteger(requestedItemId) && requestedItemId > 0 ? requestedItemId : null,
+  );
+  const [linkedOffer, setLinkedOffer] = useState<PrestataireOffer | null>(null);
   const [transitionError, setTransitionError] = useState<string | null>(null);
   const [mutatingPurchaseOrderId, setMutatingPurchaseOrderId] = useState<number | null>(null);
   const [trackingByPurchaseOrder, setTrackingByPurchaseOrder] = useState<Record<number, string>>({});
   const mutationLock = useRef<number | null>(null);
   const requestEpoch = useRef(0);
+  const offerEpoch = useRef(0);
 
   // ── Load order ─────────────────────────────────────────────────────────────────
 
@@ -220,35 +153,53 @@ export default function PrestataireOrderDetailScreen(): React.ReactElement {
     };
   }, [fetchOrder]));
 
+  const item = order
+    ? order.items.find((line) => line.id === selectedItemId) ?? order.items[0] ?? null
+    : null;
+  const linkedOfferId = item?.offerId ?? null;
+
+  // ── Linked offer (photos, condition, remarks, audio) ──────────────────────────
+
+  useEffect(() => {
+    const epoch = ++offerEpoch.current;
+    setLinkedOffer(null);
+    if (linkedOfferId === null || !Number.isSafeInteger(linkedOfferId) || linkedOfferId <= 0) return;
+    Promise.resolve()
+      .then(() => getPrestataireOffer(linkedOfferId))
+      .then((result) => {
+        if (epoch === offerEpoch.current && result?.data) setLinkedOffer(result.data);
+      })
+      .catch(() => {
+        // Optional enrichment — the order stays usable without it.
+      });
+  }, [linkedOfferId]);
+
   const replacePurchaseOrder = useCallback((updated: PrestatairePurchaseOrder) => {
     setOrder((current) => {
       if (current === null) return null;
-      const items = current.items.map((item) => item.purchaseOrder.id === updated.id
-        ? { ...item, purchaseOrder: updated }
-        : item);
+      const items = current.items.map((line) => line.purchaseOrder.id === updated.id
+        ? { ...line, purchaseOrder: updated }
+        : line);
       return { ...current, items, fulfillmentStatus: aggregateFulfillmentStatus(items) };
     });
   }, []);
 
-  const transition = useCallback(async (
-    item: PrestataireOrderItem,
-    action: "acknowledge" | "prepare" | "ship",
-  ) => {
+  const transition = useCallback(async (line: PrestataireOrderItem, action: FulfillmentAction) => {
     if (mutationLock.current !== null) return;
-    mutationLock.current = item.purchaseOrder.id;
-    setMutatingPurchaseOrderId(item.purchaseOrder.id);
+    mutationLock.current = line.purchaseOrder.id;
+    setMutatingPurchaseOrderId(line.purchaseOrder.id);
     setTransitionError(null);
     try {
-      const trackingNumber = trackingByPurchaseOrder[item.purchaseOrder.id]?.trim() ?? "";
+      const trackingNumber = trackingByPurchaseOrder[line.purchaseOrder.id]?.trim() ?? "";
       if (action === "ship" && trackingNumber.length === 0) {
         setTransitionError("partner.ship.errorRequired");
         return;
       }
       const result = action === "acknowledge"
-        ? await acknowledgePurchaseOrder(item.purchaseOrder.id)
+        ? await acknowledgePurchaseOrder(line.purchaseOrder.id)
         : action === "prepare"
-          ? await preparePurchaseOrder(item.purchaseOrder.id)
-          : await shipPurchaseOrder(item.purchaseOrder.id, { trackingNumber });
+          ? await preparePurchaseOrder(line.purchaseOrder.id)
+          : await shipPurchaseOrder(line.purchaseOrder.id, { trackingNumber });
       replacePurchaseOrder(result.data);
     } catch (caught) {
       const isConflict = caught instanceof ApiClientError && caught.status === 409;
@@ -262,11 +213,16 @@ export default function PrestataireOrderDetailScreen(): React.ReactElement {
     }
   }, [fetchOrder, replacePurchaseOrder, trackingByPurchaseOrder]);
 
+  const header = (
+    <CustomHeader title="partner.orders.detailTitle" showNotifications hasUnread={hasUnreadNotifications} />
+  );
+
   // ── Loading / error states ─────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <Screen whatsapp={false}>
+      <Screen statusBarStyle="dark-content" whatsapp={false} scrollable={false} edges={[]}>
+        {header}
         <View flex alignItems="center" justifyContent="center" style={styles.center}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
@@ -274,15 +230,16 @@ export default function PrestataireOrderDetailScreen(): React.ReactElement {
     );
   }
 
-  if (error || !order) {
+  if (error || !order || !item) {
     return (
-      <Screen whatsapp={false} padding>
+      <Screen statusBarStyle="dark-content" whatsapp={false} scrollable={false} edges={[]}>
+        {header}
         <View flex alignItems="center" justifyContent="center" style={styles.center}>
-          <Text type="default" color={Colors.gray} center>
+          <Text type="default" color={Colors.gray} center translate={false}>
             {t(error ?? "partner.orders.notFound")}
           </Text>
           <View mt={16}>
-          <Button title="partner.ordersHistory.retry" variant="primary" onPress={fetchOrder} />
+            <Button title="partner.ordersHistory.retry" variant="primary" onPress={() => void fetchOrder()} />
           </View>
         </View>
       </Screen>
@@ -291,184 +248,144 @@ export default function PrestataireOrderDetailScreen(): React.ReactElement {
 
   // ── Derived values ─────────────────────────────────────────────────────────────
 
-  const stepperInfo = getStepperInfo(order.fulfillmentStatus, [
-    t("partner.orders.step.accepted"),
-    t("partner.orders.step.shipped"),
-    t("partner.orders.step.delivered"),
-  ]);
-  const statusCfg = fallbackStatusCfg(order.fulfillmentStatus);
-  const net = order.netTotal;
+  const purchaseOrder = item.purchaseOrder;
+  const status = purchaseOrder.status;
+  const action = nextAction(status);
+  const partName = (isArabic ? item.categoryTitleAr ?? item.categoryTitle : item.categoryTitle)
+    ?? t("partner.offers.unknownPart");
+  const stickyHeight = action ? PARTNER_STICKY_CTA_HEIGHT : 0;
+  const isShippedLine = status === "shipped" || status === "received";
 
   // ── Render ─────────────────────────────────────────────────────────────────────
 
   return (
-    <Screen whatsapp={false} scrollable={false} edges={['bottom']}>
-      <CustomHeader title="partner.orders.detailTitle" />
+    <Screen statusBarStyle="dark-content" whatsapp={false} scrollable={false} edges={[]}>
+      {header}
       <ScrollView
-        style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* ── Image placeholder (first item image) ─────────────── */}
-        <View style={styles.imagePlaceholder}>
-          <Image source={require("@/assets/img/freins.png")} style={styles.partImage} resizeMode="contain" />
-        </View>
+        <PartnerDetailHero images={linkedOffer?.images ?? []} />
 
-        {/* ── Ref + status badge ───────────────────────────────── */}
-        <View
-          style={styles.refRow}
-          flexDirection="row"
-          alignItems="center"
-          gap={8}
-        >
-          <View flex>
-            <View flexDirection="row" alignItems="center" gap={4}>
-              <Text type="small" color={Colors.gray}>
-                {t("partner.orders.referenceLabel")}
-              </Text>
-              <Text type="small" semiBold color={Colors.brand} translate={false}>
-                {order.reference}
-              </Text>
-            </View>
-            <Text type="small" color={Colors.gray} translate={false}>
-              {formatDate(order.createdAt, locale)}
-            </Text>
-          </View>
-          <View style={[styles.statusBadge, { backgroundColor: statusCfg.bg }]}>
-            <Text type="small" color={statusCfg.color} translate={false}>
-              {t(statusCfg.translationKey)}
-            </Text>
-          </View>
-        </View>
-
-        {/* ── Progress stepper ─────────────────────────────────── */}
-        <View style={styles.stepperBox}>
-          <ProgressStepperComponent
-            steps={stepperInfo.steps}
-            currentStep={stepperInfo.currentStep}
-          />
-        </View>
-
-        {/* ── Détails de l'offre ───────────────────────────────── */}
-        <Section title={t("partner.offerDetail.sectionDetails")}>
-          <View flexDirection="row" alignItems="center" gap={8}>
-            <View style={[styles.statusBadgeInline, { backgroundColor: statusCfg.bg }]}>
-              <Text type="small" color={statusCfg.color} translate={false}>
-                {t(statusCfg.translationKey)}
-              </Text>
-            </View>
-          </View>
-
-        </Section>
-
-        {/* ── Remarques sur la pièce ───────────────────────────── */}
-        {order.notes ? (
-          <Section title={t("partner.offerDetail.remarks")}>
-            <Text type="default" color={Colors.grayMidDark} translate={false} style={styles.notesText}>
-              {order.notes}
-            </Text>
-          </Section>
+        {order.items.length > 1 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.partSwitcher}>
+            {order.items.map((line) => {
+              const selected = line.id === item.id;
+              const label = (isArabic ? line.categoryTitleAr ?? line.categoryTitle : line.categoryTitle)
+                ?? t("partner.offers.unknownPart");
+              return (
+                <TouchableOpacity
+                  key={line.id}
+                  style={[styles.partChip, selected && styles.partChipSelected]}
+                  onPress={() => setSelectedItemId(line.id)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={label}
+                >
+                  <Text type="labelTwo" semiBold translate={false}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         ) : null}
 
-        {/* ── Parts list ───────────────────────────────────────── */}
-        {order.items.length > 0 ? (
-          <Section title={t("partner.orders.parts")}>
-            {order.items.map((part) => (
-              <View
-                key={part.id}
-                style={styles.partRow}
-                gap={8}
-              >
-                <View flexDirection="row" alignItems="center" gap={10}>
-                  <View flex>
-                    <Text type="label" semiBold color={Colors.brand} translate={false}>
-                      {isArabic
-                        ? (part.categoryTitleAr ?? part.categoryTitle ?? "—")
-                        : (part.categoryTitle ?? "—")}
-                    </Text>
-                    <Text type="small" color={Colors.gray} translate={false}>
-                      {`${t("partner.offerDetail.qty")} ${part.quantity}`}
-                    </Text>
-                  </View>
-                  <Text type="label" semiBold color={Colors.brand} translate={false}>
-                    {`${part.netAmount.toLocaleString(locale)} Dhs`}
-                  </Text>
-                </View>
-                <View flexDirection="row" alignItems="center" gap={8}>
-                  <Text type="small" color={Colors.grayMidDark} flex>
-                    {t(`partner.orders.purchaseOrderStatus.${part.purchaseOrder.status}`)}
-                  </Text>
-                  {part.purchaseOrder.shippedAt ? (
-                    <Text type="small" color={Colors.gray} translate={false}>
-                      {formatDate(part.purchaseOrder.shippedAt, locale)}
-                    </Text>
-                  ) : null}
-                </View>
-                {part.purchaseOrder.trackingNumber ? (
-                  <View style={styles.trackingBox}>
-                    <Text type="small" color={Colors.grayMidDark} translate={false}>
-                      {part.purchaseOrder.trackingNumber}
-                    </Text>
-                  </View>
+        <PartnerPartBlock
+          name={partName}
+          reference={order.reference}
+          condition={linkedOffer?.condition ?? null}
+          quantity={item.quantity}
+        />
+
+        <View style={partnerDetailStyles.details}>
+          <PartnerSectionTitle title="partner.offerDetail.sectionDetails" />
+          {/* Figma: large Barlow status ("Expédié" in green via the status helper). */}
+          <Text type="titleTwo" semiBold size={26} color={statusColor(status)} translate={false} style={partnerDetailStyles.status}>
+            {t(orderStatusLabelKey(status))}
+          </Text>
+
+          {isShippedLine ? (
+            <View gap={2} style={partnerDetailStyles.statusMeta}>
+              <Text type="default" translate={false}>{t("partner.orders.shippedAt")}</Text>
+              {/* Date and tracking share the second line; a long tracking number shrinks instead of wrapping. */}
+              <View flexDirection="row" alignItems="center" gap={10}>
+                {purchaseOrder.shippedAt ? (
+                  <Text type="default" translate={false}>{formatPartnerDateTime(purchaseOrder.shippedAt)}</Text>
                 ) : null}
-                {part.purchaseOrder.status === "sent" ? (
-                  <Button
-                    title="partner.orders.acknowledge"
-                    variant="primary"
-                    disabled={mutatingPurchaseOrderId !== null}
-                    onPress={() => transition(part, "acknowledge")}
-                  />
-                ) : part.purchaseOrder.status === "acknowledged" ? (
-                  <Button
-                    title="partner.orders.prepare"
-                    variant="primary"
-                    disabled={mutatingPurchaseOrderId !== null}
-                    onPress={() => transition(part, "prepare")}
-                  />
-                ) : part.purchaseOrder.status === "preparing" || part.purchaseOrder.status === "ready" ? (
-                  <View gap={8}>
-                    <TextInput
-                      value={trackingByPurchaseOrder[part.purchaseOrder.id] ?? ""}
-                      onChangeText={(value) => setTrackingByPurchaseOrder((current) => ({
-                        ...current,
-                        [part.purchaseOrder.id]: value,
-                      }))}
-                      placeholder={t("partner.ship.trackingPlaceholder")}
-                      accessibilityLabel={t("partner.ship.trackingLabel")}
-                      style={[styles.trackingInput, isArabic && styles.trackingInputRtl]}
-                    />
-                    <Button
-                      title="partner.orders.ship"
-                      variant="greenDark"
-                      disabled={mutatingPurchaseOrderId !== null}
-                      onPress={() => transition(part, "ship")}
-                    />
-                  </View>
+                {purchaseOrder.trackingNumber ? (
+                  <Text
+                    type="default"
+                    color={Colors.grayMidDark}
+                    translate={false}
+                    flex
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.6}
+                  >
+                    {purchaseOrder.trackingNumber}
+                  </Text>
                 ) : null}
               </View>
-            ))}
-          </Section>
-        ) : null}
+            </View>
+          ) : null}
 
-        {transitionError ? (
-          <View style={styles.ctaBox}>
-            <Text type="small" color={Colors.red} center>{t(transitionError)}</Text>
-          </View>
-        ) : null}
+          {action === "ship" ? (
+            <>
+              <Text type="titleTwo" semiBold translate={false} style={partnerDetailStyles.bigRef}>
+                {`${t("partner.offerDetail.ref")} ${purchaseOrder.reference}`}
+              </Text>
+              <View flexDirection="row" alignItems="flex-start" gap={10} style={partnerDetailStyles.warning}>
+                <Icon name="alert-triangle" type="Feather" size={23} iconColor={Colors.red} />
+                <Text type="default" color={Colors.red} flex translate={false}>
+                  {t("partner.ship.prepareBody", { reference: purchaseOrder.reference })}
+                </Text>
+              </View>
+              <Text type="label" translate={false} style={styles.trackingLabel}>{t("partner.ship.trackingLabel")}</Text>
+              <TextInput
+                value={trackingByPurchaseOrder[purchaseOrder.id] ?? ""}
+                onChangeText={(value) => {
+                  setTrackingByPurchaseOrder((current) => ({ ...current, [purchaseOrder.id]: value }));
+                  setTransitionError(null);
+                }}
+                placeholder={t("partner.ship.trackingPlaceholder")}
+                placeholderTextColor={Colors.gray}
+                accessibilityLabel={t("partner.ship.trackingLabel")}
+                style={[styles.trackingInput, isArabic && styles.trackingInputRtl]}
+              />
+            </>
+          ) : null}
 
-        {/* ── Prix (net revenue) ───────────────────────────────── */}
-        <Section title={t("partner.offerDetail.price")}>
-          <View style={styles.priceBox}>
-            <Text type="subTitle" bold color={Colors.brand} translate={false}>
-              {`${net.toLocaleString(locale)} Dhs`}
+          {transitionError ? (
+            <Text type="small" color={Colors.red} translate={false} style={styles.transitionError}>
+              {t(transitionError)}
             </Text>
-          </View>
-        </Section>
+          ) : null}
 
-        {/* Bottom spacer */}
-        <View style={styles.bottomSpacer} />
+          <PartnerRemarks text={linkedOffer?.description ?? order.notes} />
+          <PartnerPriceBadge amount={item.netAmount} />
+          <PartnerAudioNote uri={linkedOffer?.audioUrl} />
+          <PartnerConditionLine condition={linkedOffer?.condition} />
+        </View>
+
+        <PartnerOtherOffersCarousel excludeOfferId={linkedOfferId} />
+        <PartnerSupportBanner style={partnerDetailStyles.support} />
       </ScrollView>
+
+      {action ? (
+        <View style={partnerDetailStyles.sticky}>
+          <Button
+            title={ACTION_TITLE[action]}
+            variant="primary"
+            rightIcon={action === "ship" ? "truck-fast-outline" : undefined}
+            iconTypeName="MaterialCommunityIcons"
+            sizeIcon={22}
+            disabled={mutatingPurchaseOrderId !== null}
+            onPress={() => void transition(item, action)}
+          />
+        </View>
+      ) : null}
+
+      <WhatsappBtn style={{ bottom: stickyHeight + 16 }} />
     </Screen>
   );
 }
@@ -476,93 +393,47 @@ export default function PrestataireOrderDetailScreen(): React.ReactElement {
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-    backgroundColor: Colors.backgroundLight,
-  },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 96,
   },
   center: {
     flex: 1,
     paddingHorizontal: 24,
   },
-  imagePlaceholder: {
-    height: 185,
-    backgroundColor: Colors.backgroundGray,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  partImage: {
-    width: "72%",
-    height: "82%",
-  },
-  refRow: {
+  partSwitcher: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    flexWrap: "wrap",
+    paddingTop: 12,
+    gap: 8,
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    flexShrink: 0,
-  },
-  statusBadgeInline: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    alignSelf: "flex-start",
-  },
-  stepperBox: {
-    paddingHorizontal: 8,
-    paddingBottom: 4,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.backgroundGray,
-  },
-  metaRow: {
-    marginTop: 8,
-  },
-  trackingBox: {
-    marginTop: 10,
-    backgroundColor: Colors.backgroundGray,
-    borderRadius: 6,
+  partChip: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.white,
+  },
+  partChipSelected: {
+    backgroundColor: Colors.primary,
+  },
+  trackingLabel: {
+    marginTop: 16,
+    marginBottom: 8,
   },
   trackingInput: {
+    minHeight: 48,
     borderWidth: 1,
-    borderColor: Colors.greyLight2,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderColor: Colors.borderLight,
+    borderRadius: 6,
+    paddingHorizontal: 14,
+    fontSize: 17,
     color: Colors.brand,
     textAlign: "left",
   },
   trackingInputRtl: {
     textAlign: "right",
   },
-  notesText: {
-    lineHeight: 22,
-  },
-  partRow: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.backgroundGray,
-  },
-  priceBox: {
-    backgroundColor: Colors.primary,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignSelf: "stretch",
-  },
-  ctaBox: {
-    marginHorizontal: 16,
-    marginTop: 20,
-  },
-  bottomSpacer: {
-    height: 40,
+  transitionError: {
+    marginTop: 10,
   },
 });

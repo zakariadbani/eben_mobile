@@ -21,14 +21,17 @@ interface FormValues {
 interface LoginFormProps {
   onSubmit: (values: FormValues, helpers: FormikHelpers<FormValues>) => Promise<void>;
   forgotPasswordRoute?: string;
+  /** Figma partner sign-in (205-35457) shows no show/hide eye on the password field. */
+  hidePasswordToggle?: boolean;
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({
   onSubmit,
   forgotPasswordRoute = "/(auth)/ForgotPasswordScreen",
+  hidePasswordToggle = false,
 }) => {
   const { createValidationSchema } = useGlobalValidation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const initialValues: FormValues = { password: "", phone: "", rememberMe: false };
   const validationSchema = createValidationSchema([
     { name: "password", rules: ["required"], label: "auth.fields.password" },
@@ -58,6 +61,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
         variant="secondary"
         leftIcon="lock"
         iconType="standard"
+        hidePasswordToggle={hidePasswordToggle}
       />
       <View style={styles.splitView} flexDirection="row" alignItems="center">
         <FormCheckbox
@@ -65,6 +69,8 @@ const LoginForm: React.FC<LoginFormProps> = ({
           text={t("auth.login.remember")}
           variant="secondary"
           width="auto"
+          // Figma: Barlow Condensed SemiBold; Arabic keeps NotoNaskhArabic
+          textStyle={i18n.language === "ar" ? undefined : styles.rememberText}
         />
         <Button
           outline
@@ -87,6 +93,9 @@ const styles = StyleSheet.create({
   splitView: {
     justifyContent: "space-between",
     marginBottom: 15,
+  },
+  rememberText: {
+    fontFamily: "BarlowCondensedSemiBold",
   },
   link: {
     borderWidth: 0,

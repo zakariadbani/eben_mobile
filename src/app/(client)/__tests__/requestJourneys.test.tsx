@@ -585,7 +585,8 @@ it("shows the request stepper at the matching step for an in-progress request", 
   mockParams = { requestId: "73" };
   mockGetRequest.mockResolvedValueOnce({
     success: true,
-    data: { ...request, status: "offers_received", offersCount: 1, expiresAt: "2026-09-10T00:00:00.000Z" },
+    // Deadline relative to now: a fixed date would expire the request (and hide the stepper) once passed.
+    data: { ...request, status: "offers_received", offersCount: 1, expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString() },
   });
   const screen = render(<RequestDetailScreen />);
 

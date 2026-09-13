@@ -4,14 +4,19 @@
  * Displays scrollable legal content: table of contents + article body.
  * Matches the Figma design Profile-Legal showing "Termes et conditions"
  * with a numbered ToC and full article text.
+ *
+ *   <LegalScreen />                       // client route (layout header, compact grey text)
+ *   <LegalScreen appearance="partner" />  // vendeur: own back header, Figma 93-19960 typography + footer
  */
 
 import React, { useEffect } from "react";
-import { StyleSheet } from "react-native";
+import { ScrollView, StyleSheet } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useNavigation } from "@react-navigation/core";
 import { useTranslation } from "react-i18next";
 
+import CustomHeader from "@/components/common/CustomHeader";
+import Footer from "@/components/common/Footer";
 import Screen from "@/components/common/Screen";
 import { Text } from "@/components/common/Text";
 import View from "@/components/common/View";
@@ -65,7 +70,17 @@ const SECTION_TITLE_KEYS: Record<LegalSection, string> = {
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
-const LegalScreen: React.FC = () => {
+interface LegalScreenProps {
+  /**
+   * "client" (default): the route layout owns the header; compact grey text.
+   * "partner": renders its own back header (the vendeur layout hides its header),
+   * Figma "Profile / Legal" (93-19960) typography — Barlow titles, black Roboto
+   * body — and the copyright/version footer pinned under the content.
+   */
+  appearance?: "client" | "partner";
+}
+
+const LegalScreen: React.FC<LegalScreenProps> = ({ appearance = "client" }) => {
   const { section: rawSection } = useLocalSearchParams<{ section?: string }>();
   const section: LegalSection = rawSection === "privacy" || rawSection === "returns" ? rawSection : "terms";
   const navigation = useNavigation();
@@ -74,6 +89,42 @@ const LegalScreen: React.FC = () => {
   useEffect(() => {
     navigation.setOptions({ title: t(SECTION_TITLE_KEYS[section]) });
   }, [navigation, section, t]);
+
+  if (appearance === "partner") {
+    const header = <CustomHeader title={t(SECTION_TITLE_KEYS[section])} />;
+    if (section !== "terms") {
+      return (
+        <>
+          {header}
+          <LegalUnavailableScreen />
+        </>
+      );
+    }
+    return (
+      <Screen whatsapp={false} scrollable={false} edges={["bottom"]}>
+        {header}
+        <ScrollView contentContainerStyle={partnerStyles.content} showsVerticalScrollIndicator={false}>
+          <Text type="titleTwo" semiBold color={Colors.brand} style={partnerStyles.pageTitle}>
+            {"Contenu"}
+          </Text>
+          <View style={partnerStyles.tocBlock}>
+            {tocItems.map((item) => (
+              <Text key={item} type="default" color={Colors.brand} translate={false} style={partnerStyles.bodyText}>
+                {item}
+              </Text>
+            ))}
+          </View>
+          <Text type="titleTwo" semiBold color={Colors.brand} style={partnerStyles.articleTitle}>
+            {"1.Introduction"}
+          </Text>
+          <Text type="default" color={Colors.brand} translate={false} style={partnerStyles.bodyText}>
+            {intro}
+          </Text>
+        </ScrollView>
+        <Footer />
+      </Screen>
+    );
+  }
 
   if (section !== "terms") {
     return <LegalUnavailableScreen />;
@@ -133,6 +184,30 @@ const styles = StyleSheet.create({
   },
   articleBody: {
     lineHeight: 22,
+  },
+});
+
+/** Figma "Profile / Legal" (93-19960) sizes, used by `appearance="partner"`. */
+const partnerStyles = StyleSheet.create({
+  content: {
+    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+  },
+  pageTitle: {
+    fontSize: 32,
+    lineHeight: 40,
+    marginBottom: 8,
+  },
+  tocBlock: {
+    marginBottom: 36,
+  },
+  articleTitle: {
+    lineHeight: 36,
+    marginBottom: 8,
+  },
+  bodyText: {
+    lineHeight: 20,
   },
 });
 

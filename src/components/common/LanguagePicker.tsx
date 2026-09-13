@@ -5,13 +5,13 @@ import {
   StyleProp,
   ViewStyle,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
 import i18n from "@/localization/i18n";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Colors from "@/constants/Colors";
 import View from "@/components/common/View";
 import { Text } from "@/components/common/Text";
 import Icon from "@/components/common/Icon";
+import PickerInput from "@/components/common/PickerInput";
 
 type ColorVariant = "primary" | "secondary";
 type Language = "fr" | "ar";
@@ -22,13 +22,25 @@ interface LanguagePickerProps {
 }
 
 const languageLabels: Record<Language, string> = {
-  fr: "Fran\u00e7ais",
-  ar: "\u0627\u0644\u0639\u0631\u0628\u064a\u0629",
+  fr: "Français",
+  ar: "العربية",
 };
+
+/** JS PickerInput rows: the native Android dialog picker crashed Expo Go when freed (Fabric props destructor). */
+const LANGUAGE_ORDER: Language[] = ["fr", "ar"];
+const languageItems = LANGUAGE_ORDER.map((language, index) => ({
+  id: index + 1,
+  title: languageLabels[language],
+}));
 
 const isLanguage = (value: string): value is Language =>
   value === "fr" || value === "ar";
 
+/**
+ * Figma "Choose your language": centred "Français ▾" field. Tapping it opens the
+ * shared JS PickerInput popover (FR / AR); choosing a row switches i18n and
+ * persists the language, exactly like the former native picker.
+ */
 const LanguagePicker: React.FC<LanguagePickerProps> = ({
   variant = "primary",
   style,
@@ -54,70 +66,58 @@ const LanguagePicker: React.FC<LanguagePickerProps> = ({
     await AsyncStorage.setItem("language", lang);
   };
 
-  const colorMap = {
-    primary: {
-      background: Colors.backgroundLight,
-      textColor: Colors.light,
-    },
-    secondary: {
-      background: Colors.backgroundBrand,
-      textColor: Colors.brand,
-    },
+  const colorMap: Record<ColorVariant, string> = {
+    primary: Colors.backgroundLight,
+    secondary: Colors.backgroundBrand,
   };
 
-  const selectedColor = colorMap[variant].background;
-  const itemColor = colorMap[variant].textColor;
+  const selectedColor = colorMap[variant];
+  const selectedItem = languageItems[LANGUAGE_ORDER.indexOf(selectedLanguage)];
 
   return (
-    <NativeView style={[styles.container, style]}>
-      <Picker
-        testID="language-picker"
-        accessibilityLabel={i18n.t("Choisissez votre langue")}
-        selectedValue={selectedLanguage}
-        onValueChange={changeLanguage}
-        style={styles.picker}
-        dropdownIconColor="transparent"
-        itemStyle={[styles.item, { color: itemColor }]}
-      >
-        <Picker.Item label={languageLabels.fr} value="fr" />
-        <Picker.Item label={languageLabels.ar} value="ar" />
-      </Picker>
-      <NativeView
-        testID="language-picker-display"
-        pointerEvents="none"
-        style={styles.display}
-      >
-        <View flexDirection="row" alignItems="center" justifyContent="center" gap={8}>
-          <Text translate={false} color={selectedColor} size={14}>
-            {languageLabels[selectedLanguage]}
-          </Text>
-          <NativeView testID="language-picker-chevron">
-            <Icon
-              name="chevron-down"
-              type="Feather"
-              size={16}
-              iconColor={selectedColor}
-            />
-          </NativeView>
-        </View>
-      </NativeView>
-    </NativeView>
+    <PickerInput
+      testID="language-picker"
+      accessibilityLabel={i18n.t("Choisissez votre langue")}
+      items={languageItems}
+      selectedItem={selectedItem}
+      onSelectItem={(item) => {
+        const language = LANGUAGE_ORDER[item.id - 1];
+        if (language) void changeLanguage(language);
+      }}
+      fillColor="transparent"
+      borderColor="transparent"
+      contentStyle={[styles.container, style]}
+      renderTrigger={() => (
+        <NativeView testID="language-picker-display" style={styles.display}>
+          <View flexDirection="row" alignItems="center" justifyContent="center" gap={8}>
+            <Text translate={false} color={selectedColor} size={16}>
+              {languageLabels[selectedLanguage]}
+            </Text>
+            <NativeView testID="language-picker-chevron">
+              <Icon
+                name="caret-down"
+                type="AntDesign"
+                size={14}
+                iconColor={selectedColor}
+              />
+            </NativeView>
+          </View>
+        </NativeView>
+      )}
+    />
   );
 };
 
 const styles = StyleSheet.create({
+  // Resets PickerInput's bordered field box to the borderless centred Figma field.
   container: {
     borderRadius: 8,
+    borderWidth: 0,
     minHeight: 48,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
     justifyContent: "center",
   },
-  picker: {
-    ...StyleSheet.absoluteFillObject,
-    color: "transparent",
-    // dropdownIconColor alone doesn't hide the native Android spinner arrow
-    opacity: 0,
-  },
-  item: {},
   display: {
     alignItems: "center",
     justifyContent: "center",

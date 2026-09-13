@@ -23,6 +23,8 @@ interface ImageInputListProps {
   upload?: boolean;
   canRemove?: boolean;
   canAdd?: boolean;
+  /** i18n key for the add box label (default "requestFlow.addImage"). */
+  addLabel?: string;
 }
 
 const ImageInputList: React.FC<ImageInputListProps> = ({
@@ -33,6 +35,7 @@ const ImageInputList: React.FC<ImageInputListProps> = ({
   upload = true,
   canRemove = true,
   canAdd = true,
+  addLabel = "requestFlow.addImage",
 }) => {
   const { t } = useTranslation();
   const scrollView = useRef<ScrollView>(null);
@@ -86,11 +89,11 @@ const ImageInputList: React.FC<ImageInputListProps> = ({
           disabled={loading}
           style={styles.addContainer}
           accessibilityRole="button"
-          accessibilityLabel={t("requestFlow.addImage")}
+          accessibilityLabel={t(addLabel)}
         >
           <View style={styles.addBtn}>
             <CustomIcon name="camera" size={48} />
-            <Text type="defaultTwo">requestFlow.addImage</Text>
+            <Text type="defaultTwo">{addLabel}</Text>
           </View>
         </TouchableOpacity>
       ) : null}
